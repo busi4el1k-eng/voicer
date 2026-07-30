@@ -1,0 +1,187 @@
+// Cinema Dub — data model. Postgres (Neon) via Prisma.
+// Conventions mirror ../digital_standarts: cuid ids, camelCase fields, createdAt defaults.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Clerk owns identity; we mirror users in via the user.created/updated webhook.
+model User {
+  id          String   @id @default(cuid())
+  clerkId     String   @unique
+  displayName String   @default("")
+  avatarColor String   @default("#FFD23F")
+  runs        Run[]
+  takes       Take[]
+  hostedRooms Room[]   @relation("RoomHost")
+  createdAt   DateTime @default(now())
+}
+
+// A collection of scenes shipped together ("Cursed Cinema", etc.).
+model Pack {
+  id         String   @id @default(cuid())
+  name       String
+  subtitle   String   @default("")
+  coverUrl   String?
+  isOfficial Boolean  @default(false)
+  scenes     Scene[]
+  rooms      Room[]
+  createdAt  DateTime @default(now())
+}
+
+// One curated cinematic line: video + original audio the player imitates.
+model Scene {
+  id         String   @id @default(cuid())
+  title      String
+  filmLabel  String   @default("")
+  videoUrl   String
+  audioUrl   String
+  durationMs Int
+  transcript String   @default("")
+  emotionTag String   @default("")
+  difficulty Int      @default(1) // 1-3
+  pack       Pack     @relation(fields: [packId], references: [id], onDelete: Cascade)
+  packId     String
+  takes      Take[]
+  createdAt  DateTime @default(now())
+
+  @@index([packId])
+}
+
+// A single playthrough (solo run or one player's online session).
+model Run {
+  id           String   @id @default(cuid())
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId       String?
+  mode         String   @default("solo") // 'solo' | 'online'
+  roomCode     String?
+  totalScore   Int      @default(0)
+  scenesPlayed Int      @default(0)
+  takes        Take[]
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+// One recorded attempt at one scene.
+model Take {
+  id         String   @id @default(cuid())
+  run        Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId      String
+  scene      Scene    @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  sceneId    String
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId     String?
+  audioUrl   String?
+  judgeScore Int      @default(0)
+  votes      Int      @default(0)
+  commentary String   @default("")
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime // R2/S3 lifecycle: cleaned up after 24h
+
+  @@index([runId])
+  @@index([expiresAt])
+}
+
+// ── Creator pipeline: upload a video → AI finds cut points → backend cuts it ──
+
+// One uploaded source video and the state of its processing pipeline.
+model VideoUpload {
+  id         String         @id @default(cuid())
+  // Short, human-friendly alphanumeric code used to share a video (e.g. for the
+  // solo run). Nullable so existing rows migrate cleanly; backfilled on read.
+  shareId    String?        @unique
+  userId     String?
+  title      String         @default("")
+  sourceKey  String // Spaces object key of the original upload
+  sourceUrl  String // public URL of the original
+  durationMs Int            @default(0)
+  // uploaded | cutting | done | error
+  status     String         @default("uploaded")
+  error      String         @default("")
+  segments   VideoSegment[]
+  createdAt  DateTime       @default(now())
+
+  @@index([userId])
+}
+
+// One AI-detected moment to cut out, and (after cutting) the produced clip.
+model VideoSegment {
+  id         String      @id @default(cuid())
+  upload     VideoUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  uploadId   String
+  index      Int // ordering within the source
+  player     Int         @default(1) // which player (1-4) dubs this sector, for multi-player dubs
+  startMs    Int
+  endMs      Int
+  label      String      @default("")
+  transcript String      @default("") @db.Text
+  emotionTag String      @default("")
+  // pending | cut | error
+  status     String      @default("pending")
+  partKey    String? // Spaces key of the cut clip
+  partUrl    String? // public URL of the cut clip
+  createdAt  DateTime    @default(now())
+
+  @@index([uploadId])
+}
+
+// A live online room. 4-char code is the primary key. Holds up to 4 players
+// (host + 3), tracked by the RoomPlayer join rows.
+model Room {
+  code      String       @id // 4 chars
+  host      User?        @relation("RoomHost", fields: [hostId], references: [id], onDelete: SetNull)
+  hostId    String?
+  // 'lobby' (dashboard invite) | 'playing' (host picking a video on /party) |
+  // 'dubbing' (everyone recording in the studio) | 'finished' (rendered)
+  status    String       @default("lobby")
+  pack      Pack?        @relation(fields: [packId], references: [id], onDelete: SetNull)
+  packId    String?
+  // The video the host locked in for a party dub, and the rendered result URL.
+  videoUploadId String?
+  finalUrl      String   @default("")
+  round     Int          @default(0)
+  players   RoomPlayer[]
+  takes     RoomTake[]
+  createdAt DateTime     @default(now())
+}
+
+// One seat in a room. Guests can join too, so userId is optional and the
+// display name / colour are snapshotted here rather than always read from User.
+// The row id doubles as the player's secret token (used to leave / act).
+model RoomPlayer {
+  id          String   @id @default(cuid())
+  room        Room     @relation(fields: [roomCode], references: [code], onDelete: Cascade)
+  roomCode    String
+  userId      String? // null for guests
+  displayName String
+  avatarColor String   @default("#6F48FF")
+  isHost      Boolean  @default(false)
+  // 'playing' (still dubbing their sectors) | 'finished' (submitted takes)
+  status      String   @default("playing")
+  createdAt   DateTime @default(now())
+
+  @@index([roomCode])
+}
+
+// One player's recorded take for one sector of the room's video. Uploaded when
+// a player marks themselves finished; the host's render gathers all of them.
+model RoomTake {
+  id        String   @id @default(cuid())
+  room      Room     @relation(fields: [roomCode], references: [code], onDelete: Cascade)
+  roomCode  String
+  segmentId String
+  playerId  String
+  partKey   String // Spaces object key of the recorded audio
+  partUrl   String
+  createdAt DateTime @default(now())
+
+  @@unique([roomCode, segmentId]) // one owner per sector (seat → sector is 1:1)
+  @@index([roomCode])
+}

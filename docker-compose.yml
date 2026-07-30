@@ -1,0 +1,43 @@
+# Cinema Dub (voicer) — deployed on the same droplet as digital_standarts.
+# The shared nginx:alpine container from the digital_standarts stack owns
+# 80/443 and proxies dubthatmovie.com to this service by its network alias
+# (voicer-web) over the shared external network.
+#
+# Secrets are NOT in this file — compose interpolates ${VARS} from a sibling
+# `.env` file that lives ONLY on the server (gitignored).
+services:
+  voicer-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_CLERK_SIGN_IN_URL: /login
+        NEXT_PUBLIC_CLERK_SIGN_UP_URL: /signup
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: /dashboard
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /dashboard
+        NEXT_PUBLIC_SPACES_PUBLIC_BASE: ${NEXT_PUBLIC_SPACES_PUBLIC_BASE}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL}
+    restart: unless-stopped
+    environment:
+      - HOSTNAME=0.0.0.0
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+      - CLERK_WEBHOOK_SECRET=${CLERK_WEBHOOK_SECRET}
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      - DO_SPACES_KEY=${DO_SPACES_KEY}
+      - DO_SPACES_SECRET=${DO_SPACES_SECRET}
+      - DO_SPACES_ENDPOINT=${DO_SPACES_ENDPOINT}
+      - DO_SPACES_REGION=${DO_SPACES_REGION}
+      - DO_SPACES_BUCKET=${DO_SPACES_BUCKET}
+      - DO_SPACES_PREFIX=${DO_SPACES_PREFIX}
+      - NEXT_PUBLIC_SPACES_PUBLIC_BASE=${NEXT_PUBLIC_SPACES_PUBLIC_BASE}
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
+    networks:
+      - shared
+
+networks:
+  shared:
+    external: true
+    name: digital_standarts_default

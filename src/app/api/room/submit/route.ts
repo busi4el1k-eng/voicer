@@ -1,0 +1,75 @@
+import { NextResponse, type NextRequest } from "next/server";
+import db from "@/lib/db";
+import { normalizeRoomCode } from "@/lib/room-code";
+import { roomView } from "@/lib/room.server";
+import { SPACES_PREFIX, putObject, spacesConfigured } from "@/lib/spaces";
+
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
+// A player submits their recorded sectors and marks themselves finished. Each
+// take is a form file named `take:<segmentId>`. We verify the sector belongs to
+// the room's video and is assigned to this player's seat, store it to Spaces,
+// and upsert a RoomTake row. The host's render later gathers all of them.
+export async function POST(req: NextRequest) {
+  if (!spacesConfigured()) {
+    return NextResponse.json({ error: "Storage isn't configured." }, { status: 500 });
+  }
+
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Expected a form upload." }, { status: 400 });
+  }
+
+  const code = normalizeRoomCode(String(form.get("code") ?? ""));
+  const playerId = String(form.get("playerId") ?? "");
+  if (!code || !playerId) {
+    return NextResponse.json({ error: "Missing room or player." }, { status: 400 });
+  }
+
+  const room = await db.room.findUnique({
+    where: { code },
+    include: { players: { orderBy: [{ isHost: "desc" }, { createdAt: "asc" }] } },
+  });
+  if (!room) return NextResponse.json({ error: "Room closed." }, { status: 404 });
+  if (room.status !== "dubbing") {
+    return NextResponse.json({ error: "The game isn't in progress." }, { status: 409 });
+  }
+
+  const seat = room.players.findIndex((p) => p.id === playerId) + 1;
+  if (seat === 0) return NextResponse.json({ error: "You're not in this room." }, { status: 403 });
+  if (!room.videoUploadId) {
+    return NextResponse.json({ error: "No video selected." }, { status: 409 });
+  }
+
+  // Which sectors this player is allowed to dub (their seat's sectors).
+  const segments = await db.videoSegment.findMany({
+    where: { uploadId: room.videoUploadId },
+    select: { id: true, player: true, startMs: true, endMs: true },
+  });
+  const mine = new Set(
+    segments.filter((s) => (s.player ?? 1) === seat && s.endMs > s.startMs).map((s) => s.id),
+  );
+
+  for (const [field, value] of form.entries()) {
+    if (!field.startsWith("take:")) continue;
+    const segmentId = field.slice("take:".length);
+    if (!mine.has(segmentId)) continue; // ignore sectors not assigned to this seat
+    if (!(value instanceof File) || value.size === 0) continue;
+
+    const buf = Buffer.from(await value.arrayBuffer());
+    const key = `${SPACES_PREFIX}rooms/${code}/takes/${segmentId}.webm`;
+    const { url } = await putObject(key, buf, value.type || "audio/webm");
+
+    await db.roomTake.upsert({
+      where: { roomCode_segmentId: { roomCode: code, segmentId } },
+      update: { playerId, partKey: key, partUrl: url },
+      create: { roomCode: code, segmentId, playerId, partKey: key, partUrl: url },
+    });
+  }
+
+  await db.roomPlayer.update({ where: { id: playerId }, data: { status: "finished" } });
+  return NextResponse.json({ room: await roomView(code) });
+}

@@ -1,0 +1,246 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { normalizeRoomCode } from "@/lib/room-code";
+
+export type PlayerView = {
+  id: string;
+  displayName: string;
+  avatarColor: string;
+  isHost: boolean;
+  seat: number; // 1-based; host = 1
+  status: string; // 'playing' | 'finished'
+};
+export type RoomView = {
+  code: string;
+  status: string;
+  videoUploadId: string | null;
+  finalUrl: string;
+  players: PlayerView[];
+};
+
+const STORAGE_KEY = "cd_room";
+const POLL_MS = 2500;
+// Fired whenever membership changes so every useRoom instance in the tab (e.g.
+// the dashboard's StudioPanel and Lobby) re-reads it immediately — otherwise a
+// join/leave in one panel wouldn't reflect in the other until a reload.
+const ROOM_EVENT = "cd_room_change";
+
+// Membership snapshots isHost so a returning member can be shown the waiting
+// room instantly, before the (possibly slow) room fetch resolves.
+type Membership = { code: string; playerId: string; isHost: boolean };
+
+function readMembership(): Membership | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const m = JSON.parse(raw) as Partial<Membership>;
+    if (!m.code || !m.playerId) return null;
+    return { code: m.code, playerId: m.playerId, isHost: m.isHost ?? false };
+  } catch {
+    return null;
+  }
+}
+
+// Client-side room state: the caller's identity (name/colour from the
+// dashboard), the joined room, live-polled player list, and create/join/leave
+// actions. Membership survives reloads via localStorage and is shared across
+// hook instances in the same tab via a window event.
+export function useRoom(me: { displayName: string; avatarColor: string }) {
+  const [room, setRoom] = useState<RoomView | null>(null);
+  const [membership, setMembership] = useState<Membership | null>(null);
+  // False until the mount effect has read localStorage. Guards must wait for
+  // this before treating "no membership" as "not in a room" — otherwise the
+  // first render (membership still null) would wrongly look room-less.
+  const [hydrated, setHydrated] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const meRef = useRef(me);
+  meRef.current = me;
+
+  const playerId = membership?.playerId ?? null;
+
+  const persist = useCallback((m: Membership | null) => {
+    try {
+      if (m) localStorage.setItem(STORAGE_KEY, JSON.stringify(m));
+      else localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore storage errors (private mode etc.) */
+    }
+    // Let sibling hook instances in this tab re-sync right away.
+    try {
+      window.dispatchEvent(new Event(ROOM_EVENT));
+    } catch {
+      /* SSR / no window */
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    setRoom(null);
+    setMembership(null);
+    persist(null);
+  }, [persist]);
+
+  // Adopt a membership (from storage or a sibling instance) and load its room.
+  const applyMembership = useCallback(
+    (m: Membership | null) => {
+      setMembership(m);
+      if (!m) {
+        setRoom(null);
+        return;
+      }
+      fetch(`/api/room/${m.code}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((d) => d?.room && setRoom(d.room))
+        .catch((status) => {
+          if (status === 404) reset(); // room closed — drop the stale membership
+        });
+    },
+    [reset],
+  );
+
+  // Rehydrate on mount, and stay in sync with joins/leaves from sibling
+  // instances (same tab via ROOM_EVENT) and other tabs (storage event).
+  useEffect(() => {
+    applyMembership(readMembership());
+    setHydrated(true);
+    const onChange = () => applyMembership(readMembership());
+    window.addEventListener(ROOM_EVENT, onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener(ROOM_EVENT, onChange);
+      window.removeEventListener("storage", onChange);
+    };
+  }, [applyMembership]);
+
+  // Poll the room while we're in one so joins/leaves show up for everyone.
+  useEffect(() => {
+    if (!room) return;
+    const code = room.code;
+    const id = setInterval(() => {
+      fetch(`/api/room/${code}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((d) => d?.room && setRoom(d.room))
+        .catch((status) => {
+          if (status === 404) reset(); // room closed by host
+        });
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [room, reset]);
+
+  const create = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/room", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(meRef.current),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't create the room.");
+      setRoom(data.room);
+      const m: Membership = { code: data.room.code, playerId: data.playerId, isHost: true };
+      setMembership(m);
+      persist(m);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't create the room.");
+    } finally {
+      setBusy(false);
+    }
+  }, [persist]);
+
+  const join = useCallback(
+    async (rawCode: string) => {
+      const code = normalizeRoomCode(rawCode);
+      if (!code) {
+        setError("Enter a room code.");
+        return false;
+      }
+      setBusy(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/room/join", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...meRef.current, code }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error ?? "Couldn't join the room.");
+        setRoom(data.room);
+        const m: Membership = { code: data.room.code, playerId: data.playerId, isHost: false };
+        setMembership(m);
+        persist(m);
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't join the room.");
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [persist],
+  );
+
+  // Host-only: flip the room to "playing" so waiting members follow into the
+  // game. Returns true once the server confirms.
+  const start = useCallback(async (): Promise<boolean> => {
+    if (!room || !playerId) return false;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/room/start", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: room.code, playerId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't start the party.");
+      setRoom(data.room);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't start the party.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [room, playerId]);
+
+  const leave = useCallback(async () => {
+    if (!room || !playerId) return;
+    const code = room.code;
+    reset();
+    try {
+      await fetch("/api/room/leave", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code, playerId }),
+      });
+    } catch {
+      /* local state already cleared */
+    }
+  }, [room, playerId, reset]);
+
+  // Authoritative host flag once the room is loaded; before that, fall back to
+  // the membership snapshot so the UI (e.g. the waiting room) is correct
+  // instantly. `inRoom` is optimistic for the same reason.
+  const isHost = room
+    ? room.players.find((p) => p.id === playerId)?.isHost === true
+    : (membership?.isHost ?? false);
+  const inRoom = !!membership || !!room;
+
+  return {
+    room,
+    playerId,
+    inRoom,
+    isHost,
+    hydrated,
+    busy,
+    error,
+    setError,
+    create,
+    join,
+    start,
+    leave,
+  };
+}

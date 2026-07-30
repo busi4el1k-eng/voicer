@@ -1,0 +1,672 @@
+@import "tailwindcss";
+
+/* Cinema Dub design system — Gartic Phone register, sound instead of drawing.
+   Saturated, chunky, playful. Hard offset shadows, zero blur. */
+@theme {
+  --color-violet-deep: #2a0845; /* stage background */
+  --color-violet: #6520a0; /* primary surface */
+  --color-violet-lift: #7c31bc; /* raised rows, list items */
+  --color-magenta: #ff3d8b; /* record state, primary action */
+  --color-sun: #ffd23f; /* scores, highlights, winner */
+  --color-mint: #27e1a1; /* live / connected / mic OK — reserved, never decorative */
+  --color-cream: #fff6ec; /* cards, text on violet */
+  --color-ink: #1f0733; /* text on cream */
+
+  --font-display: var(--font-fredoka), system-ui, sans-serif;
+  --font-body: var(--font-nunito), system-ui, sans-serif;
+
+  /* Hard offset shadow — sticker & cardboard, never glass. */
+  --shadow-hard: 4px 4px 0 rgba(31, 7, 51, 0.55);
+  --shadow-hard-sm: 1px 1px 0 rgba(31, 7, 51, 0.55);
+}
+
+/* Reusable multi-layer text outlines, straight from Gartic Phone. */
+:root {
+  --g-outline-dark: #201255 2px 1.5px 0, #201255 1.75517px 2.458851px 0,
+    #201255 1.0806px 3.18294px 0, #201255 0.141474px 3.49499px 0, #201255 -0.832294px 3.31859px 0,
+    #201255 -1.60229px 2.69694px 0, #201255 -1.97998px 1.78224px 0, #201255 -1.87291px 0.798434px 0,
+    #201255 -1.30729px -0.0136px 0, #201255 -0.421592px -0.45506px 0, #201255 0.567324px -0.41785px 0,
+    #201255 1.41734px 0.08892px 0, #201255 1.92034px 0.941169px 0;
+  --g-outline-light: #f1ebff 2px 0 0, #f1ebff 1.75517px 0.958851px 0, #f1ebff 1.0806px 1.68294px 0,
+    #f1ebff 0.141474px 1.99499px 0, #f1ebff -0.832294px 1.81859px 0, #f1ebff -1.60229px 1.19694px 0,
+    #f1ebff -1.97998px 0.28224px 0, #f1ebff -1.87291px -0.701566px 0, #f1ebff -1.30729px -1.5136px 0,
+    #f1ebff -0.421592px -1.95506px 0, #f1ebff 0.567324px -1.91785px 0, #f1ebff 1.41734px -1.41108px 0,
+    #f1ebff 1.92034px -0.558831px 0;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  /* Gartic Phone purple→magenta stage gradient. */
+  background: linear-gradient(200deg, rgba(92, 9, 190, 1) 0%, rgba(207, 48, 93, 1) 100%);
+  background-attachment: fixed;
+  color: var(--color-cream);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Gartic Phone lobby skin — the "g-" component classes
+   ============================================================ */
+
+.g-screen {
+  position: relative;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 16px 16px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.g-logo {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: clamp(28px, 6vw, 42px);
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: #5cffb6;
+  text-shadow: var(--g-outline-dark);
+  text-align: center;
+  line-height: 1.05;
+}
+.g-logo em {
+  font-style: normal;
+  color: #ffe27a;
+}
+
+.g-title {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 22px;
+  text-transform: uppercase;
+  text-align: center;
+  color: #5cffb6;
+  text-shadow: var(--g-outline-dark);
+  margin: 4px 0 14px;
+}
+
+.g-center {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  align-self: stretch;
+  width: 100%;
+}
+
+.g-panel {
+  background-color: rgba(37, 28, 92, 0.4);
+  border: 2px solid rgba(32, 18, 85, 0.2);
+  box-shadow: inset 0 0 0 2px #8952dc;
+  border-radius: 14px;
+  padding: 14px;
+}
+.g-left {
+  width: 340px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
+.g-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Game-mode / instruction card */
+.g-card {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.g-card .g-card-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: linear-gradient(0deg, #d4c5ff 0%, #ebe0ff 100%);
+  /* Outline + bottom 3D edge as one concentric shadow stack (no mismatched
+     outer border), so corners line up and dimmed cards fade evenly. */
+  box-shadow: inset 0 0 0 2px #f2e9ff, 0 0 0 2px #201255, 0 4px 0 0 #a890e8;
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.g-card:hover .g-card-inner {
+  background: linear-gradient(0deg, #dfd3ff 0%, #fcfbff 100%);
+}
+/* Chunky press, matching the buttons — no persistent selection ring. */
+.g-card:active .g-card-inner {
+  transform: translateY(2px);
+  box-shadow: inset 0 0 0 2px #f2e9ff, 0 0 0 2px #201255, 0 2px 0 0 #a890e8;
+}
+.g-card.checked .g-card-inner {
+  box-shadow: inset 0 0 0 4px #5bffb6, inset 0 0 0 6px rgba(17, 53, 60, 0.5), 0 3px 0 0 #a890e8;
+}
+.g-card.soon {
+  cursor: default;
+  opacity: 0.72;
+}
+.g-card .g-ficon {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+}
+.g-card h4 {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 16px;
+  color: #301a6b;
+  text-shadow: var(--g-outline-light);
+  margin: 0 0 4px;
+}
+.g-card p {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.28;
+  color: #012342;
+}
+.g-card .g-newtag,
+.g-card .g-soontag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.g-card .g-newtag {
+  background: #74ff8f;
+  border: 2px solid #5534dc;
+  color: #5635dc;
+}
+.g-card .g-soontag {
+  background: #634ac9;
+  color: #eadfff;
+}
+
+/* User / player card */
+.g-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 8px 12px 8px 8px;
+  border-radius: 100px 30px 30px 100px;
+  background: linear-gradient(0deg, #c8b7fa 0%, #e1d7ff 100%);
+  box-shadow: inset 0 0 0 2px #f2e9ff, 0 3px 0 0 #a890e8;
+}
+.g-user .g-avt {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 20px;
+  color: #fff;
+  border: 2px solid #2d208e;
+  box-shadow: 0 0 0 2px #fff;
+}
+.g-user .g-uname {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 16px;
+  color: #012342;
+  text-shadow: var(--g-outline-light);
+  line-height: 1.1;
+}
+.g-user .g-utag {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #6f57c9;
+}
+.g-user.empty {
+  background: rgba(76, 46, 171, 0.7);
+  border: 2px solid #634ac9;
+  box-shadow: none;
+}
+.g-user.empty .g-uname {
+  color: #7a63da;
+  text-shadow: none;
+}
+
+/* 3-dots toggle at the right of the user box */
+.g-user .g-dots {
+  margin-left: auto;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: rgba(45, 32, 142, 0.14);
+  transition: background 0.12s, transform 0.08s;
+}
+.g-user .g-dots:hover {
+  background: rgba(45, 32, 142, 0.24);
+}
+.g-user .g-dots:active {
+  transform: scale(0.92);
+}
+.g-user .g-dots:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+.g-user .g-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #2d208e;
+}
+
+/* Empty player slots (ghosts) under the user box */
+.g-party {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.g-ghost-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 100px 30px 30px 100px;
+  border: 2px dashed rgba(137, 82, 220, 0.5);
+  background: rgba(37, 28, 92, 0.28);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, transform 0.08s;
+}
+button.g-ghost-slot:hover:not(:disabled) {
+  border-color: rgba(137, 82, 220, 0.9);
+  background: rgba(37, 28, 92, 0.45);
+}
+button.g-ghost-slot:active:not(:disabled) {
+  transform: translateY(1px);
+}
+button.g-ghost-slot:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.g-ghost-slot.filled {
+  border-style: solid;
+  border-color: rgba(137, 82, 220, 0.55);
+  background: rgba(60, 44, 130, 0.5);
+  cursor: default;
+}
+.g-player-name {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 14px;
+  color: #e7dfff;
+}
+.g-player-tag {
+  margin-left: auto;
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #5cffb6;
+}
+
+/* Invite-code banner */
+.g-invite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 2px solid rgba(92, 255, 182, 0.35);
+  background: rgba(55, 196, 145, 0.14);
+  cursor: pointer;
+  transition: background 0.12s, transform 0.08s;
+}
+.g-invite:hover {
+  background: rgba(55, 196, 145, 0.22);
+}
+.g-invite:active {
+  transform: translateY(1px);
+}
+.g-invite-cap {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: rgba(231, 223, 255, 0.6);
+}
+.g-invite-code {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 26px;
+  letter-spacing: 0.22em;
+  color: #5cffb6;
+  text-shadow: var(--g-outline-dark);
+}
+.g-invite-copied {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #5cffb6;
+}
+
+/* Invite popup window */
+.g-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(31, 7, 51, 0.7);
+}
+.g-modal {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 20px 20px;
+  border-radius: 16px;
+  background: #251c5c;
+  border: 2px solid rgba(32, 18, 85, 0.2);
+  box-shadow: inset 0 0 0 2px #8952dc, 0 12px 0 0 rgba(17, 0, 69, 0.4);
+  text-align: center;
+}
+.g-modal-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e7dfff;
+  font-size: 20px;
+  line-height: 1;
+}
+.g-modal-x:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.g-modal-title {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 20px;
+  color: #fff6ec;
+}
+.g-modal-sub {
+  font-family: var(--font-nunito), sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 246, 236, 0.7);
+}
+.g-modal-code {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px dashed rgba(92, 255, 182, 0.5);
+  background: rgba(55, 196, 145, 0.12);
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 42px;
+  letter-spacing: 0.28em;
+  text-indent: 0.28em;
+  color: #5cffb6;
+  text-shadow: var(--g-outline-dark);
+}
+.g-modal-count {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: rgba(255, 246, 236, 0.5);
+}
+
+/* Room-code entry input */
+.g-code-input {
+  width: 100%;
+  height: 46px;
+  border-radius: 10px;
+  border: 2px solid #8952dc;
+  background: rgba(37, 28, 92, 0.5);
+  color: #fff;
+  text-align: center;
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.g-code-input:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+.g-code-input::placeholder {
+  color: rgba(231, 223, 255, 0.35);
+  letter-spacing: 0.12em;
+}
+.g-ghost-avt {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #7a63da;
+  background: rgba(76, 46, 171, 0.35);
+  border: 2px dashed rgba(137, 82, 220, 0.6);
+}
+.g-ghost-label {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(231, 223, 255, 0.4);
+}
+
+/* Collapsible stats: 0fr -> 1fr grows to content height (auto-height animation) */
+.g-stats-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.32s cubic-bezier(0.34, 1.32, 0.64, 1),
+    opacity 0.24s ease;
+}
+.g-stats-collapse.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.g-stats-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Chunky buttons */
+.g-btn {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 18px;
+  cursor: pointer;
+  border: none;
+  height: 52px;
+  padding: 0 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.g-btn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+.g-btn-start {
+  background: linear-gradient(0deg, #37c491 0%, #5cffb6 100%);
+  color: #0b3d2c;
+  box-shadow: inset 0 0 0 2px #b6ffe0, 0 4px 0 0 #2a8b65;
+}
+.g-btn-start:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 0 0 2px #b6ffe0, 0 2px 0 0 #2a8b65;
+}
+.g-btn-primary {
+  background: linear-gradient(0deg, #ffcf3f 0%, #ffe27a 100%);
+  color: #4a3400;
+  box-shadow: inset 0 0 0 2px #fff2c2, 0 4px 0 0 #c99a1e;
+}
+.g-btn-primary:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 0 0 2px #fff2c2, 0 2px 0 0 #c99a1e;
+}
+.g-btn-ghost {
+  background: rgba(37, 28, 92, 0.5);
+  color: #e7dfff;
+  box-shadow: inset 0 0 0 2px #8952dc, 0 4px 0 0 rgba(17, 0, 69, 0.4);
+}
+.g-btn-ghost:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 0 0 2px #8952dc, 0 2px 0 0 rgba(17, 0, 69, 0.4);
+}
+
+.g-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18px;
+  align-self: stretch;
+}
+
+/* Custom video player: fill the screen (video + controls) in fullscreen. */
+.g-player:fullscreen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #000;
+  border-radius: 0;
+}
+.g-player:fullscreen video {
+  max-height: calc(100vh - 60px);
+}
+
+/* Tabs (PRESETS | CUSTOM style) */
+.g-tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: -2px;
+}
+.g-tab {
+  flex: 1;
+  cursor: pointer;
+  border: 2px solid rgba(32, 18, 85, 0.2);
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  background: rgba(37, 28, 92, 0.3);
+  padding: 10px;
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 15px;
+  text-transform: uppercase;
+  color: #ded8ef;
+  text-align: center;
+}
+.g-tab.active {
+  background: rgba(37, 28, 92, 0.4);
+  color: #5cffb6;
+  box-shadow: inset 0 0 0 2px #8952dc;
+}
+
+/* Small stat row inside the left panel */
+.g-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+}
+.g-stat .g-stat-label {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.6);
+}
+.g-stat .g-stat-value {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 20px;
+  color: #5cffb6;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 860px) {
+  .g-center {
+    flex-direction: column;
+  }
+  .g-left {
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

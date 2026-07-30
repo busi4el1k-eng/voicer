@@ -1,0 +1,408 @@
+"use client";
+
+import { use, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useMic, type RecordResult } from "@/lib/audio/useMic";
+import { decodeAudio, type Pcm } from "@/lib/audio/waveform";
+import { RecorderWave } from "@/components/RecorderWave";
+import { VideoStage, type VideoStageHandle } from "@/components/VideoStage";
+
+type Seg = {
+  id: string;
+  startMs: number;
+  endMs: number;
+  label: string;
+  transcript: string;
+  emotionTag: string;
+};
+type Video = { id: string; title: string; sourceUrl: string; segments: Seg[] };
+type Phase = "loading" | "run" | "summary" | "exporting" | "result" | "empty" | "error";
+
+const fmt = (ms: number) => {
+  const s = Math.max(0, ms) / 1000;
+  return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+};
+
+export default function SoloRunPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const mic = useMic();
+
+  const [video, setVideo] = useState<Video | null>(null);
+  const [segs, setSegs] = useState<Seg[]>([]);
+  const [phase, setPhase] = useState<Phase>("loading");
+  const [cur, setCur] = useState(0);
+  const [takes, setTakes] = useState<Record<string, RecordResult>>({});
+  const [origWave, setOrigWave] = useState<Record<string, Float32Array>>({});
+  const [takeWave, setTakeWave] = useState<Record<string, Float32Array>>({});
+  const [resultUrl, setResultUrl] = useState("");
+  const [exportErr, setExportErr] = useState("");
+
+  const stageRef = useRef<VideoStageHandle>(null);
+  const pcmRef = useRef<Pcm | null>(null);
+  const takesRef = useRef<Record<string, RecordResult>>({});
+  const capRef = useRef<number | null>(null); // auto-stop timer (sector-length cap)
+
+  // Load the shared video + its sectors.
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`/api/solo/video/${id}`);
+        if (!r.ok) throw new Error();
+        const d = (await r.json()) as { video: Video };
+        setVideo(d.video);
+        const s = d.video.segments.filter((x) => x.endMs > x.startMs);
+        setSegs(s);
+        setPhase(s.length === 0 ? "empty" : "run");
+      } catch {
+        setPhase("error");
+      }
+    })();
+  }, [id]);
+
+  // Decode the source audio once and precompute each sector's original envelope.
+  useEffect(() => {
+    if (!video?.sourceUrl || segs.length === 0) return;
+    (async () => {
+      try {
+        const pcm = await decodeAudio(video.sourceUrl);
+        pcmRef.current = pcm;
+        const map: Record<string, Float32Array> = {};
+        for (const s of segs) {
+          const from = Math.floor((s.startMs / 1000) * pcm.rate);
+          const to = Math.floor((s.endMs / 1000) * pcm.rate);
+          map[s.id] = pcm.data.subarray(from, to);
+        }
+        setOrigWave(map);
+      } catch {
+        /* original waveform is best-effort (needs CORS) */
+      }
+    })();
+  }, [video?.sourceUrl, segs]);
+
+  // Clear a pending record cap if we unmount mid-recording.
+  useEffect(() => {
+    return () => {
+      if (capRef.current != null) clearTimeout(capRef.current);
+    };
+  }, []);
+
+  const seg = segs[cur];
+
+
+  const stopRecording = useCallback(async () => {
+    if (capRef.current != null) {
+      clearTimeout(capRef.current);
+      capRef.current = null;
+    }
+    if (!seg) return;
+    const take = await mic.stopRec();
+    if (!take) return;
+    takesRef.current[seg.id] = take;
+    setTakes({ ...takesRef.current });
+    try {
+      const pcm = await decodeAudio(take.blob);
+      setTakeWave((p) => ({ ...p, [seg.id]: pcm.data }));
+    } catch {
+      /* keep the recording even if we can't draw its waveform */
+    }
+  }, [seg, mic]);
+
+  // You can't record longer than the sector runs: auto-stop at the sector
+  // length. Anything you leave unfilled stays silent in the final mix (the
+  // original audio is muted across the whole sector).
+  const startRecording = useCallback(async () => {
+    if (!seg) return;
+    if (!mic.ready) await mic.open();
+    mic.startRec();
+    if (capRef.current != null) clearTimeout(capRef.current);
+    const maxMs = Math.max(300, seg.endMs - seg.startMs);
+    capRef.current = window.setTimeout(() => void stopRecording(), maxMs);
+  }, [seg, mic, stopRecording]);
+
+  const playMyTake = useCallback(() => {
+    const take = seg ? takesRef.current[seg.id] : undefined;
+    if (!take) return;
+    void new Audio(take.url).play().catch(() => {});
+  }, [seg]);
+
+  const stopVideo = () => stageRef.current?.stop();
+
+  const goTo = useCallback(
+    (i: number) => {
+      stopVideo();
+      setCur(Math.max(0, Math.min(segs.length - 1, i)));
+    },
+    [segs.length],
+  );
+
+  const next = () => {
+    if (mic.recording) return;
+    stopVideo();
+    if (cur >= segs.length - 1) setPhase("summary");
+    else setCur(cur + 1);
+  };
+
+  // Combine every recorded sector back into the full-length video (the backend
+  // replaces the original audio inside each dubbed sector) and show the result.
+  const finish = useCallback(async () => {
+    const recorded = Object.entries(takesRef.current);
+    if (recorded.length === 0) {
+      setExportErr("Record at least one sector first.");
+      return;
+    }
+    setExportErr("");
+    setPhase("exporting");
+    try {
+      const fd = new FormData();
+      fd.append("uploadId", id);
+      for (const [segId, take] of recorded) fd.append(`take:${segId}`, take.blob, `${segId}.webm`);
+      const r = await fetch("/api/creator/dub", { method: "POST", body: fd });
+      if (!r.ok) throw new Error((await r.json()).error || "Export failed.");
+      const d = (await r.json()) as { url: string };
+      setResultUrl(d.url);
+      setPhase("result");
+    } catch (e) {
+      setExportErr(e instanceof Error ? e.message : "Export failed.");
+      setPhase("summary");
+    }
+  }, [id]);
+
+  // --- render ---------------------------------------------------------------
+
+  if (phase === "loading") {
+    return (
+      <main className="g-screen">
+        <p className="mt-20 text-cream/60">Loading…</p>
+      </main>
+    );
+  }
+
+  if (phase === "error" || !video) {
+    return (
+      <main className="g-screen">
+        <h1 className="g-logo mt-10">Couldn&apos;t load</h1>
+        <p className="mt-2 text-[14px] text-cream/60">That video isn&apos;t available.</p>
+        <Link href="/play" className="mt-4 text-[13px] text-cream/60 underline">
+          Back
+        </Link>
+      </main>
+    );
+  }
+
+  if (phase === "empty") {
+    return (
+      <main className="g-screen">
+        <h1 className="g-logo mt-10">No sectors</h1>
+        <p className="mt-2 text-[14px] text-cream/60">
+          This video has no sectors to dub yet.
+        </p>
+        <Link href="/play" className="mt-4 text-[13px] text-cream/60 underline">
+          Back
+        </Link>
+      </main>
+    );
+  }
+
+  const recordedCount = Object.keys(takes).length;
+
+  return (
+    <main className="g-screen">
+      <div className="flex h-[72px] items-center">
+        <h1 className="g-logo">{video.title || "Solo run"}</h1>
+      </div>
+
+      <div className="w-full max-w-2xl">
+        {phase === "run" && seg && (
+          <>
+            {/* Progress */}
+            <div className="mb-3 flex items-center justify-between">
+              <span className="font-display text-[14px] font-bold uppercase tracking-[0.1em] text-mint">
+                Sector {cur + 1} / {segs.length}
+              </span>
+              <div className="flex flex-1 gap-1 pl-4">
+                {segs.map((s, i) => (
+                  <button
+                    key={s.id}
+                    onClick={() => goTo(i)}
+                    disabled={mic.recording}
+                    title={`Sector ${i + 1}`}
+                    className="h-2 flex-1 rounded-full transition-colors"
+                    style={{
+                      background:
+                        i === cur
+                          ? "#FF3D8B"
+                          : takes[s.id]
+                            ? "#27E1A1"
+                            : "rgba(255,246,236,0.18)",
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Video — app-styled player, restricted to just this sector */}
+            <div className="g-panel mb-4">
+              <VideoStage
+                ref={stageRef}
+                src={video.sourceUrl}
+                sector={{ startMs: seg.startMs, endMs: seg.endMs }}
+              />
+              <p className="mt-2 text-center font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
+                {fmt(seg.startMs)} – {fmt(seg.endMs)} · space = play / pause
+              </p>
+            </div>
+
+            {/* Line text */}
+            {seg.transcript && (
+              <div className="g-panel mb-4 text-center text-[16px] text-cream">
+                &ldquo;{seg.transcript}&rdquo;
+              </div>
+            )}
+
+            {/* Recorder + voice waveform over the original */}
+            <div className="g-panel mb-4">
+              <div className="mb-2 flex justify-between text-[11px] font-bold uppercase tracking-[0.08em]">
+                <span className="text-sky-400">Original</span>
+                <span className="text-red-400">Your voice</span>
+              </div>
+              <RecorderWave
+                original={origWave[seg.id]}
+                take={takeWave[seg.id]}
+                recording={mic.recording}
+                getLevel={mic.getLevel}
+              />
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <button
+                  onClick={() => (mic.recording ? void stopRecording() : void startRecording())}
+                  className={`g-btn h-11 text-[14px] ${
+                    mic.recording ? "bg-magenta text-cream" : "g-btn-start"
+                  }`}
+                >
+                  {mic.recording ? "■ Stop" : takes[seg.id] ? "● Re-record" : "● Record"}
+                </button>
+                <button
+                  onClick={playMyTake}
+                  disabled={!takes[seg.id] || mic.recording}
+                  className="g-btn g-btn-ghost h-11 text-[14px]"
+                >
+                  ▶ My take
+                </button>
+                <button
+                  onClick={next}
+                  disabled={mic.recording}
+                  className="g-btn g-btn-primary col-span-2 h-11 text-[14px] sm:col-span-1"
+                >
+                  {cur >= segs.length - 1 ? "Finish sectors →" : "Next sector →"}
+                </button>
+              </div>
+              {mic.error && <p className="mt-3 text-[13px] text-magenta">{mic.error}</p>}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => goTo(cur - 1)}
+                disabled={cur === 0 || mic.recording}
+                className="text-[13px] text-cream/50 underline disabled:opacity-40"
+              >
+                ◀ Previous sector
+              </button>
+              <Link href="/play" className="text-[13px] text-cream/50 underline">
+                Quit
+              </Link>
+            </div>
+          </>
+        )}
+
+        {phase === "summary" && (
+          <div className="g-panel">
+            <h2 className="g-title">All sectors done</h2>
+            <p className="mb-4 text-center text-[13px] text-cream/60">
+              {recordedCount} of {segs.length} sectors recorded.
+            </p>
+
+            <div className="flex flex-col gap-2">
+              {segs.map((s, i) => (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-3 rounded-[10px] bg-white/5 px-4 py-3"
+                >
+                  <span className="font-display text-[13px] font-bold text-cream/40">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="flex-1 truncate text-[14px] text-cream">
+                    {s.transcript || `Sector ${i + 1}`}
+                  </span>
+                  <span className="font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
+                    {fmt(s.startMs)}–{fmt(s.endMs)}
+                  </span>
+                  <span
+                    className={`font-display text-[12px] font-bold uppercase ${
+                      takes[s.id] ? "text-mint" : "text-cream/30"
+                    }`}
+                  >
+                    {takes[s.id] ? "● Recorded" : "— Skipped"}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex flex-col items-center gap-2 border-t border-cream/10 pt-4">
+              <button
+                className="g-btn g-btn-start w-full"
+                disabled={recordedCount === 0}
+                onClick={() => void finish()}
+              >
+                Finish &amp; combine ({recordedCount}/{segs.length})
+              </button>
+              {exportErr && <p className="text-[13px] text-magenta">{exportErr}</p>}
+              <button
+                onClick={() => {
+                  setPhase("run");
+                  setCur(0);
+                }}
+                className="text-[13px] text-cream/50 underline"
+              >
+                ◀ Back to sectors
+              </button>
+            </div>
+          </div>
+        )}
+
+        {phase === "exporting" && (
+          <div className="g-panel text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cream/20 border-t-mint" />
+            <h2 className="g-title">Combining your dub…</h2>
+            <p className="text-[13px] text-cream/60">
+              Stitching every recorded sector back into the full video.
+            </p>
+          </div>
+        )}
+
+        {phase === "result" && (
+          <div className="g-panel text-center">
+            <h2 className="g-title">Your dub is ready</h2>
+            <p className="mb-4 text-[13px] text-cream/60">
+              {recordedCount} of {segs.length} sectors replaced with your voice.
+            </p>
+            {resultUrl && (
+              <div className="mb-4">
+                <VideoStage src={resultUrl} />
+              </div>
+            )}
+            <div className="flex flex-col items-center gap-3">
+              <a href={resultUrl} download className="g-btn g-btn-start">
+                ↓ Download video
+              </a>
+              <button
+                onClick={() => setPhase("summary")}
+                className="text-[13px] text-cream/50 underline"
+              >
+                ◀ Back to sectors
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
