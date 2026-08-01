@@ -46,6 +46,7 @@ export function RecorderWave({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bufRef = useRef<Float32Array | null>(null);
+  const bufOrigRef = useRef<Float32Array | undefined>(undefined); // sector the live buffer belongs to
   const posRef = useRef(0);
   const rafRef = useRef(0);
 
@@ -69,6 +70,7 @@ export function RecorderWave({
       // newest mic level, until the canvas is full.
       const W = Math.max(1, Math.floor(canvas.clientWidth * 2));
       bufRef.current = new Float32Array(W);
+      bufOrigRef.current = original; // this live buffer belongs to the current sector
       posRef.current = 0;
       const tick = () => {
         const buf = bufRef.current!;
@@ -89,7 +91,21 @@ export function RecorderWave({
     }
 
     const { W, H } = base();
-    if (take && take.length) drawWaveform(ctx, W, H, take, MINE_COLOR);
+    const buf = bufRef.current;
+    if (buf && posRef.current > 0 && bufOrigRef.current === original) {
+      // Freeze the live red exactly where it stopped. Rescaling the take to the
+      // full width here made it visibly jump forward after the auto-stop; keep
+      // it identical to the last recorded frame instead.
+      ctx.fillStyle = MINE_COLOR;
+      const n = Math.min(posRef.current, buf.length, W);
+      for (let x = 0; x < n; x++) {
+        const h = Math.max(1, Math.min(1, buf[x]) * H);
+        ctx.fillRect(x, (H - h) / 2, 1, h);
+      }
+    } else if (take && take.length) {
+      // No live buffer (e.g. revisiting an earlier take): draw the full take.
+      drawWaveform(ctx, W, H, take, MINE_COLOR);
+    }
   }, [recording, original, take, getLevel]);
 
   return <canvas ref={canvasRef} className="h-40 w-full rounded-[10px] bg-violet-deep" />;
