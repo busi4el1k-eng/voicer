@@ -3,48 +3,41 @@
 // stem — the original music + FX with dialogue removed — which we cache as the
 // per-source music bed. Separation is slow (CPU), so callers run this off the
 // request path (see bed.server.ts + `after`).
-
-import { Agent, fetch as undiciFetch } from "undici";
+//
+// Uses node:http directly (not global fetch / undici): the separation holds the
+// connection open with no response for minutes, which undici's 300s
+// headers/body timeout aborts as an opaque "fetch failed". A raw http request
+// has no such default timeout; we cap the whole thing ourselves.
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 
 const URL_BASE = process.env.DEMUCS_URL?.replace(/\/+$/, "");
 const API_KEY = process.env.DEMUCS_API_KEY;
 
-// A generous ceiling: CPU separation runs ~2.6x realtime, so even a long scene
-// finishes well inside this. Guards against a hung upstream holding a slot.
+// Generous overall cap: CPU separation runs ~2.6x realtime, so even a long scene
+// finishes well inside this. Guards against a hung upstream holding the socket.
 const TIMEOUT_MS = 20 * 60 * 1000;
-
-// Demucs holds the connection open (no response headers) for the *whole*
-// separation — minutes. Node's global fetch (undici) defaults headersTimeout /
-// bodyTimeout to 300s and would abort with an opaque "fetch failed" long before
-// the job finishes. Disable those here and let the AbortController be the only
-// cap. connectTimeout still guards a dead host. Built lazily so importing this
-// module (e.g. during `next build` page-data collection) has no side effects.
-let _dispatcher: Agent | null = null;
-function dispatcher(): Agent {
-  if (!_dispatcher) {
-    _dispatcher = new Agent({ headersTimeout: 0, bodyTimeout: 0, connectTimeout: 10_000 });
-  }
-  return _dispatcher;
-}
 
 export function demucsConfigured(): boolean {
   return !!(URL_BASE && API_KEY);
 }
 
 // Separate `audio` and return the requested stem as a WAV buffer.
-// `stem`: "no_vocals" (music bed, default) | "vocals" | "both" (zip).
-export async function separateStem(
+// `stem`: "no_vocals" (music bed, default) | "vocals".
+export function separateStem(
   audio: Buffer,
   filename = "scene.wav",
   stem: "no_vocals" | "vocals" = "no_vocals",
 ): Promise<Buffer> {
   if (!demucsConfigured()) {
-    throw new Error("Demucs is not configured (DEMUCS_URL / DEMUCS_API_KEY).");
+    return Promise.reject(new Error("Demucs is not configured (DEMUCS_URL / DEMUCS_API_KEY)."));
   }
 
-  // Build the multipart/form-data body by hand. Relying on global FormData/Blob
-  // with undici's fetch dropped the file field (server saw no "file"); a manual
-  // Buffer body is deterministic and parses cleanly as FastAPI's UploadFile.
+  const url = new URL(`${URL_BASE}/separate?stem=${stem}`);
+  const isHttps = url.protocol === "https:";
+  const requestFn = isHttps ? httpsRequest : httpRequest;
+
+  // Hand-built multipart/form-data body (FastAPI UploadFile field "file").
   const boundary = `----voicer${Math.random().toString(16).slice(2)}`;
   const CRLF = "\r\n";
   const head = Buffer.from(
@@ -55,30 +48,42 @@ export async function separateStem(
   const tail = Buffer.from(`${CRLF}--${boundary}--${CRLF}`);
   const body = Buffer.concat([head, audio, tail]);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    // Use undici's own fetch (not Node's global fetch) so the Agent above — from
-    // the same undici — is a compatible dispatcher. Mixing the standalone undici
-    // Agent into Node's built-in fetch throws an opaque "fetch failed".
-    const res = await undiciFetch(`${URL_BASE}/separate?stem=${stem}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+  return new Promise<Buffer>((resolve, reject) => {
+    const req = requestFn(
+      {
+        hostname: url.hostname,
+        port: url.port || (isHttps ? 443 : 80),
+        path: url.pathname + url.search,
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          "Content-Length": body.length,
+        },
       },
-      body,
-      signal: controller.signal,
-      dispatcher: dispatcher(),
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () => {
+          clearTimeout(timer);
+          const buf = Buffer.concat(chunks);
+          if (res.statusCode !== 200) {
+            reject(new Error(`Demucs ${res.statusCode}: ${buf.toString("utf8").slice(0, 300)}`));
+          } else {
+            resolve(buf);
+          }
+        });
+      },
+    );
+
+    const timer = setTimeout(() => req.destroy(new Error("Demucs request timed out")), TIMEOUT_MS);
+    req.on("error", (e) => {
+      clearTimeout(timer);
+      reject(e);
     });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`Demucs ${res.status}: ${detail.slice(0, 300)}`);
-    }
-    return Buffer.from(await res.arrayBuffer());
-  } finally {
-    clearTimeout(timer);
-  }
+    req.write(body);
+    req.end();
+  });
 }
 
 // Convenience: the music bed (vocals removed) for a scene's audio.
