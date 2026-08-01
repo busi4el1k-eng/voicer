@@ -68,36 +68,85 @@ export async function cutSegment(
   return readFile(out);
 }
 
+// Extract the full audio track as 44.1k stereo WAV (what Demucs wants, and what
+// the render pipeline slices the music bed from).
+export async function extractAudio(input: string, out: string): Promise<Buffer> {
+  await run(["-y", "-i", input, "-vn", "-ac", "2", "-ar", "44100", "-c:a", "pcm_s16le", out]);
+  return readFile(out);
+}
+
 // A recorded dub take placed on the timeline of the source video.
 export type DubTake = { path: string; startMs: number; endMs: number };
 
-// Produce the final full-length video: keep the original video stream, but in
-// each dubbed sector mute the original audio and drop the recorded take in.
-// Audio outside the sectors is left untouched.
-export async function muxDub(input: string, takes: DubTake[], out: string): Promise<Buffer> {
+export type MuxOptions = {
+  // Path to the Demucs music bed (no_vocals, full-length, time-aligned with the
+  // source). When present, each dubbed sector plays the original music under the
+  // take instead of going silent. Omit to keep the legacy mute-only behaviour.
+  bedPath?: string | null;
+  // Duck the music under the voice (sidechain compression). Default: true.
+  duck?: boolean;
+};
+
+// Normalise every branch to one format so amix / sidechaincompress agree.
+const AF = "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo";
+
+// Produce the final full-length video: keep the original video stream, and in
+// each dubbed sector replace the original dialogue with the recorded take. With
+// a bed, the original *music* is preserved under the take; without one, the
+// sector is simply muted then voiced (original audio outside sectors is always
+// left untouched).
+export async function muxDub(
+  input: string,
+  takes: DubTake[],
+  out: string,
+  opts: MuxOptions = {},
+): Promise<Buffer> {
   if (takes.length === 0) throw new Error("No dub takes to mux.");
+  const useBed = !!opts.bedPath;
+  const duck = opts.duck !== false;
 
   const args: string[] = ["-y", "-i", input];
   for (const t of takes) args.push("-i", t.path);
+  if (useBed) args.push("-i", opts.bedPath as string);
+  const bedIdx = takes.length + 1; // input index of the bed (video=0, takes=1..N)
 
   // Mute the original audio during every dubbed sector (OR of time ranges).
   const ranges = takes
     .map((t) => `between(t,${(t.startMs / 1000).toFixed(3)},${(t.endMs / 1000).toFixed(3)})`)
     .join("+");
-  const parts = [`[0:a]volume=0:enable='${ranges}'[base]`];
+  const parts = [`[0:a]${AF},volume=0:enable='${ranges}'[base]`];
+  const mix = ["[base]"];
 
-  // Trim each take to its sector length and delay it to the sector start.
-  const labels = ["[base]"];
   takes.forEach((t, i) => {
+    const startS = (t.startMs / 1000).toFixed(3);
+    const endS = (t.endMs / 1000).toFixed(3);
     const dur = ((t.endMs - t.startMs) / 1000).toFixed(3);
     const delay = Math.max(0, Math.round(t.startMs));
-    parts.push(`[${i + 1}:a]atrim=0:${dur},asetpts=PTS-STARTPTS,adelay=${delay}:all=1[t${i}]`);
-    labels.push(`[t${i}]`);
+    const voice = `[${i + 1}:a]${AF},atrim=0:${dur},asetpts=PTS-STARTPTS,adelay=${delay}:all=1`;
+
+    if (useBed && duck) {
+      // Voice is split: one copy keys the compressor, one goes into the mix.
+      parts.push(`${voice},asplit=2[v${i}a][v${i}b]`);
+      parts.push(
+        `[${bedIdx}:a]${AF},atrim=${startS}:${endS},asetpts=PTS-STARTPTS,adelay=${delay}:all=1[b${i}]`,
+      );
+      parts.push(`[b${i}][v${i}a]sidechaincompress=threshold=0.05:ratio=8:attack=5:release=250[d${i}]`);
+      mix.push(`[v${i}b]`, `[d${i}]`);
+    } else if (useBed) {
+      parts.push(`${voice}[v${i}]`);
+      parts.push(
+        `[${bedIdx}:a]${AF},atrim=${startS}:${endS},asetpts=PTS-STARTPTS,adelay=${delay}:all=1[b${i}]`,
+      );
+      mix.push(`[v${i}]`, `[b${i}]`);
+    } else {
+      parts.push(`${voice}[v${i}]`);
+      mix.push(`[v${i}]`);
+    }
   });
 
-  // Sum them (normalize=0 keeps levels: base is 0 inside sectors, takes are 0
-  // outside their window, so they don't fight).
-  parts.push(`${labels.join("")}amix=inputs=${labels.length}:normalize=0[aout]`);
+  // Sum them (normalize=0 keeps levels: base is 0 inside sectors; the take/bed
+  // branches are silent outside their window, so they don't fight).
+  parts.push(`${mix.join("")}amix=inputs=${mix.length}:normalize=0[aout]`);
 
   args.push(
     "-filter_complex", parts.join(";"),

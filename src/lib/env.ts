@@ -11,6 +11,10 @@ const serverSchema = z.object({
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET: z.string().optional(),
+  // Demucs source-separation service (keeps original music when dubbing).
+  // Optional: without it, renders fall back to muting the sector (no music).
+  DEMUCS_URL: z.string().url().optional(),
+  DEMUCS_API_KEY: z.string().optional(),
 });
 
 const clientSchema = z.object({

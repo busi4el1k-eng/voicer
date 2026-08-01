@@ -105,6 +105,10 @@ model VideoUpload {
   // uploaded | cutting | done | error
   status     String         @default("uploaded")
   error      String         @default("")
+  // Demucs music/FX bed (original audio with vocals removed), computed once per
+  // source so dubbed sectors keep the original music. none|processing|ready|error.
+  bedKey     String? // Spaces key of the separated no_vocals bed (full length)
+  bedStatus  String         @default("none")
   segments   VideoSegment[]
   createdAt  DateTime       @default(now())
 

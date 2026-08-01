@@ -70,8 +70,15 @@ export async function POST(req: NextRequest) {
       }
       if (takes.length === 0) throw new ClientError("No recorded takes to combine.");
 
+      // Keep the original music under each dubbed sector when the bed is ready.
+      let bedPath: string | null = null;
+      if (upload.bedStatus === "ready" && upload.bedKey) {
+        bedPath = join(dir, "bed.wav");
+        await writeFile(bedPath, await getObjectBuffer(upload.bedKey));
+      }
+
       const out = join(dir, "party-dub.mp4");
-      return muxDub(input, takes, out);
+      return muxDub(input, takes, out, { bedPath });
     });
 
     const key = `${SPACES_PREFIX}rooms/${code}/final/${Date.now()}.mp4`;

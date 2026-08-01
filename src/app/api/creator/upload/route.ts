@@ -1,9 +1,10 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
 import { SPACES_PREFIX, putObject, spacesConfigured } from "@/lib/spaces";
 import { rateLimit } from "@/lib/rate-limit";
 import { generateShareId } from "@/lib/share-id.server";
+import { generateBedForUpload } from "@/lib/bed.server";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -63,6 +64,11 @@ export async function POST(req: NextRequest) {
     where: { id: upload.id },
     data: { sourceKey: key, sourceUrl: url },
   });
+
+  // Start separating the music bed now, off the request path, so it's likely
+  // ready by the time the creator finishes placing sectors and renders. No-op
+  // when Demucs isn't configured; safe to re-trigger via /api/creator/bed.
+  after(() => generateBedForUpload(saved.id));
 
   return NextResponse.json({ upload: saved });
 }
