@@ -4,12 +4,25 @@
 // per-source music bed. Separation is slow (CPU), so callers run this off the
 // request path (see bed.server.ts + `after`).
 
+import { Agent } from "undici";
+
 const URL_BASE = process.env.DEMUCS_URL?.replace(/\/+$/, "");
 const API_KEY = process.env.DEMUCS_API_KEY;
 
 // A generous ceiling: CPU separation runs ~2.6x realtime, so even a long scene
 // finishes well inside this. Guards against a hung upstream holding a slot.
 const TIMEOUT_MS = 20 * 60 * 1000;
+
+// Demucs holds the connection open (no response headers) for the *whole*
+// separation — minutes. Node's global fetch (undici) defaults headersTimeout /
+// bodyTimeout to 300s and would abort with an opaque "fetch failed" long before
+// the job finishes. Disable those here and let the AbortController above be the
+// only cap. connectTimeout still guards a dead host.
+const dispatcher = new Agent({
+  headersTimeout: 0,
+  bodyTimeout: 0,
+  connectTimeout: 10_000,
+});
 
 export function demucsConfigured(): boolean {
   return !!(URL_BASE && API_KEY);
@@ -37,7 +50,9 @@ export async function separateStem(
       headers: { Authorization: `Bearer ${API_KEY}` },
       body: form,
       signal: controller.signal,
-    });
+      // undici-specific: overrides the 300s header/body timeout (see above).
+      dispatcher,
+    } as RequestInit & { dispatcher: Agent });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       throw new Error(`Demucs ${res.status}: ${detail.slice(0, 300)}`);
