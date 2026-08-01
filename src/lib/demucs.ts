@@ -4,7 +4,7 @@
 // per-source music bed. Separation is slow (CPU), so callers run this off the
 // request path (see bed.server.ts + `after`).
 
-import { Agent } from "undici";
+import { Agent, fetch as undiciFetch } from "undici";
 
 const URL_BASE = process.env.DEMUCS_URL?.replace(/\/+$/, "");
 const API_KEY = process.env.DEMUCS_API_KEY;
@@ -39,20 +39,35 @@ export async function separateStem(
     throw new Error("Demucs is not configured (DEMUCS_URL / DEMUCS_API_KEY).");
   }
 
-  const form = new FormData();
-  form.append("file", new Blob([new Uint8Array(audio)]), filename);
+  // Build the multipart/form-data body by hand. Relying on global FormData/Blob
+  // with undici's fetch dropped the file field (server saw no "file"); a manual
+  // Buffer body is deterministic and parses cleanly as FastAPI's UploadFile.
+  const boundary = `----voicer${Math.random().toString(16).slice(2)}`;
+  const CRLF = "\r\n";
+  const head = Buffer.from(
+    `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="file"; filename="${filename}"${CRLF}` +
+      `Content-Type: application/octet-stream${CRLF}${CRLF}`,
+  );
+  const tail = Buffer.from(`${CRLF}--${boundary}--${CRLF}`);
+  const body = Buffer.concat([head, audio, tail]);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${URL_BASE}/separate?stem=${stem}`, {
+    // Use undici's own fetch (not Node's global fetch) so the Agent above — from
+    // the same undici — is a compatible dispatcher. Mixing the standalone undici
+    // Agent into Node's built-in fetch throws an opaque "fetch failed".
+    const res = await undiciFetch(`${URL_BASE}/separate?stem=${stem}`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${API_KEY}` },
-      body: form,
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body,
       signal: controller.signal,
-      // undici-specific: overrides the 300s header/body timeout (see above).
       dispatcher,
-    } as RequestInit & { dispatcher: Agent });
+    });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       throw new Error(`Demucs ${res.status}: ${detail.slice(0, 300)}`);
