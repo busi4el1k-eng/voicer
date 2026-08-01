@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AccountBar } from "@/components/AccountBar";
 import { VideoThumb } from "@/components/VideoThumb";
+import { LiquidLogo } from "@/components/LiquidLogo";
 import { formatShareId } from "@/lib/share-id";
 
 // One fixed colour per player seat (1-4), matching the editor.
@@ -31,11 +32,82 @@ type Upload = {
   segments: Segment[];
 };
 
+// Upload + Demucs progress overlay (the liquid "dubthatmovie" bar).
+type Overlay = {
+  active: boolean;
+  phase: "upload" | "separating" | "ready" | "error";
+  progress: number; // 0..1 across the whole upload → separation flow
+  message: string;
+  uploadId?: string;
+};
+
+// POST the file with real upload progress (fetch can't report upload progress).
+function uploadXhr(file: File, title: string, onProgress: (frac: number) => void): Promise<Upload> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/creator/upload");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      try {
+        const d = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) resolve(d.upload as Upload);
+        else reject(new Error(d.error || "Upload failed."));
+      } catch {
+        reject(new Error("Upload failed."));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload."));
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("title", title);
+    xhr.send(fd);
+  });
+}
+
+// Poll the music-bed status while easing the visual toward ~0.96. Resolves with
+// the terminal status; "none" (separation not configured) resolves after a short
+// grace so the flow never hangs.
+function waitForBed(
+  uploadId: string,
+  onTick: (p: number) => void,
+): Promise<"ready" | "error" | "none"> {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    let stopped = false;
+    const ease = window.setInterval(() => {
+      const el = (Date.now() - start) / 1000;
+      onTick(Math.min(0.96, 0.4 + 0.56 * (1 - Math.exp(-el / 80))));
+    }, 120);
+    const finish = (s: "ready" | "error" | "none") => {
+      stopped = true;
+      window.clearInterval(ease);
+      resolve(s);
+    };
+    const poll = async () => {
+      if (stopped) return;
+      try {
+        const r = await fetch(`/api/creator/bed?uploadId=${uploadId}`);
+        const d = (await r.json()) as { status?: string };
+        if (d.status === "ready") return finish("ready");
+        if (d.status === "error") return finish("error");
+        if (d.status === "none" && Date.now() - start > 12000) return finish("none");
+      } catch {
+        /* transient — keep polling */
+      }
+      if (!stopped) window.setTimeout(poll, 2500);
+    };
+    void poll();
+  });
+}
+
 export default function CreatorPage() {
   const [jobs, setJobs] = useState<Upload[]>([]);
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState<string>(""); // "upload" | `del:<id>` | `rename:<id>`
   const [err, setErr] = useState("");
+  const [ov, setOv] = useState<Overlay>({ active: false, phase: "upload", progress: 0, message: "" });
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Inline rename state for the management table.
@@ -67,25 +139,79 @@ export default function CreatorPage() {
     void load();
   }, [load]);
 
+  // Watch the bed separation to completion, easing the liquid fill as it goes.
+  const runSeparation = useCallback(
+    async (uploadId: string) => {
+      const res = await waitForBed(uploadId, (p) =>
+        setOv((o) => ({ ...o, progress: Math.max(o.progress, p) })),
+      );
+      if (res === "error") {
+        setOv((o) => ({
+          ...o,
+          phase: "error",
+          message: "Couldn't prepare the music. Retry, or continue without it.",
+        }));
+        return;
+      }
+      setOv((o) => ({
+        ...o,
+        phase: "ready",
+        progress: 1,
+        message: res === "ready" ? "Music ready!" : "Uploaded!",
+      }));
+      await load();
+      window.setTimeout(() => setOv((o) => ({ ...o, active: false })), 1200);
+    },
+    [load],
+  );
+
   const upload = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file) return setErr("Choose a video file first.");
     setErr("");
-    setBusy("upload");
+    setOv({ active: true, phase: "upload", progress: 0, message: "Uploading video…" });
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("title", title);
-      const r = await fetch("/api/creator/upload", { method: "POST", body: fd });
-      if (!r.ok) throw new Error((await r.json()).error || "Upload failed.");
+      // Upload occupies the first third of the bar; separation the rest.
+      const up = await uploadXhr(file, title, (frac) =>
+        setOv((o) => ({ ...o, progress: frac * 0.3, message: "Uploading video…" })),
+      );
       setTitle("");
       if (fileRef.current) fileRef.current.value = "";
-      await load();
+      setOv((o) => ({
+        ...o,
+        phase: "separating",
+        progress: Math.max(o.progress, 0.36),
+        uploadId: up.id,
+        message: "Separating music…",
+      }));
+      await runSeparation(up.id);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Upload failed.");
-    } finally {
-      setBusy("");
+      setOv((o) => ({
+        ...o,
+        phase: "error",
+        message: e instanceof Error ? e.message : "Upload failed.",
+      }));
     }
+  };
+
+  // Re-kick separation after an error (the upload itself already succeeded).
+  const retryBed = async () => {
+    const id = ov.uploadId;
+    if (!id) {
+      setOv((o) => ({ ...o, active: false }));
+      return;
+    }
+    setOv((o) => ({ ...o, phase: "separating", progress: Math.max(o.progress, 0.4), message: "Separating music…" }));
+    try {
+      await fetch("/api/creator/bed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadId: id }),
+      });
+    } catch {
+      /* the poll below will surface any persistent failure */
+    }
+    await runSeparation(id);
   };
 
   const remove = async (j: Upload) => {
@@ -156,8 +282,8 @@ export default function CreatorPage() {
               accept="video/*"
               className="text-[13px] text-cream/70 file:mr-3 file:cursor-pointer file:rounded-[8px] file:border-0 file:bg-violet-lift file:px-3 file:py-2 file:font-display file:text-cream"
             />
-            <button className="g-btn g-btn-start" onClick={upload} disabled={busy === "upload"}>
-              {busy === "upload" ? "Uploading…" : "Upload"}
+            <button className="g-btn g-btn-start" onClick={upload} disabled={ov.active}>
+              {ov.active ? "Working…" : "Upload"}
             </button>
 
             <p className="text-[12px] leading-[1.5] text-cream/60">
@@ -350,6 +476,58 @@ export default function CreatorPage() {
           </div>
         </div>
       </div>
+
+      {/* Upload + Demucs separation — liquid "dubthatmovie" progress overlay */}
+      {ov.active && (
+        <div className="g-modal-overlay" style={{ zIndex: 60 }}>
+          <div className="g-modal" style={{ maxWidth: 640, gap: 14, padding: "30px 26px 24px" }}>
+            <div style={{ width: "100%", padding: "0 4px" }}>
+              <LiquidLogo progress={ov.progress} />
+            </div>
+            <div
+              className="tnum"
+              style={{
+                fontFamily: "var(--font-nunito), sans-serif",
+                fontWeight: 900,
+                fontSize: 30,
+                color: "#5cffb6",
+                textShadow: "var(--g-outline-dark)",
+              }}
+            >
+              {Math.round(ov.progress * 100)}%
+            </div>
+            <div className="g-modal-title" style={{ fontSize: 18 }}>
+              {ov.message}
+            </div>
+            {ov.phase === "separating" && (
+              <div className="g-modal-sub">
+                Keeping the original music under your dub — this can take a few minutes.
+              </div>
+            )}
+            {ov.phase === "error" && (
+              <div className="flex gap-2 pt-1">
+                <button
+                  className="g-btn g-btn-primary"
+                  style={{ height: 44, padding: "0 20px", fontSize: 15 }}
+                  onClick={() => void retryBed()}
+                >
+                  Retry
+                </button>
+                <button
+                  className="g-btn g-btn-ghost"
+                  style={{ height: 44, padding: "0 20px", fontSize: 15 }}
+                  onClick={() => {
+                    setOv((o) => ({ ...o, active: false }));
+                    void load();
+                  }}
+                >
+                  Continue
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
