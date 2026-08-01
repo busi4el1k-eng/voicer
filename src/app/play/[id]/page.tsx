@@ -174,6 +174,12 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
   const takesRef = useRef<Record<string, RecordResult>>({});
   const origRef = useRef<Pcm | null>(null);
   const stopAtRef = useRef<number | null>(null);
+  const capRef = useRef<number | null>(null); // auto-stop timer (sector-length cap)
+
+  // Clear a pending record cap if we unmount mid-recording.
+  useEffect(() => () => {
+    if (capRef.current != null) clearTimeout(capRef.current);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -292,27 +298,41 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
     void v.play().catch(() => {});
   }, [seg]);
 
-  // Start / stop recording this line. On start we play the muted video from the
-  // sector start so you can dub to picture; you stop when you're done.
-  const toggleRecord = useCallback(async () => {
+  // Stop the current line's recording (manually or via the sector-length cap).
+  const stopRecording = useCallback(async () => {
+    if (capRef.current != null) {
+      clearTimeout(capRef.current);
+      capRef.current = null;
+    }
+    const take = await mic.stopRec();
+    videoRef.current?.pause();
+    stopAtRef.current = null;
+    if (seg && take) {
+      takesRef.current[seg.id] = take;
+      setTakes({ ...takesRef.current });
+      await analyze(seg, take);
+    }
+  }, [seg, mic, analyze]);
+
+  // Start recording this line: play the muted video from the sector start so you
+  // can dub to picture. You can't record past the sector length — auto-stop at
+  // the sector duration so the take always fits the slot.
+  const startRecording = useCallback(async () => {
     const v = videoRef.current;
     if (!v || !seg) return;
-    if (mic.recording) {
-      const take = await mic.stopRec();
-      v.pause();
-      stopAtRef.current = null;
-      if (take) {
-        takesRef.current[seg.id] = take;
-        setTakes({ ...takesRef.current });
-        await analyze(seg, take);
-      }
-      return;
-    }
     v.muted = true;
     v.currentTime = seg.startMs / 1000;
     await v.play().catch(() => {});
     mic.startRec();
-  }, [seg, mic, analyze]);
+    if (capRef.current != null) clearTimeout(capRef.current);
+    const maxMs = Math.max(300, seg.endMs - seg.startMs);
+    capRef.current = window.setTimeout(() => void stopRecording(), maxMs);
+  }, [seg, mic, stopRecording]);
+
+  const toggleRecord = useCallback(() => {
+    if (mic.recording) void stopRecording();
+    else void startRecording();
+  }, [mic.recording, startRecording, stopRecording]);
 
   const replayOriginal = useCallback(() => {
     setReplaying("orig");
