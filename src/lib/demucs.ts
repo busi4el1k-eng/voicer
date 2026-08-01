@@ -16,13 +16,16 @@ const TIMEOUT_MS = 20 * 60 * 1000;
 // Demucs holds the connection open (no response headers) for the *whole*
 // separation — minutes. Node's global fetch (undici) defaults headersTimeout /
 // bodyTimeout to 300s and would abort with an opaque "fetch failed" long before
-// the job finishes. Disable those here and let the AbortController above be the
-// only cap. connectTimeout still guards a dead host.
-const dispatcher = new Agent({
-  headersTimeout: 0,
-  bodyTimeout: 0,
-  connectTimeout: 10_000,
-});
+// the job finishes. Disable those here and let the AbortController be the only
+// cap. connectTimeout still guards a dead host. Built lazily so importing this
+// module (e.g. during `next build` page-data collection) has no side effects.
+let _dispatcher: Agent | null = null;
+function dispatcher(): Agent {
+  if (!_dispatcher) {
+    _dispatcher = new Agent({ headersTimeout: 0, bodyTimeout: 0, connectTimeout: 10_000 });
+  }
+  return _dispatcher;
+}
 
 export function demucsConfigured(): boolean {
   return !!(URL_BASE && API_KEY);
@@ -66,7 +69,7 @@ export async function separateStem(
       },
       body,
       signal: controller.signal,
-      dispatcher,
+      dispatcher: dispatcher(),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
