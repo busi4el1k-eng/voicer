@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 scratch/
+
+# Claude local settings
+.claude/settings.local.json*
