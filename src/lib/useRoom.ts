@@ -91,7 +91,13 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
       }
       fetch(`/api/room/${m.code}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((d) => d?.room && setRoom(d.room))
+        .then((d: { room?: RoomView } | null) => {
+          if (!d?.room) return;
+          // Room exists but we're not in its roster (closed & recycled, kicked,
+          // pruned): the stored membership is stale, so drop it.
+          if (d.room.players.some((p) => p.id === m.playerId)) setRoom(d.room);
+          else reset();
+        })
         .catch((status) => {
           if (status === 404) reset(); // room closed — drop the stale membership
         });
@@ -113,20 +119,32 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
     };
   }, [applyMembership]);
 
-  // Poll the room while we're in one so joins/leaves show up for everyone.
+  // Poll while we have a membership (not just a loaded room) so joins/leaves
+  // show up for everyone, a room that failed to load initially keeps retrying,
+  // and a dead/stale membership self-heals instead of trapping the user.
   useEffect(() => {
-    if (!room) return;
-    const code = room.code;
-    const id = setInterval(() => {
+    const code = membership?.code;
+    if (!code) return;
+    let cancelled = false;
+    const tick = () => {
       fetch(`/api/room/${code}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((d) => d?.room && setRoom(d.room))
+        .then((d: { room?: RoomView } | null) => {
+          if (cancelled || !d?.room) return;
+          // Still in the roster → sync; otherwise the room recycled without us.
+          if (d.room.players.some((p) => p.id === playerId)) setRoom(d.room);
+          else reset();
+        })
         .catch((status) => {
-          if (status === 404) reset(); // room closed by host
+          if (!cancelled && status === 404) reset(); // room closed by host
         });
-    }, POLL_MS);
-    return () => clearInterval(id);
-  }, [room, reset]);
+    };
+    const id = setInterval(tick, POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [membership?.code, playerId, reset]);
 
   const create = useCallback(async () => {
     setBusy(true);
@@ -207,19 +225,22 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
   }, [room, playerId]);
 
   const leave = useCallback(async () => {
-    if (!room || !playerId) return;
-    const code = room.code;
+    // Always clear local membership first — even if the room never loaded or no
+    // longer exists — so the user is never trapped and can immediately re-enter.
+    const code = room?.code ?? membership?.code ?? null;
+    const pid = playerId;
     reset();
+    if (!code || !pid) return;
     try {
       await fetch("/api/room/leave", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code, playerId }),
+        body: JSON.stringify({ code, playerId: pid }),
       });
     } catch {
       /* local state already cleared */
     }
-  }, [room, playerId, reset]);
+  }, [room, membership, playerId, reset]);
 
   // Authoritative host flag once the room is loaded; before that, fall back to
   // the membership snapshot so the UI (e.g. the waiting room) is correct

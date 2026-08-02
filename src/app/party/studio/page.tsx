@@ -44,6 +44,7 @@ export default function PartyStudioPage() {
   const [takeWave, setTakeWave] = useState<Record<string, Float32Array>>({});
   const [err, setErr] = useState("");
   const [renderBusy, setRenderBusy] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const stageRef = useRef<VideoStageHandle>(null);
   const pcmRef = useRef<Pcm | null>(null);
@@ -224,6 +225,7 @@ export default function PartyStudioPage() {
   // dashboard's "follow the host" effect would immediately pull them back in.
   // The host just navigates (leaving would tear the room down for everyone).
   const backToLobby = useCallback(async () => {
+    setLeaving(true);
     if (!isHost) await leave();
     router.push("/dashboard");
   }, [isHost, leave, router]);
@@ -306,12 +308,18 @@ export default function PartyStudioPage() {
         ) : phase === "error" ? (
           <div className="g-panel text-center">
             <h2 className="g-title">Couldn&apos;t load</h2>
-            <p className="mb-4 text-[13px] text-cream/60">The party video isn&apos;t available.</p>
+            <p className="mb-4 text-[13px] text-cream/60">
+              The party video isn&apos;t available anymore
+              {isHost
+                ? " — it may have been deleted. Leave and set up the party again."
+                : ". Leaving the party — the host will need to pick another video."}
+            </p>
             <button
-              onClick={() => router.push("/party")}
+              onClick={() => void backToLobby()}
+              disabled={leaving}
               className="g-btn g-btn-ghost mx-auto"
             >
-              Back
+              {leaving ? "Leaving…" : "Leave party"}
             </button>
           </div>
         ) : mySubmitted || phase === "submitting" ? (

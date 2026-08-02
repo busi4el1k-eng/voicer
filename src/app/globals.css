@@ -36,16 +36,57 @@
 
 html {
   height: 100%;
+  /* Deepest fallback so no white ever shows through (e.g. overscroll). */
+  background-color: var(--color-violet-deep);
 }
 
 body {
   min-height: 100%;
-  /* Gartic Phone purple→magenta stage gradient. */
-  background: linear-gradient(200deg, rgba(92, 9, 190, 1) 0%, rgba(207, 48, 93, 1) 100%);
-  background-attachment: fixed;
+  /* The gradient + animated emojis live on the fixed .g-bg layer instead, so
+     the backdrop never scrolls with the page and always fills the viewport. */
+  background: transparent;
   color: var(--color-cream);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Fixed, non-scrolling stage backdrop (gradient + floating emojis). */
+.g-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(200deg, rgba(92, 9, 190, 1) 0%, rgba(207, 48, 93, 1) 100%);
+}
+.g-bg-float {
+  position: absolute;
+  bottom: -12vh;
+  display: block;
+  line-height: 1;
+  /* Render the colour emoji as a flat, translucent black silhouette. */
+  filter: brightness(0);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation-name: g-float-diagonal;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes g-float-diagonal {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.11;
+  }
+  92% {
+    opacity: 0.11;
+  }
+  100% {
+    transform: translate3d(var(--g-float-x, 12vw), -130vh, 0) rotate(var(--g-float-rot, 15deg));
+    opacity: 0;
+  }
 }
 
 .tnum {
