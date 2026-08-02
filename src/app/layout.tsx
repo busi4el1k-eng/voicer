@@ -4,6 +4,7 @@ import { ClerkResilientProvider } from "@/components/ClerkResilientProvider";
 import { BackButton } from "@/components/BackButton";
 import { isClerkConfigured } from "@/lib/clerk";
 import "./globals.css";
+import "./mobile.css";
 
 const fredoka = Fredoka({
   variable: "--font-fredoka",

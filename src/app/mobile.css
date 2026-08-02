@@ -1,0 +1,51 @@
+/* Small-screen refinements for the shared Gartic (g-*) design system.
+   Kept in its own file (imported after globals.css) so it stays additive and
+   never conflicts with concurrent edits to globals.css. */
+
+@media (max-width: 640px) {
+  /* Tighter stage padding + logo/title sizing on phones. */
+  .g-screen {
+    padding: 12px 12px 24px;
+  }
+  .g-logo {
+    font-size: clamp(24px, 8vw, 34px);
+  }
+  .g-title {
+    font-size: 19px;
+  }
+  .g-center {
+    gap: 12px;
+  }
+
+  /* Chunky buttons: a touch shorter, full-width primary CTAs (better taps). */
+  .g-btn {
+    height: 48px;
+    font-size: 16px;
+    padding: 0 18px;
+  }
+  .g-actions {
+    align-self: stretch;
+  }
+  .g-actions > .g-btn {
+    width: 100%;
+  }
+
+  /* Modals hug the viewport; big code text scales down so it never clips. */
+  .g-modal {
+    max-width: 100%;
+  }
+  .g-modal-code {
+    font-size: 34px;
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
+  }
+  .g-invite-code {
+    font-size: 22px;
+  }
+
+  /* A stray wide child should never make the whole page scroll sideways. */
+  html,
+  body {
+    overflow-x: hidden;
+  }
+}
