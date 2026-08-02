@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import { ClerkResilientProvider } from "@/components/ClerkResilientProvider";
+import { BackButton } from "@/components/BackButton";
 import { isClerkConfigured } from "@/lib/clerk";
 import "./globals.css";
 
@@ -26,7 +27,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const shell = (
     <html lang="en" className={`${fredoka.variable} ${nunito.variable} h-full`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <BackButton />
+        {children}
+      </body>
     </html>
   );
 
