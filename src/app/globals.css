@@ -665,10 +665,27 @@ button.g-ghost-slot:disabled {
 @media (max-width: 860px) {
   .g-center {
     flex-direction: column;
+    align-items: stretch;
   }
   .g-left {
-    width: auto;
+    width: 100%;
   }
+}
+
+/* Thin, on-theme scrollbar for the zoomable timeline viewport. */
+.g-timeline-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #8952dc transparent;
+}
+.g-timeline-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.g-timeline-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.g-timeline-scroll::-webkit-scrollbar-thumb {
+  background: #8952dc;
+  border-radius: 8px;
 }
 
 @media (prefers-reduced-motion: reduce) {

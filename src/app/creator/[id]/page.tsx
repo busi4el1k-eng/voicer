@@ -42,6 +42,14 @@ const fmt = (ms: number) => {
 // One fixed colour per player seat (1-4), so a player reads the same everywhere.
 const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8"];
 
+// Timeline zoom: 1× fills the frame; higher values widen the track so it scrolls
+// and sectors can be placed more precisely. A drag on the track past this many
+// pixels is treated as a scroll (pan) rather than a tap that marks a sector — so
+// scrolling is never mistaken for placing a sector start.
+const ZOOM_STEPS = [1, 1.5, 2, 4];
+const MAX_ZOOM = ZOOM_STEPS[ZOOM_STEPS.length - 1];
+const PAN_THRESHOLD = 6;
+
 // A little sticker-icon + heading used atop each editor panel, in the app's
 // chunky display style.
 function SectionHead({
@@ -82,15 +90,19 @@ function Badge({ children, className = "" }: { children: React.ReactNode; classN
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
 
-  // Touch devices get tap/drag instructions (and no keyboard hints). SSR-safe:
-  // server snapshot is false, the client subscribes to the media query.
+  // Touch/mobile devices get tap-drag instructions (and no keyboard hints).
+  // We treat either a coarse pointer OR the narrow mobile layout (matching the
+  // app's 860px breakpoint) as "mobile" so phones never get PC-only hints, even
+  // if the browser misreports pointer type. SSR-safe: server snapshot is false,
+  // the client subscribes to the media query.
+  const MOBILE_MQ = "(pointer: coarse), (max-width: 860px)";
   const isTouch = useSyncExternalStore(
     (cb) => {
-      const mq = window.matchMedia("(pointer: coarse)");
+      const mq = window.matchMedia(MOBILE_MQ);
       mq.addEventListener("change", cb);
       return () => mq.removeEventListener("change", cb);
     },
-    () => window.matchMedia("(pointer: coarse)").matches,
+    () => window.matchMedia(MOBILE_MQ).matches,
     () => false,
   );
 
@@ -104,6 +116,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [copied, setCopied] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
+  // How far the timeline is zoomed in (1 = fit to frame). Above 1 the track
+  // grows wider than its viewport and can be scrolled.
+  const [zoom, setZoom] = useState(1);
   // Click-to-place is always on: first click on the timeline sets a sector's
   // start, the second sets its end. `pendingStart` holds the first click.
   const [pendingStart, setPendingStart] = useState<number | null>(null);
@@ -113,9 +128,14 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null); // scroll viewport around the track
+  const trackRef = useRef<HTMLDivElement>(null); // full-width (zoomed) inner track
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stopAtRef = useRef<number | null>(null);
+  // Decoded waveform samples, cached so re-rendering at a new zoom is cheap.
+  const waveDataRef = useRef<Float32Array | null>(null);
+  // In-flight track drag used to tell a scroll (pan) from a tap that marks a sector.
+  const panRef = useRef<{ x: number; y: number; scroll: number; moved: boolean } | null>(null);
 
   // Load the upload + its segments.
   useEffect(() => {
@@ -142,40 +162,56 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     })();
   }, [id]);
 
-  // Draw the original audio waveform behind the timeline (best-effort; skipped
-  // if the CDN blocks the fetch for decoding).
-  const drawWave = useCallback(async (url: string) => {
-    try {
-      const buf = await (await fetch(url)).arrayBuffer();
-      const Ctx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ac = new Ctx();
-      const audio = await ac.decodeAudioData(buf);
-      await ac.close();
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const W = (canvas.width = canvas.clientWidth * 2);
-      const H = (canvas.height = canvas.clientHeight * 2);
-      const ctx = canvas.getContext("2d")!;
-      const data = audio.getChannelData(0);
-      const step = Math.floor(data.length / W);
-      ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = "rgba(255,246,236,0.28)";
-      for (let x = 0; x < W; x++) {
-        let peak = 0;
-        for (let i = 0; i < step; i++) peak = Math.max(peak, Math.abs(data[x * step + i] || 0));
-        const h = Math.max(1, peak * H);
-        ctx.fillRect(x, (H - h) / 2, 1, h);
-      }
-    } catch {
-      /* waveform is optional */
+  // Paint the cached waveform onto the canvas at its current (zoomed) width.
+  // Cheap enough to re-run whenever the track resizes.
+  const renderWave = useCallback(() => {
+    const canvas = canvasRef.current;
+    const data = waveDataRef.current;
+    if (!canvas || !data) return;
+    const W = (canvas.width = Math.max(1, canvas.clientWidth * 2));
+    const H = (canvas.height = Math.max(1, canvas.clientHeight * 2));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const step = Math.max(1, Math.floor(data.length / W));
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(255,246,236,0.28)";
+    for (let x = 0; x < W; x++) {
+      let peak = 0;
+      for (let i = 0; i < step; i++) peak = Math.max(peak, Math.abs(data[x * step + i] || 0));
+      const h = Math.max(1, peak * H);
+      ctx.fillRect(x, (H - h) / 2, 1, h);
     }
   }, []);
+
+  // Decode the original audio once, cache the samples, then draw. Best-effort;
+  // skipped if the CDN blocks the fetch for decoding.
+  const drawWave = useCallback(
+    async (url: string) => {
+      try {
+        const buf = await (await fetch(url)).arrayBuffer();
+        const Ctx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const ac = new Ctx();
+        const audio = await ac.decodeAudioData(buf);
+        await ac.close();
+        waveDataRef.current = audio.getChannelData(0).slice();
+        renderWave();
+      } catch {
+        /* waveform is optional */
+      }
+    },
+    [renderWave],
+  );
 
   useEffect(() => {
     if (upload?.sourceUrl) void drawWave(upload.sourceUrl);
   }, [upload?.sourceUrl, drawWave]);
+
+  // Re-render the waveform crisply after the track width changes with the zoom.
+  useEffect(() => {
+    renderWave();
+  }, [zoom, renderWave]);
 
   // Create a sector spanning two marked times, fitted so it can't overlap a
   // neighbour (start pushed past any sector it lands in; end clipped to the next
@@ -298,6 +334,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     if (stopAtRef.current != null && v.currentTime * 1000 >= stopAtRef.current) {
       v.pause();
       stopAtRef.current = null;
+    }
+    // Keep the playhead within view while playing when zoomed in.
+    const vp = scrollRef.current;
+    if (vp && zoom > 1 && durMs > 0) {
+      const px = ((v.currentTime * 1000) / durMs) * vp.clientWidth * zoom;
+      const margin = vp.clientWidth * 0.12;
+      if (px < vp.scrollLeft + margin) vp.scrollLeft = px - margin;
+      else if (px > vp.scrollLeft + vp.clientWidth - margin)
+        vp.scrollLeft = px - vp.clientWidth + margin;
     }
   };
 
@@ -505,11 +550,59 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     window.addEventListener("pointerup", up);
   };
 
-  // Click an empty part of the timeline to mark a sector: first click sets the
-  // start, second click sets the end. The playhead is left where it is — only
-  // dragging the yellow knob moves it.
-  const onTrackPlace = (e: React.PointerEvent) => {
+  // Change the zoom while keeping whatever is under the viewport centre put, so
+  // zooming in/out feels anchored rather than jumping back to the start.
+  const applyZoom = useCallback((next: number) => {
+    const clamped = Math.min(MAX_ZOOM, Math.max(1, Math.round(next * 2) / 2));
+    setZoom((prev) => {
+      const vp = scrollRef.current;
+      if (vp && vp.clientWidth > 0 && clamped !== prev) {
+        const frac = (vp.scrollLeft + vp.clientWidth / 2) / (vp.clientWidth * prev);
+        const nextScroll = frac * vp.clientWidth * clamped - vp.clientWidth / 2;
+        requestAnimationFrame(() => {
+          const el = scrollRef.current;
+          if (el) el.scrollLeft = Math.max(0, nextScroll);
+        });
+      }
+      return clamped;
+    });
+  }, []);
+
+  // Step to the next preset zoom (1× → 1.5× → 2× → 4× → back to 1×).
+  const cycleZoom = useCallback(() => {
+    const i = ZOOM_STEPS.indexOf(zoom);
+    applyZoom(ZOOM_STEPS[(i + 1) % ZOOM_STEPS.length] ?? 1);
+  }, [zoom, applyZoom]);
+
+  // Pointer down on an empty part of the track. We don't act yet: a stationary
+  // release marks a sector (first tap = start, second = end), while a drag past
+  // PAN_THRESHOLD scrolls the timeline instead — so a scroll is never mistaken
+  // for placing a sector start. Sector/handle/playhead drags stopPropagation, so
+  // they never reach here.
+  const onTrackPointerDown = (e: React.PointerEvent) => {
     if (durMs <= 0) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const vp = scrollRef.current;
+    panRef.current = { x: e.clientX, y: e.clientY, scroll: vp ? vp.scrollLeft : 0, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  const onTrackPointerMove = (e: React.PointerEvent) => {
+    const p = panRef.current;
+    if (!p) return;
+    const dx = e.clientX - p.x;
+    if (!p.moved && Math.hypot(dx, e.clientY - p.y) > PAN_THRESHOLD) p.moved = true;
+    if (p.moved) {
+      const vp = scrollRef.current;
+      if (vp) vp.scrollLeft = p.scroll - dx;
+    }
+  };
+
+  const onTrackPointerUp = (e: React.PointerEvent) => {
+    const p = panRef.current;
+    panRef.current = null;
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    if (!p || p.moved) return; // a scroll, not a tap — don't mark a sector
     placePoint(timeAtClientX(e.clientX));
   };
 
@@ -665,8 +758,21 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         {/* Timeline */}
         <div className="g-panel">
           <SectionHead icon="🎞️" title="Timeline">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Badge className="text-mint">
+            <div className="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2">
+              {/* Zoom: one button cycling fixed steps (1× → 1.5× → 2× → 4×). */}
+              <button
+                type="button"
+                onClick={cycleZoom}
+                disabled={durMs <= 0}
+                title="Timeline zoom — tap to cycle"
+                aria-label={`Timeline zoom ${zoom}×, tap to change`}
+                className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black tabular-nums text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[1px] disabled:opacity-35 sm:px-3"
+                style={{ background: "rgba(37, 28, 92, 0.6)" }}
+              >
+                🔍 {zoom % 1 === 0 ? zoom : zoom.toFixed(1)}×
+              </button>
+              {/* Sector count — hidden on phones so the buttons stay on one row. */}
+              <Badge className="hidden text-mint sm:inline-flex">
                 {segs.length} {segs.length === 1 ? "sector" : "sectors"}
               </Badge>
               {/* Active player (1-4): the seat any new sector is assigned to. */}
@@ -674,28 +780,36 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 type="button"
                 onClick={() => setActivePlayer((p) => (p % 4) + 1)}
                 title="Player the next sector is assigned to — click to change (1-4)"
-                className="h-9 rounded-[9px] px-3 font-display text-[13px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_3px_0_rgba(31,7,51,0.35)] transition-transform active:translate-y-[1px]"
+                className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_3px_0_rgba(31,7,51,0.35)] transition-transform active:translate-y-[1px] sm:px-3"
                 style={{ background: PLAYER_COLORS[(activePlayer - 1) % 4] }}
               >
-                🎙 Player {activePlayer}
+                🎙 <span className="sm:hidden">P{activePlayer}</span>
+                <span className="hidden sm:inline">Player {activePlayer}</span>
               </button>
               <button
                 onClick={addSeg}
-                className="g-btn g-btn-ghost h-9 px-4 text-[13px]"
+                className="g-btn g-btn-ghost h-9 flex-none px-3 text-[13px] sm:px-4"
                 disabled={durMs <= 0}
               >
-                + Add sector
+                + Add<span className="hidden sm:inline"> sector</span>
               </button>
             </div>
           </SectionHead>
 
-          {/* Framed track */}
+          {/* Framed track — a scroll viewport wraps the (zoomable) inner track */}
           <div className="rounded-[12px] bg-violet-deep p-2 shadow-[inset_0_0_0_2px_#8952dc]">
+            <div ref={scrollRef} className="g-timeline-scroll relative overflow-x-auto overflow-y-hidden rounded-[9px]">
             <div
               ref={trackRef}
-              onPointerDown={onTrackPlace}
-              className="relative h-[104px] w-full cursor-crosshair touch-none overflow-hidden rounded-[9px]"
+              onPointerDown={onTrackPointerDown}
+              onPointerMove={onTrackPointerMove}
+              onPointerUp={onTrackPointerUp}
+              onPointerCancel={() => {
+                panRef.current = null;
+              }}
+              className="relative h-[104px] cursor-crosshair touch-none rounded-[9px]"
               style={{
+                width: `${zoom * 100}%`,
                 background:
                   "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 44px), linear-gradient(180deg, #1c0733 0%, #2a0845 100%)",
               }}
@@ -777,6 +891,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 </div>
               )}
             </div>
+            </div>
           </div>
 
           {/* Help / hint strip */}
@@ -801,8 +916,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 Tap the timeline to mark a sector start, then tap again for its end · drag the{" "}
                 <span className="text-sun">◆</span> playhead to scrub · tap a sector to select &amp;
                 play · drag a sector to move it, drag its <b className="text-cream/80">edges</b> to
-                resize · use <b className="text-cream/80">Delete</b> below to remove. Sectors
-                can&apos;t overlap.
+                resize · use <b className="text-cream/80">Delete</b> below to remove ·{" "}
+                <b className="text-cream/80">zoom</b> in and drag an empty part of the timeline to
+                scroll. Sectors can&apos;t overlap.
               </span>
             ) : (
               <span>
@@ -812,8 +928,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 <kbd className="font-display font-bold text-cream/80">←/→</kbd> jump 5s ·{" "}
                 <kbd className="font-display font-bold text-cream/80">Ctrl</kbd> also marks a sector.
                 Drag a sector to move it, its edges to resize;{" "}
-                <kbd className="font-display font-bold text-cream/80">Delete</kbd> removes. Sectors
-                can&apos;t overlap.
+                <kbd className="font-display font-bold text-cream/80">Delete</kbd> removes ·{" "}
+                <b className="text-cream/80">zoom</b> in and drag an empty part of the timeline to
+                scroll. Sectors can&apos;t overlap.
               </span>
             )}
           </div>
