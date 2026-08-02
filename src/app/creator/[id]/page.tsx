@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { formatShareId } from "@/lib/share-id";
 
@@ -54,7 +54,7 @@ function SectionHead({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <div className="flex items-center gap-2">
         <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-violet-lift/50 text-[18px] shadow-[inset_0_0_0_2px_rgba(137,82,220,0.6)]">
           {icon}
@@ -81,6 +81,18 @@ function Badge({ children, className = "" }: { children: React.ReactNode; classN
 
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+
+  // Touch devices get tap/drag instructions (and no keyboard hints). SSR-safe:
+  // server snapshot is false, the client subscribes to the media query.
+  const isTouch = useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia("(pointer: coarse)");
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => window.matchMedia("(pointer: coarse)").matches,
+    () => false,
+  );
 
   const [upload, setUpload] = useState<Upload | null>(null);
   const [segs, setSegs] = useState<Seg[]>([]);
@@ -653,7 +665,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         {/* Timeline */}
         <div className="g-panel">
           <SectionHead icon="🎞️" title="Timeline">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <Badge className="text-mint">
                 {segs.length} {segs.length === 1 ? "sector" : "sectors"}
               </Badge>
@@ -721,7 +733,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                         setSelected(s.key);
                         playSeg(s);
                       }}
-                      className="absolute top-2 bottom-2 z-10 flex cursor-grab items-center overflow-hidden rounded-[7px] active:cursor-grabbing"
+                      className="absolute top-2 bottom-2 z-10 flex touch-none cursor-grab items-center overflow-hidden rounded-[7px] active:cursor-grabbing"
                       style={{
                         left: `${left}%`,
                         width: `${Math.max(width, 0.5)}%`,
@@ -735,7 +747,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                     >
                       <span
                         onPointerDown={(e) => startDrag(e, s, "left")}
-                        className="absolute left-0 top-0 bottom-0 z-20 flex w-3 cursor-ew-resize items-center justify-center bg-black/20 hover:bg-black/40"
+                        className="absolute left-0 top-0 bottom-0 z-20 flex w-5 touch-none cursor-ew-resize items-center justify-center bg-black/20 hover:bg-black/40"
                       >
                         <span className="h-5 w-[2px] rounded bg-white/70" />
                       </span>
@@ -747,7 +759,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                       </span>
                       <span
                         onPointerDown={(e) => startDrag(e, s, "right")}
-                        className="absolute right-0 top-0 bottom-0 z-20 flex w-3 cursor-ew-resize items-center justify-center bg-black/20 hover:bg-black/40"
+                        className="absolute right-0 top-0 bottom-0 z-20 flex w-5 touch-none cursor-ew-resize items-center justify-center bg-black/20 hover:bg-black/40"
                       >
                         <span className="h-5 w-[2px] rounded bg-white/70" />
                       </span>
@@ -774,9 +786,23 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             </span>
             {pendingStart !== null ? (
               <span className="text-magenta">
-                Click the timeline again (or press{" "}
-                <kbd className="font-display font-bold">Ctrl</kbd>) to set the sector end · Esc to
-                cancel.
+                {isTouch ? (
+                  <>Tap the timeline again to set the sector end · tap a sector to cancel.</>
+                ) : (
+                  <>
+                    Click the timeline again (or press{" "}
+                    <kbd className="font-display font-bold">Ctrl</kbd>) to set the sector end · Esc to
+                    cancel.
+                  </>
+                )}
+              </span>
+            ) : isTouch ? (
+              <span>
+                Tap the timeline to mark a sector start, then tap again for its end · drag the{" "}
+                <span className="text-sun">◆</span> playhead to scrub · tap a sector to select &amp;
+                play · drag a sector to move it, drag its <b className="text-cream/80">edges</b> to
+                resize · use <b className="text-cream/80">Delete</b> below to remove. Sectors
+                can&apos;t overlap.
               </span>
             ) : (
               <span>
