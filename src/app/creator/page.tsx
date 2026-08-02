@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AccountBar } from "@/components/AccountBar";
+import { useAppDialog } from "@/components/AppDialog";
 import { VideoThumb } from "@/components/VideoThumb";
 import { LiquidLogo } from "@/components/LiquidLogo";
 import { formatShareId } from "@/lib/share-id";
@@ -104,11 +105,13 @@ function waitForBed(
 
 export default function CreatorPage() {
   const [jobs, setJobs] = useState<Upload[]>([]);
+  const [loaded, setLoaded] = useState(false); // first jobs fetch has resolved
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState<string>(""); // "upload" | `del:<id>` | `rename:<id>`
   const [err, setErr] = useState("");
   const [ov, setOv] = useState<Overlay>({ active: false, phase: "upload", progress: 0, message: "" });
   const fileRef = useRef<HTMLInputElement>(null);
+  const { dialog, confirm, alert } = useAppDialog();
 
   // Inline rename state for the management table.
   const [editingId, setEditingId] = useState("");
@@ -132,6 +135,8 @@ export default function CreatorPage() {
       setJobs(d.uploads ?? []);
     } catch {
       /* ignore */
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -215,7 +220,14 @@ export default function CreatorPage() {
   };
 
   const remove = async (j: Upload) => {
-    if (!confirm(`Delete “${j.title || "Untitled"}” and its clips? This can't be undone.`)) return;
+    const ok = await confirm({
+      title: "Delete video?",
+      message: `“${j.title || "Untitled"}” and all its clips will be removed. This can't be undone.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+      icon: "🗑️",
+    });
+    if (!ok) return;
     setErr("");
     setBusy(`del:${j.id}`);
     try {
@@ -223,7 +235,11 @@ export default function CreatorPage() {
       if (!r.ok) throw new Error((await r.json()).error || "Delete failed.");
       await load();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Delete failed.");
+      await alert({
+        title: "Couldn't delete",
+        message: e instanceof Error ? e.message : "Delete failed.",
+        tone: "danger",
+      });
     } finally {
       setBusy("");
     }
@@ -247,7 +263,11 @@ export default function CreatorPage() {
       setEditingId("");
       await load();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Rename failed.");
+      await alert({
+        title: "Couldn't rename",
+        message: e instanceof Error ? e.message : "Rename failed.",
+        tone: "danger",
+      });
     } finally {
       setBusy("");
     }
@@ -269,41 +289,65 @@ export default function CreatorPage() {
         {/* LEFT — add a video + info */}
         <div className="g-left">
           <h2 className="g-title">Add a video</h2>
-          <div className="g-panel flex flex-1 flex-col gap-3">
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title (optional)"
-              className="rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[14px] text-cream placeholder:text-cream/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
-            />
-            <input
-              ref={fileRef}
-              type="file"
-              accept="video/*"
-              className="text-[13px] text-cream/70 file:mr-3 file:cursor-pointer file:rounded-[8px] file:border-0 file:bg-violet-lift file:px-3 file:py-2 file:font-display file:text-cream"
-            />
-            <button className="g-btn g-btn-start" onClick={upload} disabled={ov.active}>
+          <div className="g-panel flex flex-1 flex-col gap-4">
+            {/* Title */}
+            <label className="flex flex-col gap-1.5">
+              <span className="font-display text-[12px] font-bold uppercase tracking-[0.06em] text-mint">
+                Title <span className="font-semibold text-cream/40">— optional</span>
+              </span>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Name your video…"
+                className="h-[46px] rounded-[10px] border-2 border-violet-lift bg-violet-deep/50 px-4 font-display text-[15px] font-bold text-cream placeholder:font-semibold placeholder:text-cream/35 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-white"
+              />
+            </label>
+
+            {/* File */}
+            <label className="flex flex-col gap-1.5">
+              <span className="font-display text-[12px] font-bold uppercase tracking-[0.06em] text-mint">
+                Video file
+              </span>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="video/*"
+                className="cursor-pointer rounded-[10px] border-2 border-violet-lift bg-violet-deep/50 p-2 font-display text-[13px] font-semibold text-cream/70 file:mr-3 file:cursor-pointer file:rounded-[8px] file:border-0 file:bg-violet-lift file:px-3 file:py-2 file:font-display file:font-bold file:uppercase file:tracking-[0.04em] file:text-cream hover:file:bg-[#9a45d6]"
+              />
+            </label>
+
+            <button className="g-btn g-btn-start w-full" onClick={upload} disabled={ov.active}>
               {ov.active ? "Working…" : "Upload"}
             </button>
 
-            <p className="text-[12px] leading-[1.5] text-cream/60">
+            <p className="rounded-[10px] border-2 border-white/10 bg-white/[0.05] px-3.5 py-3 font-display text-[12.5px] font-semibold leading-[1.5] text-cream/65">
               Upload a video, then open the editor to mark the lines (sectors) on the timeline. The
               backend cuts the video at those spots and stores each part.
             </p>
 
-            {err && <p className="text-[13px] text-magenta">{err}</p>}
-
-            <Link href="/dashboard" className="mt-auto text-[13px] text-cream/50 underline">
-              Back to lobby
-            </Link>
+            {err && (
+              <p className="font-display text-[13px] font-bold text-magenta">{err}</p>
+            )}
           </div>
         </div>
 
         {/* RIGHT — manage existing videos */}
         <div className="g-right">
-          <h2 className="g-title">Your videos ({jobs.length})</h2>
+          <h2 className="g-title">
+            Your videos{" "}
+            {loaded ? (
+              `(${jobs.length})`
+            ) : (
+              <span
+                aria-label="Loading videos"
+                className="ml-1 inline-block h-[15px] w-[15px] animate-spin rounded-full border-2 border-cream/25 border-t-mint align-[-2px]"
+              />
+            )}
+          </h2>
           <div className="g-panel flex-1">
-            {jobs.length === 0 ? (
+            {!loaded ? (
+              <p className="text-center text-[13px] text-cream/50">Loading your videos…</p>
+            ) : jobs.length === 0 ? (
               <p className="text-center text-[13px] text-cream/50">
                 Nothing uploaded yet. Add a video on the left.
               </p>
@@ -528,6 +572,8 @@ export default function CreatorPage() {
           </div>
         </div>
       )}
+
+      {dialog}
     </main>
   );
 }
