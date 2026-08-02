@@ -164,13 +164,13 @@ export function StudioPanel({
             maxLength={4}
             className="g-code-input"
           />
-          <div className="flex gap-2">
-            <button type="submit" className="g-btn g-btn-primary h-[42px] flex-1 text-[14px]" disabled={busy}>
+          <div className="flex flex-col gap-2">
+            <button type="submit" className="g-btn g-btn-primary h-[42px] w-full text-[14px]" disabled={busy}>
               {busy ? "Joining…" : "Join"}
             </button>
             <button
               type="button"
-              className="g-btn g-btn-ghost h-[42px] flex-1 text-[14px]"
+              className="g-btn g-btn-ghost h-[42px] w-full text-[14px]"
               onClick={() => {
                 setJoining(false);
                 setError(null);
