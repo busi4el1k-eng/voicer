@@ -14,9 +14,9 @@ import { request as httpsRequest } from "node:https";
 const URL_BASE = process.env.DEMUCS_URL?.replace(/\/+$/, "");
 const API_KEY = process.env.DEMUCS_API_KEY;
 
-// Generous overall cap: CPU separation runs ~2.6x realtime, so even a long scene
-// finishes well inside this. Guards against a hung upstream holding the socket.
-const TIMEOUT_MS = 20 * 60 * 1000;
+// No client-side timeout on the separation: CPU runs ~2.6x realtime, so long
+// videos take many minutes and we let them finish. node:http has no default
+// socket timeout, so the request simply waits for Demucs to respond.
 
 export function demucsConfigured(): boolean {
   return !!(URL_BASE && API_KEY);
@@ -65,7 +65,6 @@ export function separateStem(
         const chunks: Buffer[] = [];
         res.on("data", (c: Buffer) => chunks.push(c));
         res.on("end", () => {
-          clearTimeout(timer);
           const buf = Buffer.concat(chunks);
           if (res.statusCode !== 200) {
             reject(new Error(`Demucs ${res.statusCode}: ${buf.toString("utf8").slice(0, 300)}`));
@@ -76,11 +75,7 @@ export function separateStem(
       },
     );
 
-    const timer = setTimeout(() => req.destroy(new Error("Demucs request timed out")), TIMEOUT_MS);
-    req.on("error", (e) => {
-      clearTimeout(timer);
-      reject(e);
-    });
+    req.on("error", (e) => reject(e));
     req.write(body);
     req.end();
   });
