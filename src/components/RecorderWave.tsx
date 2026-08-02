@@ -38,11 +38,13 @@ export function RecorderWave({
   take,
   recording,
   getLevel,
+  durationMs,
 }: {
   original?: Float32Array;
   take?: Float32Array;
   recording: boolean;
   getLevel: () => number;
+  durationMs?: number; // sector length: the red reaches the far edge at this time
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bufRef = useRef<Float32Array | null>(null);
@@ -72,12 +74,18 @@ export function RecorderWave({
       bufRef.current = new Float32Array(W);
       bufOrigRef.current = original; // this live buffer belongs to the current sector
       posRef.current = 0;
+      const startTs = performance.now();
+      // Advance the red front by elapsed/sector time so it reaches the far edge
+      // (the end of the blue) exactly when the sector-length cap stops it. Fall
+      // back to a frame-paced fill when no duration is provided.
+      const spanMs = durationMs && durationMs > 0 ? durationMs : (W / 60) * 1000;
       const tick = () => {
         const buf = bufRef.current!;
-        if (posRef.current < buf.length) {
-          buf[posRef.current] = getLevel();
-          posRef.current++;
-        }
+        const elapsed = performance.now() - startTs;
+        const target = Math.min(buf.length, Math.round((elapsed / spanMs) * buf.length));
+        const lvl = getLevel();
+        for (let x = posRef.current; x < target; x++) buf[x] = lvl; // fill any skipped columns
+        posRef.current = target;
         const { H } = base();
         ctx.fillStyle = MINE_COLOR;
         for (let x = 0; x < posRef.current; x++) {
@@ -106,7 +114,7 @@ export function RecorderWave({
       // No live buffer (e.g. revisiting an earlier take): draw the full take.
       drawWaveform(ctx, W, H, take, MINE_COLOR);
     }
-  }, [recording, original, take, getLevel]);
+  }, [recording, original, take, getLevel, durationMs]);
 
   return <canvas ref={canvasRef} className="h-40 w-full rounded-[10px] bg-violet-deep" />;
 }

@@ -270,6 +270,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                 take={takeWave[seg.id]}
                 recording={mic.recording}
                 getLevel={mic.getLevel}
+                durationMs={seg.endMs - seg.startMs}
               />
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <button
