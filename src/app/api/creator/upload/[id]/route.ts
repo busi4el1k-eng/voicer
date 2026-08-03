@@ -18,19 +18,33 @@ async function ownedUpload(id: string) {
   return { upload: owns ? upload : null };
 }
 
-// Rename an upload (the "change" action in the management table).
+// Update an upload the creator owns: rename it and/or flip its library
+// visibility (private ↔ public). Both fields are optional so the management
+// table can send whichever one changed.
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const { title } = (await req.json().catch(() => ({}))) as { title?: string };
-  if (typeof title !== "string") {
-    return NextResponse.json({ error: "title required." }, { status: 400 });
+  const { title, visibility } = (await req.json().catch(() => ({}))) as {
+    title?: string;
+    visibility?: string;
+  };
+  if (title === undefined && visibility === undefined) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+  if (title !== undefined && typeof title !== "string") {
+    return NextResponse.json({ error: "title must be a string." }, { status: 400 });
+  }
+  if (visibility !== undefined && visibility !== "public" && visibility !== "private") {
+    return NextResponse.json({ error: "visibility must be 'public' or 'private'." }, { status: 400 });
   }
   const { upload } = await ownedUpload(id);
   if (!upload) return NextResponse.json({ error: "Upload not found." }, { status: 404 });
 
   const saved = await db.videoUpload.update({
     where: { id },
-    data: { title: title.slice(0, 120) },
+    data: {
+      ...(title !== undefined ? { title: title.slice(0, 120) } : {}),
+      ...(visibility !== undefined ? { visibility } : {}),
+    },
     include: { segments: { orderBy: { index: "asc" } } },
   });
   return NextResponse.json({ upload: saved });

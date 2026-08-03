@@ -38,6 +38,13 @@ const MODES: Mode[] = [
     href: "/party",
   },
   {
+    id: "library",
+    icon: "🎞️",
+    title: "Video library",
+    text: "Browse videos other creators made public — pick one and dub it.",
+    href: "/library",
+  },
+  {
     id: "ghost",
     icon: "❓",
     title: "???",

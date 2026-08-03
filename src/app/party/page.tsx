@@ -71,8 +71,8 @@ export default function PartyHome() {
     }
   };
 
-  const search = async () => {
-    const trimmed = code.trim();
+  const search = async (override?: string) => {
+    const trimmed = (override ?? code).trim();
     if (!trimmed) return setErr("Enter a share code.");
     setBusy(true);
     setErr("");
@@ -88,6 +88,19 @@ export default function PartyHome() {
       setBusy(false);
     }
   };
+
+  // A code handed off from the Video library ("Party mode") pre-fills the search
+  // and looks the video up automatically, so the host lands right on it.
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get("code");
+    if (!c) return;
+    void (async () => {
+      const pretty = formatShareInput(c);
+      setCode(pretty);
+      await search(pretty);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <main className="g-screen">
@@ -171,7 +184,7 @@ export default function PartyHome() {
               autoFocus
               className="flex-1 rounded-[10px] bg-violet-deep/60 px-4 py-3 font-display text-[16px] font-bold uppercase tracking-[0.12em] text-cream placeholder:font-normal placeholder:tracking-normal placeholder:text-cream/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
             />
-            <button onClick={search} disabled={busy} className="g-btn g-btn-primary px-5">
+            <button onClick={() => void search()} disabled={busy} className="g-btn g-btn-primary px-5">
               {busy ? "…" : "Search"}
             </button>
           </div>

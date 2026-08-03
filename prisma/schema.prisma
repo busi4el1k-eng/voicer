@@ -104,6 +104,10 @@ model VideoUpload {
   durationMs Int            @default(0)
   // uploaded | cutting | done | error
   status     String         @default("uploaded")
+  // 'private' (only the creator sees it) | 'public' (listed in the shared
+  // Video library for every user to browse and dub). Defaults to private so
+  // nothing is exposed until the creator opts in.
+  visibility String         @default("private")
   error      String         @default("")
   // Demucs music/FX bed (original audio with vocals removed), computed once per
   // source so dubbed sectors keep the original music. none|processing|ready|error.
@@ -113,6 +117,7 @@ model VideoUpload {
   createdAt  DateTime       @default(now())
 
   @@index([userId])
+  @@index([visibility])
 }
 
 // One AI-detected moment to cut out, and (after cutting) the produced clip.

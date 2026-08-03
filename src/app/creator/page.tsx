@@ -27,6 +27,7 @@ type Upload = {
   id: string;
   title: string;
   status: string;
+  visibility: string; // 'private' | 'public'
   shareId: string | null;
   sourceUrl: string;
   error: string;
@@ -245,6 +246,34 @@ export default function CreatorPage() {
     }
   };
 
+  // Flip a video between private and public. Public videos show up in the
+  // shared Video library for every user to browse and dub.
+  const toggleVisibility = async (j: Upload) => {
+    const next = j.visibility === "public" ? "private" : "public";
+    setErr("");
+    setBusy(`vis:${j.id}`);
+    // Optimistic — the pill flips immediately, reconciled by the reload below.
+    setJobs((prev) => prev.map((u) => (u.id === j.id ? { ...u, visibility: next } : u)));
+    try {
+      const r = await fetch(`/api/creator/upload/${j.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility: next }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || "Update failed.");
+      await load();
+    } catch (e) {
+      await load(); // roll back the optimistic flip to the server truth
+      await alert({
+        title: "Couldn't update visibility",
+        message: e instanceof Error ? e.message : "Update failed.",
+        tone: "danger",
+      });
+    } finally {
+      setBusy("");
+    }
+  };
+
   const startRename = (j: Upload) => {
     setEditingId(j.id);
     setEditTitle(j.title);
@@ -355,7 +384,11 @@ export default function CreatorPage() {
               <ul className="flex flex-col gap-3">
                 {jobs.map((j) => {
                   const editing = editingId === j.id;
-                  const rowBusy = busy === `del:${j.id}` || busy === `rename:${j.id}`;
+                  const rowBusy =
+                    busy === `del:${j.id}` ||
+                    busy === `rename:${j.id}` ||
+                    busy === `vis:${j.id}`;
+                  const isPublic = j.visibility === "public";
                   // Distinct players assigned across this video's sectors.
                   const players = Array.from(new Set(j.segments.map((s) => s.player ?? 1))).sort(
                     (a, b) => a - b,
@@ -417,6 +450,30 @@ export default function CreatorPage() {
                                 </span>
                               </button>
                             )}
+                            {/* Library visibility toggle — public videos appear
+                                in the shared Video library for every user. */}
+                            <button
+                              type="button"
+                              onClick={() => void toggleVisibility(j)}
+                              disabled={rowBusy}
+                              title={
+                                isPublic
+                                  ? "Public — visible in the Video library. Click to make private."
+                                  : "Private — only you can see it. Click to publish to the library."
+                              }
+                              className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-display text-[11px] font-bold uppercase tracking-[0.06em] transition disabled:opacity-60 ${
+                                isPublic
+                                  ? "bg-mint/20 text-mint hover:bg-mint/30"
+                                  : "bg-white/8 text-cream/60 hover:bg-white/15"
+                              }`}
+                            >
+                              <span aria-hidden>{isPublic ? "🌐" : "🔒"}</span>
+                              {busy === `vis:${j.id}`
+                                ? "…"
+                                : isPublic
+                                  ? "Public"
+                                  : "Private"}
+                            </button>
                           </div>
                         </div>
 
