@@ -37,7 +37,11 @@ export async function POST(req: NextRequest) {
   });
   if (!u) return NextResponse.json({ error: "Upload not found." }, { status: 404 });
 
-  if (u.bedStatus === "none" || u.bedStatus === "error") {
+  // Anything but a finished bed is worth (re)triggering — generateBedForUpload's
+  // atomic claim decides whether there's real work: it starts a fresh job,
+  // retries an errored one, reclaims a stale "processing" job whose worker died,
+  // and no-ops on a still-live one.
+  if (u.bedStatus !== "ready") {
     after(() => generateBedForUpload(uploadId));
     return NextResponse.json({ status: "processing" });
   }

@@ -3,7 +3,7 @@ import { getOrCreateUser } from "@/lib/get-user";
 import { isClerkConfigured } from "@/lib/clerk";
 import { AccountBar } from "@/components/AccountBar";
 import { Lobby } from "@/components/Lobby";
-import { StudioPanel } from "@/components/StudioPanel";
+import { StudioPanel, type Stat } from "@/components/StudioPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -27,23 +27,31 @@ export default async function DashboardPage() {
   const initial = name.charAt(0).toUpperCase();
 
   // Real stats from the DB for the signed-in user. Guests have none yet → zeros.
-  let stats = [
+  let stats: Stat[] = [
     { label: "Runs", value: 0 },
     { label: "Scenes played", value: 0 },
-    { label: "Avg judge score", value: 0 },
+    { label: "Rating", value: "—" },
     { label: "Best scene", value: 0 },
   ];
   if (user) {
     try {
-      const [runCount, agg, best] = await Promise.all([
+      const [runCount, agg, best, rating] = await Promise.all([
         db.run.count({ where: { userId: user.id } }),
-        db.take.aggregate({ where: { userId: user.id }, _avg: { judgeScore: true }, _count: true }),
+        db.take.aggregate({ where: { userId: user.id }, _count: true }),
         db.take.aggregate({ where: { userId: user.id }, _max: { judgeScore: true } }),
+        db.playerRating.aggregate({ where: { ratedUserId: user.id }, _avg: { stars: true }, _count: true }),
       ]);
+      // Average star rating other players gave this user across finished parties,
+      // shown as e.g. "4.3 ★ (7)". "—" until they've been rated at least once.
+      const avgStars = rating._avg.stars;
+      const ratingLabel =
+        rating._count > 0 && avgStars != null
+          ? `${(Math.round(avgStars * 10) / 10).toFixed(1)} ★ (${rating._count})`
+          : "—";
       stats = [
         { label: "Runs", value: runCount },
         { label: "Scenes played", value: agg._count },
-        { label: "Avg judge score", value: Math.round(agg._avg.judgeScore ?? 0) },
+        { label: "Rating", value: ratingLabel },
         { label: "Best scene", value: best._max.judgeScore ?? 0 },
       ];
     } catch {

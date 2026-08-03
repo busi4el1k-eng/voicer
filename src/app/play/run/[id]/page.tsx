@@ -2,10 +2,13 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { downloadHref } from "@/lib/download";
 import { useMic, type RecordResult } from "@/lib/audio/useMic";
 import { decodeAudio, type Pcm } from "@/lib/audio/waveform";
 import { RecorderWave } from "@/components/RecorderWave";
 import { VideoStage, type VideoStageHandle } from "@/components/VideoStage";
+import { RateVideo } from "@/components/RateVideo";
+import { getClientId } from "@/lib/client-id";
 
 type Seg = {
   id: string;
@@ -36,11 +39,18 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   const [takeWave, setTakeWave] = useState<Record<string, Float32Array>>({});
   const [resultUrl, setResultUrl] = useState("");
   const [exportErr, setExportErr] = useState("");
+  // Per-browser id so a solo player's video rating sticks to them. Lazily read
+  // (client-only) — it isn't rendered until the result screen, so there's no
+  // hydration mismatch from the empty server value.
+  const [clientId] = useState(() => (typeof window !== "undefined" ? getClientId() : ""));
+
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const stageRef = useRef<VideoStageHandle>(null);
   const pcmRef = useRef<Pcm | null>(null);
   const takesRef = useRef<Record<string, RecordResult>>({});
   const capRef = useRef<number | null>(null); // auto-stop timer (sector-length cap)
+  const countdownRef = useRef<number | null>(null); // pre-record 3-2-1 ticker
 
   // Load the shared video + its sectors.
   useEffect(() => {
@@ -79,10 +89,11 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
     })();
   }, [video?.sourceUrl, segs]);
 
-  // Clear a pending record cap if we unmount mid-recording.
+  // Clear any pending record cap / countdown if we unmount mid-recording.
   useEffect(() => {
     return () => {
       if (capRef.current != null) clearTimeout(capRef.current);
+      if (countdownRef.current != null) clearInterval(countdownRef.current);
     };
   }, []);
 
@@ -119,6 +130,39 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
     capRef.current = window.setTimeout(() => void stopRecording(), maxMs);
   }, [seg, mic, stopRecording]);
 
+  // Give players a moment to react: a 3-2-1 countdown before recording opens.
+  // Warm up the mic during the count so capture starts the instant it hits 0.
+  const beginCountdown = useCallback(() => {
+    if (!seg || countdownRef.current != null || mic.recording) return;
+    if (!mic.ready) void mic.open();
+    let n = 3;
+    setCountdown(n);
+    countdownRef.current = window.setInterval(() => {
+      n -= 1;
+      if (n <= 0) {
+        if (countdownRef.current != null) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
+        setCountdown(null);
+        void startRecording();
+      } else {
+        setCountdown(n);
+      }
+    }, 1000);
+  }, [seg, mic, startRecording]);
+
+  const cancelCountdown = useCallback(() => {
+    if (countdownRef.current != null) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setCountdown(null);
+  }, []);
+
+  const counting = countdown != null;
+  const busy = mic.recording || counting;
+
   const playMyTake = useCallback(() => {
     const take = seg ? takesRef.current[seg.id] : undefined;
     if (!take) return;
@@ -136,7 +180,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   );
 
   const next = () => {
-    if (mic.recording) return;
+    if (mic.recording || countdownRef.current != null) return;
     stopVideo();
     if (cur >= segs.length - 1) setPhase("summary");
     else setCur(cur + 1);
@@ -224,7 +268,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                   <button
                     key={s.id}
                     onClick={() => goTo(i)}
-                    disabled={mic.recording}
+                    disabled={busy}
                     title={`Sector ${i + 1}`}
                     className="h-2 flex-1 rounded-full transition-colors"
                     style={{
@@ -242,11 +286,23 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
 
             {/* Video — app-styled player, restricted to just this sector */}
             <div className="g-panel mb-4">
-              <VideoStage
-                ref={stageRef}
-                src={video.sourceUrl}
-                sector={{ startMs: seg.startMs, endMs: seg.endMs }}
-              />
+              <div className="relative">
+                <VideoStage
+                  ref={stageRef}
+                  src={video.sourceUrl}
+                  sector={{ startMs: seg.startMs, endMs: seg.endMs }}
+                />
+                {counting && (
+                  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-black/55">
+                    <span
+                      key={countdown}
+                      className="animate-[pulse_1s_ease-in-out] font-display text-[96px] font-bold leading-none text-cream drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
+                    >
+                      {countdown}
+                    </span>
+                  </div>
+                )}
+              </div>
               <p className="mt-2 text-center font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
                 {fmt(seg.startMs)} – {fmt(seg.endMs)} · space = play / pause
               </p>
@@ -274,23 +330,35 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
               />
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <button
-                  onClick={() => (mic.recording ? void stopRecording() : void startRecording())}
+                  onClick={() =>
+                    mic.recording
+                      ? void stopRecording()
+                      : counting
+                        ? cancelCountdown()
+                        : beginCountdown()
+                  }
                   className={`g-btn h-11 text-[14px] ${
-                    mic.recording ? "bg-magenta text-cream" : "g-btn-start"
+                    mic.recording || counting ? "bg-magenta text-cream" : "g-btn-start"
                   }`}
                 >
-                  {mic.recording ? "■ Stop" : takes[seg.id] ? "● Re-record" : "● Record"}
+                  {mic.recording
+                    ? "■ Stop"
+                    : counting
+                      ? `Starting in ${countdown}…`
+                      : takes[seg.id]
+                        ? "● Re-record"
+                        : "● Record"}
                 </button>
                 <button
                   onClick={playMyTake}
-                  disabled={!takes[seg.id] || mic.recording}
+                  disabled={!takes[seg.id] || busy}
                   className="g-btn g-btn-ghost h-11 text-[14px]"
                 >
                   ▶ My take
                 </button>
                 <button
                   onClick={next}
-                  disabled={mic.recording}
+                  disabled={busy}
                   className="g-btn g-btn-primary col-span-2 h-11 text-[14px] sm:col-span-1"
                 >
                   {cur >= segs.length - 1 ? "Finish sectors →" : "Next sector →"}
@@ -302,7 +370,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
             <div className="flex items-center justify-between">
               <button
                 onClick={() => goTo(cur - 1)}
-                disabled={cur === 0 || mic.recording}
+                disabled={cur === 0 || busy}
                 className="text-[13px] text-cream/50 underline disabled:opacity-40"
               >
                 ◀ Previous sector
@@ -391,16 +459,17 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
               </div>
             )}
             <div className="flex flex-col items-center gap-3">
-              <a href={resultUrl} download className="g-btn g-btn-start">
+              <a href={downloadHref(resultUrl, `${video?.title || "cinema-dub"}.mp4`)} className="g-btn g-btn-start">
                 ↓ Download video
               </a>
-              <button
-                onClick={() => setPhase("summary")}
-                className="text-[13px] text-cream/50 underline"
-              >
-                ◀ Back to sectors
-              </button>
+              <Link href="/dashboard" className="g-btn g-btn-ghost w-full">
+                ← Back to dashboard
+              </Link>
             </div>
+
+            {video && clientId && (
+              <RateVideo uploadId={video.id} raterKey={clientId} />
+            )}
           </div>
         )}
       </div>

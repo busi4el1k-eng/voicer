@@ -10,13 +10,29 @@ import { demucsConfigured, separateBed } from "@/lib/demucs";
 //
 // Slow (CPU separation, minutes) — always call this OFF the request path, e.g.
 // via `after()`. Safe to call repeatedly: an atomic claim prevents double work.
+// A bed job "processing" for longer than this is assumed dead (the worker was
+// killed mid-separation, e.g. a deploy/restart) and may be reclaimed. Comfortably
+// longer than the slowest realistic separation so we never steal a live job.
+const STALE_PROCESSING_MS = 30 * 60_000; // 30 minutes
+
 export async function generateBedForUpload(uploadId: string): Promise<void> {
   if (!demucsConfigured() || !spacesConfigured()) return;
 
-  // Atomically claim the job: only proceed if it isn't already ready/processing.
+  // Atomically claim the job. Proceed if it hasn't started ("none"/"error"), or
+  // if a previous "processing" claim has gone stale — its worker died without
+  // finishing, leaving the status stuck. `bedStartedAt` gates the reclaim so two
+  // callers can't both grab the same job.
+  const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS);
   const claim = await db.videoUpload.updateMany({
-    where: { id: uploadId, bedStatus: { in: ["none", "error"] } },
-    data: { bedStatus: "processing" },
+    where: {
+      id: uploadId,
+      OR: [
+        { bedStatus: { in: ["none", "error"] } },
+        { bedStatus: "processing", bedStartedAt: { lt: staleBefore } },
+        { bedStatus: "processing", bedStartedAt: null },
+      ],
+    },
+    data: { bedStatus: "processing", bedStartedAt: new Date() },
   });
   if (claim.count === 0) return;
 

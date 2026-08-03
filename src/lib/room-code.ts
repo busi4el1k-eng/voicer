@@ -5,7 +5,7 @@
 import { SHARE_ID_ALPHABET } from "@/lib/share-id";
 
 export const ROOM_CODE_LENGTH = 4;
-export const MAX_PLAYERS = 4; // host + up to 3 others
+export const MAX_PLAYERS = 7; // host + up to 6 others
 export const MIN_PLAYERS = 2; // party mode needs at least two players to start
 
 export function randomRoomCode(): string {

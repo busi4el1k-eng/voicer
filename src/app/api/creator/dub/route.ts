@@ -51,8 +51,9 @@ export async function POST(req: NextRequest) {
       }
       if (takes.length === 0) throw new ClientError("No recorded takes were sent.");
 
-      // If the Demucs music bed is ready, feed it in so dubbed sectors keep the
-      // original music; otherwise fall back to muting the sector.
+      // Use the vocals-removed bed (music + noise, no actor voices) as the
+      // continuous background so only the dub is heard; falls back to the
+      // original audio if the bed isn't ready yet.
       let bedPath: string | null = null;
       if (upload.bedStatus === "ready" && upload.bedKey) {
         bedPath = join(dir, "bed.wav");

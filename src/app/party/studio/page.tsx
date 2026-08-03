@@ -6,6 +6,9 @@ import { useMic, type RecordResult } from "@/lib/audio/useMic";
 import { decodeAudio, type Pcm } from "@/lib/audio/waveform";
 import { RecorderWave } from "@/components/RecorderWave";
 import { VideoStage, type VideoStageHandle } from "@/components/VideoStage";
+import { RatePlayers } from "@/components/RatePlayers";
+import { RateVideo } from "@/components/RateVideo";
+import { downloadHref } from "@/lib/download";
 import { useRoom } from "@/lib/useRoom";
 
 type Seg = {
@@ -45,11 +48,14 @@ export default function PartyStudioPage() {
   const [err, setErr] = useState("");
   const [renderBusy, setRenderBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [showRating, setShowRating] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const stageRef = useRef<VideoStageHandle>(null);
   const pcmRef = useRef<Pcm | null>(null);
   const takesRef = useRef<Record<string, RecordResult>>({});
   const capRef = useRef<number | null>(null); // auto-stop timer (sector-length cap)
+  const countdownRef = useRef<number | null>(null); // pre-record 3-2-1 ticker
 
   const me = room?.players.find((p) => p.id === playerId);
   const mySeat = me?.seat ?? 0;
@@ -115,10 +121,11 @@ export default function PartyStudioPage() {
     })();
   }, [video?.sourceUrl, segs]);
 
-  // Clear a pending record cap if we unmount mid-recording.
+  // Clear any pending record cap / countdown if we unmount mid-recording.
   useEffect(() => {
     return () => {
       if (capRef.current != null) clearTimeout(capRef.current);
+      if (countdownRef.current != null) clearInterval(countdownRef.current);
     };
   }, []);
 
@@ -154,6 +161,39 @@ export default function PartyStudioPage() {
     capRef.current = window.setTimeout(() => void stopRecording(), maxMs);
   }, [seg, mic, stopRecording]);
 
+  // Give players a moment to react: a 3-2-1 countdown before recording opens.
+  // Warm up the mic during the count so capture starts the instant it hits 0.
+  const beginCountdown = useCallback(() => {
+    if (!seg || countdownRef.current != null || mic.recording) return;
+    if (!mic.ready) void mic.open();
+    let n = 3;
+    setCountdown(n);
+    countdownRef.current = window.setInterval(() => {
+      n -= 1;
+      if (n <= 0) {
+        if (countdownRef.current != null) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
+        setCountdown(null);
+        void startRecording();
+      } else {
+        setCountdown(n);
+      }
+    }, 1000);
+  }, [seg, mic, startRecording]);
+
+  const cancelCountdown = useCallback(() => {
+    if (countdownRef.current != null) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setCountdown(null);
+  }, []);
+
+  const counting = countdown != null;
+  const busy = mic.recording || counting;
+
   const playMyTake = useCallback(() => {
     const take = seg ? takesRef.current[seg.id] : undefined;
     if (!take) return;
@@ -171,7 +211,7 @@ export default function PartyStudioPage() {
   );
 
   const next = () => {
-    if (mic.recording) return;
+    if (mic.recording || countdownRef.current != null) return;
     stopVideo();
     if (cur >= segs.length - 1) setPhase("summary");
     else setCur(cur + 1);
@@ -294,16 +334,34 @@ export default function PartyStudioPage() {
               <VideoStage src={room.finalUrl} />
             </div>
             <div className="flex flex-col items-center gap-3">
-              <a href={room.finalUrl} download className="g-btn g-btn-start">
+              <a href={downloadHref(room.finalUrl, `${title}.mp4`)} className="g-btn g-btn-start">
                 ↓ Download video
               </a>
               <button
                 onClick={() => void backToLobby()}
-                className="text-[13px] text-cream/50 underline"
+                disabled={leaving}
+                className="g-btn g-btn-ghost w-full"
               >
-                Back to lobby
+                {leaving ? "Leaving…" : "← Back to dashboard"}
               </button>
+              {playerId && (
+                <button
+                  onClick={() => setShowRating((v) => !v)}
+                  className="g-btn g-btn-primary w-full"
+                >
+                  {showRating ? "Hide ratings" : "★ Rate video & cast"}
+                </button>
+              )}
             </div>
+
+            {showRating && playerId && (
+              <>
+                {room.videoUploadId && (
+                  <RateVideo uploadId={room.videoUploadId} raterKey={playerId} />
+                )}
+                <RatePlayers code={room.code} playerId={playerId} players={room.players} />
+              </>
+            )}
           </div>
         ) : phase === "error" ? (
           <div className="g-panel text-center">
@@ -424,7 +482,7 @@ export default function PartyStudioPage() {
                     <button
                       key={s.id}
                       onClick={() => goTo(i)}
-                      disabled={mic.recording}
+                      disabled={busy}
                       title={`Sector ${i + 1}`}
                       className="h-2 flex-1 rounded-full transition-colors"
                       style={{
@@ -441,11 +499,23 @@ export default function PartyStudioPage() {
               </div>
 
               <div className="g-panel mb-4">
-                <VideoStage
-                  ref={stageRef}
-                  src={video?.sourceUrl}
-                  sector={{ startMs: seg.startMs, endMs: seg.endMs }}
-                />
+                <div className="relative">
+                  <VideoStage
+                    ref={stageRef}
+                    src={video?.sourceUrl}
+                    sector={{ startMs: seg.startMs, endMs: seg.endMs }}
+                  />
+                  {counting && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-black/55">
+                      <span
+                        key={countdown}
+                        className="animate-[pulse_1s_ease-in-out] font-display text-[96px] font-bold leading-none text-cream drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
+                      >
+                        {countdown}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <p className="mt-2 text-center font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
                   {fmt(seg.startMs)} – {fmt(seg.endMs)} · space = play / pause
                 </p>
@@ -471,23 +541,35 @@ export default function PartyStudioPage() {
                 />
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <button
-                    onClick={() => (mic.recording ? void stopRecording() : void startRecording())}
+                    onClick={() =>
+                      mic.recording
+                        ? void stopRecording()
+                        : counting
+                          ? cancelCountdown()
+                          : beginCountdown()
+                    }
                     className={`g-btn h-11 text-[14px] ${
-                      mic.recording ? "bg-magenta text-cream" : "g-btn-start"
+                      mic.recording || counting ? "bg-magenta text-cream" : "g-btn-start"
                     }`}
                   >
-                    {mic.recording ? "■ Stop" : takes[seg.id] ? "● Re-record" : "● Record"}
+                    {mic.recording
+                      ? "■ Stop"
+                      : counting
+                        ? `Starting in ${countdown}…`
+                        : takes[seg.id]
+                          ? "● Re-record"
+                          : "● Record"}
                   </button>
                   <button
                     onClick={playMyTake}
-                    disabled={!takes[seg.id] || mic.recording}
+                    disabled={!takes[seg.id] || busy}
                     className="g-btn g-btn-ghost h-11 text-[14px]"
                   >
                     ▶ My take
                   </button>
                   <button
                     onClick={next}
-                    disabled={mic.recording}
+                    disabled={busy}
                     className="g-btn g-btn-primary col-span-2 h-11 text-[14px] sm:col-span-1"
                   >
                     {cur >= segs.length - 1 ? "Finish sectors →" : "Next sector →"}
@@ -499,14 +581,14 @@ export default function PartyStudioPage() {
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => goTo(cur - 1)}
-                  disabled={cur === 0 || mic.recording}
+                  disabled={cur === 0 || busy}
                   className="text-[13px] text-cream/50 underline disabled:opacity-40"
                 >
                   ◀ Previous sector
                 </button>
                 <button
                   onClick={() => setPhase("summary")}
-                  disabled={mic.recording}
+                  disabled={busy}
                   className="text-[13px] text-cream/50 underline disabled:opacity-40"
                 >
                   Review &amp; finish

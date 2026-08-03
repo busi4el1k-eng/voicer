@@ -29,6 +29,19 @@ export async function GET() {
     : [];
   const userById = new Map(users.map((u) => [u.id, u]));
 
+  // Average star rank per video (one grouped query), for the library display.
+  const ratingRows = uploads.length
+    ? await db.videoRating.groupBy({
+        by: ["uploadId"],
+        where: { uploadId: { in: uploads.map((u) => u.id) } },
+        _avg: { stars: true },
+        _count: true,
+      })
+    : [];
+  const ratingByUpload = new Map(
+    ratingRows.map((r) => [r.uploadId, { avg: r._avg.stars ?? 0, count: r._count }]),
+  );
+
   // Public videos need a share code so anyone can look them up / play them.
   // Backfill any missing or legacy-length codes on read (same as the jobs list).
   const videos = [];
@@ -40,6 +53,7 @@ export async function GET() {
     }
     const creator = u.userId ? userById.get(u.userId) : undefined;
     const players = new Set(u.segments.map((s) => s.player ?? 1)).size;
+    const rating = ratingByUpload.get(u.id);
     videos.push({
       id: u.id,
       title: u.title,
@@ -51,6 +65,9 @@ export async function GET() {
       players,
       creator: creator?.displayName || "Anonymous",
       creatorColor: creator?.avatarColor || "#6F48FF",
+      // Average 0–5 rank and how many players have rated it (0 = unrated yet).
+      rating: rating ? Math.round(rating.avg * 10) / 10 : 0,
+      ratingCount: rating?.count ?? 0,
       createdAt: u.createdAt,
     });
   }

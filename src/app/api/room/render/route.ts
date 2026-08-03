@@ -70,7 +70,9 @@ export async function POST(req: NextRequest) {
       }
       if (takes.length === 0) throw new ClientError("No recorded takes to combine.");
 
-      // Keep the original music under each dubbed sector when the bed is ready.
+      // Use the vocals-removed bed (music + noise, no actor voices) as the
+      // continuous background so only the dubs are heard; falls back to the
+      // original audio if the bed isn't ready yet.
       let bedPath: string | null = null;
       if (upload.bedStatus === "ready" && upload.bedKey) {
         bedPath = join(dir, "bed.wav");

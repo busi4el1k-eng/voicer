@@ -7,7 +7,7 @@ import { roomView } from "@/lib/room.server";
 export const runtime = "nodejs";
 
 // Join an existing room by its invite code. Rejects if the room is missing,
-// already in play, or full (4 players).
+// already in play, or full (MAX_PLAYERS).
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     code?: string;

@@ -79,22 +79,23 @@ export async function extractAudio(input: string, out: string): Promise<Buffer> 
 export type DubTake = { path: string; startMs: number; endMs: number };
 
 export type MuxOptions = {
-  // Path to the Demucs music bed (no_vocals, full-length, time-aligned with the
-  // source). When present, each dubbed sector plays the original music under the
-  // take instead of going silent. Omit to keep the legacy mute-only behaviour.
+  // Path to the Demucs music/FX bed: the original audio with the actor vocals
+  // removed (music + background noise), full-length and time-aligned with the
+  // source. When present it becomes the CONTINUOUS base of the mix, so the
+  // original dialogue is gone everywhere and only the dub is heard as voice.
   bedPath?: string | null;
-  // Duck the music under the voice (sidechain compression). Default: true.
-  duck?: boolean;
 };
 
-// Normalise every branch to one format so amix / sidechaincompress agree.
+// Normalise every branch to one format so amix agrees on layout/rate.
 const AF = "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo";
 
-// Produce the final full-length video: keep the original video stream, and in
-// each dubbed sector replace the original dialogue with the recorded take. With
-// a bed, the original *music* is preserved under the take; without one, the
-// sector is simply muted then voiced (original audio outside sectors is always
-// left untouched).
+// Produce the final full-length video: keep the original video stream, use the
+// vocals-removed bed (original music + background noise, no actor dialogue) as
+// the continuous audio base for the WHOLE clip, and overlay each recorded dub
+// take on top in its sector. Because the background is the same source
+// end-to-end, there are no per-sector separation artifacts, and the only voices
+// heard are the dubs. Without a bed we fall back to the untouched original audio
+// (actor voices remain) so a render still succeeds.
 export async function muxDub(
   input: string,
   takes: DubTake[],
@@ -103,49 +104,28 @@ export async function muxDub(
 ): Promise<Buffer> {
   if (takes.length === 0) throw new Error("No dub takes to mux.");
   const useBed = !!opts.bedPath;
-  const duck = opts.duck !== false;
 
   const args: string[] = ["-y", "-i", input];
   for (const t of takes) args.push("-i", t.path);
   if (useBed) args.push("-i", opts.bedPath as string);
   const bedIdx = takes.length + 1; // input index of the bed (video=0, takes=1..N)
 
-  // Mute the original audio during every dubbed sector (OR of time ranges).
-  const ranges = takes
-    .map((t) => `between(t,${(t.startMs / 1000).toFixed(3)},${(t.endMs / 1000).toFixed(3)})`)
-    .join("+");
-  const parts = [`[0:a]${AF},volume=0:enable='${ranges}'[base]`];
+  // Base of the mix: the full-length vocals-removed bed when available (actor
+  // voices gone, background continuous), otherwise the original audio track.
+  const baseSrc = useBed ? `${bedIdx}:a` : "0:a";
+  const parts = [`[${baseSrc}]${AF}[base]`];
   const mix = ["[base]"];
 
   takes.forEach((t, i) => {
-    const startS = (t.startMs / 1000).toFixed(3);
-    const endS = (t.endMs / 1000).toFixed(3);
     const dur = ((t.endMs - t.startMs) / 1000).toFixed(3);
     const delay = Math.max(0, Math.round(t.startMs));
-    const voice = `[${i + 1}:a]${AF},atrim=0:${dur},asetpts=PTS-STARTPTS,adelay=${delay}:all=1`;
-
-    if (useBed && duck) {
-      // Voice is split: one copy keys the compressor, one goes into the mix.
-      parts.push(`${voice},asplit=2[v${i}a][v${i}b]`);
-      parts.push(
-        `[${bedIdx}:a]${AF},atrim=${startS}:${endS},asetpts=PTS-STARTPTS,adelay=${delay}:all=1[b${i}]`,
-      );
-      parts.push(`[b${i}][v${i}a]sidechaincompress=threshold=0.05:ratio=8:attack=5:release=250[d${i}]`);
-      mix.push(`[v${i}b]`, `[d${i}]`);
-    } else if (useBed) {
-      parts.push(`${voice}[v${i}]`);
-      parts.push(
-        `[${bedIdx}:a]${AF},atrim=${startS}:${endS},asetpts=PTS-STARTPTS,adelay=${delay}:all=1[b${i}]`,
-      );
-      mix.push(`[v${i}]`, `[b${i}]`);
-    } else {
-      parts.push(`${voice}[v${i}]`);
-      mix.push(`[v${i}]`);
-    }
+    // Trim the take to its length, then park it at its start on the timeline.
+    parts.push(`[${i + 1}:a]${AF},atrim=0:${dur},asetpts=PTS-STARTPTS,adelay=${delay}:all=1[v${i}]`);
+    mix.push(`[v${i}]`);
   });
 
-  // Sum them (normalize=0 keeps levels: base is 0 inside sectors; the take/bed
-  // branches are silent outside their window, so they don't fight).
+  // Sum base + takes (normalize=0 keeps levels: each take is silent outside its
+  // own window, so it only adds the dub voice on top of the background there).
   parts.push(`${mix.join("")}amix=inputs=${mix.length}:normalize=0[aout]`);
 
   args.push(

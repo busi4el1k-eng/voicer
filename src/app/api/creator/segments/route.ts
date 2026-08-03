@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import db from "@/lib/db";
+import { MAX_PLAYERS } from "@/lib/room-code";
 
 export const runtime = "nodejs";
 
@@ -36,8 +37,8 @@ export async function PUT(req: NextRequest) {
       label: String(s.label ?? "").slice(0, 80),
       transcript: String(s.transcript ?? "").slice(0, 400),
       emotionTag: String(s.emotionTag ?? "").slice(0, 24),
-      // Clamp to a valid player seat (1-4); default to player 1.
-      player: Math.min(4, Math.max(1, Math.round(Number(s.player) || 1))),
+      // Clamp to a valid player seat (1..MAX_PLAYERS); default to player 1.
+      player: Math.min(MAX_PLAYERS, Math.max(1, Math.round(Number(s.player) || 1))),
     }))
     .sort((a, b) => a.startMs - b.startMs);
 

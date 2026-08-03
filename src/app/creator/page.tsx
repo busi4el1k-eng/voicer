@@ -9,7 +9,7 @@ import { LiquidLogo } from "@/components/LiquidLogo";
 import { formatShareId } from "@/lib/share-id";
 
 // One fixed colour per player seat (1-4), matching the editor.
-const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8"];
+const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8", "#A78BFA", "#FB923C", "#F87171"];
 
 type Segment = {
   id: string;
@@ -431,7 +431,7 @@ export default function CreatorPage() {
                                       key={p}
                                       title={`Player ${p}`}
                                       className="h-2.5 w-2.5 rounded-full shadow-[inset_0_0_0_1.5px_rgba(31,7,51,0.4)]"
-                                      style={{ background: PLAYER_COLORS[(p - 1) % 4] }}
+                                      style={{ background: PLAYER_COLORS[(p - 1) % PLAYER_COLORS.length] }}
                                     />
                                   ))}
                                 </span>

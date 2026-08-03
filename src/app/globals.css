@@ -338,6 +338,20 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* Keep the panel compact no matter how many seats there are: show a few
+     seats, then scroll inside the list instead of growing the whole page. */
+  max-height: 216px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(137, 82, 220, 0.6) transparent;
+}
+.g-party::-webkit-scrollbar {
+  width: 6px;
+}
+.g-party::-webkit-scrollbar-thumb {
+  background: rgba(137, 82, 220, 0.6);
+  border-radius: 100px;
 }
 .g-ghost-slot {
   display: flex;

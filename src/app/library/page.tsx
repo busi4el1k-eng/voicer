@@ -8,7 +8,7 @@ import { VideoThumb } from "@/components/VideoThumb";
 import { formatShareId } from "@/lib/share-id";
 
 // One fixed colour per player seat (1-4), matching the creator/editor.
-const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8"];
+const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8", "#A78BFA", "#FB923C", "#F87171"];
 
 type Video = {
   id: string;
@@ -21,6 +21,8 @@ type Video = {
   players: number;
   creator: string;
   creatorColor: string;
+  rating: number; // average 0–5 rank (0 = unrated)
+  ratingCount: number;
 };
 
 const fmtDuration = (ms: number) => {
@@ -125,6 +127,23 @@ export default function LibraryPage() {
                             <span className="font-display font-bold text-cream/85">{v.lines}</span>
                             <span className="text-cream/45">line{v.lines === 1 ? "" : "s"}</span>
                           </span>
+                          {v.ratingCount > 0 ? (
+                            <span
+                              className="flex items-center gap-1"
+                              title={`Rated by ${v.ratingCount} player${v.ratingCount === 1 ? "" : "s"}`}
+                            >
+                              <span className="text-sun">★</span>
+                              <span className="font-display font-bold text-cream/85">
+                                {v.rating.toFixed(1)}
+                              </span>
+                              <span className="text-cream/45">({v.ratingCount})</span>
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-cream/35">
+                              <span>★</span>
+                              <span>unrated</span>
+                            </span>
+                          )}
                           {v.players > 0 && (
                             <span className="flex items-center gap-1">
                               {Array.from({ length: v.players }, (_, i) => (
@@ -132,7 +151,7 @@ export default function LibraryPage() {
                                   key={i}
                                   title={`Player ${i + 1}`}
                                   className="h-2.5 w-2.5 rounded-full shadow-[inset_0_0_0_1.5px_rgba(31,7,51,0.4)]"
-                                  style={{ background: PLAYER_COLORS[i % 4] }}
+                                  style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] }}
                                 />
                               ))}
                             </span>

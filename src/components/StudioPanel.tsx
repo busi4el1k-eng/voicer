@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRoom } from "@/lib/useRoom";
 import { MAX_PLAYERS, normalizeRoomCode } from "@/lib/room-code";
 
-type Stat = { label: string; value: number };
+export type Stat = { label: string; value: number | string };
 
 const OTHER_SEATS = MAX_PLAYERS - 1; // seats besides "you" (the top user box)
 

@@ -35,6 +35,10 @@ export const VideoStage = forwardRef<VideoStageHandle, { src?: string; sector?: 
     const [playhead, setPlayhead] = useState(0); // absolute ms
     const [durMs, setDurMs] = useState(0);
     const [muted, setMuted] = useState(false);
+    // Loading state: `buffering` drives the spinner (initial load or a mid-play
+    // stall), `bufferedMs` is how far the download has reached (grey seek fill).
+    const [buffering, setBuffering] = useState(true);
+    const [bufferedMs, setBufferedMs] = useState(0);
 
     // Sector mode maps the timeline onto [startMs, endMs); whole-video mode uses
     // the full duration.
@@ -42,6 +46,8 @@ export const VideoStage = forwardRef<VideoStageHandle, { src?: string; sector?: 
     const span = sector ? Math.max(1, sector.endMs - sector.startMs) : durMs;
     const rel = Math.min(span, Math.max(0, playhead - base));
     const frac = span > 0 ? rel / span : 0;
+    // How much of the (sector or whole) timeline has downloaded, as a fraction.
+    const bufFrac = span > 0 ? Math.min(1, Math.max(0, (bufferedMs - base) / span)) : 0;
 
     useImperativeHandle(ref, () => ({
       playSector(startMs: number, endMs: number) {
@@ -75,6 +81,13 @@ export const VideoStage = forwardRef<VideoStageHandle, { src?: string; sector?: 
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sector?.startMs, sector?.endMs]);
 
+    // A fresh source starts unloaded: show the spinner and reset the buffer bar
+    // until the new video reports it can play.
+    useEffect(() => {
+      setBuffering(true);
+      setBufferedMs(0);
+    }, [src]);
+
     const onTimeUpdate = () => {
       const v = videoRef.current;
       if (!v) return;
@@ -83,6 +96,26 @@ export const VideoStage = forwardRef<VideoStageHandle, { src?: string; sector?: 
         v.pause();
         stopAtRef.current = null;
       }
+    };
+
+    // Track how far the download has reached — the buffered range covering the
+    // current position (like the grey bar in YouTube). Falls back to the last
+    // range so the bar still advances when seeking around.
+    const updateBuffered = () => {
+      const v = videoRef.current;
+      if (!v) return;
+      const ranges = v.buffered;
+      if (!ranges || ranges.length === 0) {
+        setBufferedMs(0);
+        return;
+      }
+      const ct = v.currentTime;
+      let end = 0;
+      for (let i = 0; i < ranges.length; i++) {
+        if (ranges.start(i) <= ct + 0.25) end = Math.max(end, ranges.end(i));
+      }
+      if (end === 0) end = ranges.end(ranges.length - 1);
+      setBufferedMs(end * 1000);
     };
 
     const applyDuration = () => {
@@ -168,20 +201,51 @@ export const VideoStage = forwardRef<VideoStageHandle, { src?: string; sector?: 
         ref={playerRef}
         className="g-player overflow-hidden rounded-[10px] bg-black shadow-[inset_0_0_0_2px_rgba(137,82,220,0.5)]"
       >
-        <video
-          ref={videoRef}
-          src={src}
-          preload="metadata"
-          onClick={togglePlay}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onTimeUpdate={onTimeUpdate}
-          onLoadedMetadata={applyDuration}
-          onDurationChange={applyDuration}
-          className={`mx-auto block w-full cursor-pointer bg-black ${
-            sector ? "max-h-[34vh]" : "max-h-[46vh]"
-          }`}
-        />
+        {/* Video + a loading overlay that appears on first load or a mid-play
+            stall. `preload="auto"` fetches ahead so playback is less likely to
+            freeze. */}
+        <div className="relative">
+          <video
+            ref={videoRef}
+            src={src}
+            preload="auto"
+            onClick={togglePlay}
+            onPlay={() => setPlaying(true)}
+            onPlaying={() => {
+              setPlaying(true);
+              setBuffering(false);
+            }}
+            onPause={() => setPlaying(false)}
+            onWaiting={() => setBuffering(true)}
+            onStalled={() => setBuffering(true)}
+            onSeeking={() => setBuffering(true)}
+            onSeeked={() => {
+              setBuffering(false);
+              updateBuffered();
+            }}
+            onCanPlay={() => setBuffering(false)}
+            onLoadStart={() => setBuffering(true)}
+            onProgress={updateBuffered}
+            onTimeUpdate={() => {
+              onTimeUpdate();
+              updateBuffered();
+            }}
+            onLoadedMetadata={applyDuration}
+            onDurationChange={applyDuration}
+            className={`mx-auto block w-full cursor-pointer bg-black ${
+              sector ? "max-h-[34vh]" : "max-h-[46vh]"
+            }`}
+          />
+
+          {buffering && !!src && (
+            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/35">
+              <span
+                aria-label="Loading video"
+                className="h-11 w-11 animate-spin rounded-full border-4 border-cream/25 border-t-mint"
+              />
+            </div>
+          )}
+        </div>
 
         {/* Custom, app-styled controls */}
         <div className="flex items-center gap-2 bg-[#160427] px-3 py-2.5 sm:gap-3">
@@ -200,8 +264,13 @@ export const VideoStage = forwardRef<VideoStageHandle, { src?: string; sector?: 
 
           <div
             onPointerDown={onSeekBar}
-            className="group relative h-3 flex-1 cursor-pointer rounded-full bg-black/50 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
+            className="group relative h-3 flex-1 cursor-pointer overflow-hidden rounded-full bg-black/50 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
           >
+            {/* Grey "loaded so far" fill (buffered), behind the played fill. */}
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-cream/25"
+              style={{ width: `${bufFrac * 100}%` }}
+            />
             <div
               className="absolute inset-y-0 left-0 rounded-full bg-mint"
               style={{ width: `${frac * 100}%` }}

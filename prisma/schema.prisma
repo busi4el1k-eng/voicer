@@ -13,14 +13,15 @@ datasource db {
 
 // Clerk owns identity; we mirror users in via the user.created/updated webhook.
 model User {
-  id          String   @id @default(cuid())
-  clerkId     String   @unique
-  displayName String   @default("")
-  avatarColor String   @default("#FFD23F")
-  runs        Run[]
-  takes       Take[]
-  hostedRooms Room[]   @relation("RoomHost")
-  createdAt   DateTime @default(now())
+  id              String         @id @default(cuid())
+  clerkId         String         @unique
+  displayName     String         @default("")
+  avatarColor     String         @default("#FFD23F")
+  runs            Run[]
+  takes           Take[]
+  hostedRooms     Room[]         @relation("RoomHost")
+  ratingsReceived PlayerRating[] @relation("RatedUser")
+  createdAt       DateTime       @default(now())
 }
 
 // A collection of scenes shipped together ("Cursed Cinema", etc.).
@@ -113,11 +114,32 @@ model VideoUpload {
   // source so dubbed sectors keep the original music. none|processing|ready|error.
   bedKey     String? // Spaces key of the separated no_vocals bed (full length)
   bedStatus  String         @default("none")
+  // When the current bed job entered "processing". Lets a later trigger reclaim
+  // a job whose worker died mid-separation (status stuck on "processing").
+  bedStartedAt DateTime?
   segments   VideoSegment[]
+  ratings    VideoRating[]
   createdAt  DateTime       @default(now())
 
   @@index([userId])
   @@index([visibility])
+}
+
+// A 0–5 star rating a player gave a video after dubbing it (solo run or party).
+// One row per rater per video (raterKey = the player's room seat id in a party,
+// or a persistent per-browser client id in solo), upserted so re-rating just
+// updates. Averaged per video for the "rank" shown in the shared library.
+model VideoRating {
+  id        String      @id @default(cuid())
+  upload    VideoUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  uploadId  String
+  raterKey  String // opaque id of who rated (room player id or browser client id)
+  stars     Int // 0..5
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([uploadId, raterKey]) // one score per rater per video
+  @@index([uploadId])
 }
 
 // One AI-detected moment to cut out, and (after cutting) the produced clip.
@@ -192,5 +214,29 @@ model RoomTake {
   createdAt DateTime @default(now())
 
   @@unique([roomCode, segmentId]) // one owner per sector (seat → sector is 1:1)
+  @@index([roomCode])
+}
+
+// A 0–5 star rating one player gave another after a finished party dub. Kept
+// deliberately independent of Room/RoomPlayer lifecycle (plain string ids, no
+// cascade) so the score survives after the room is recycled — the durable link
+// is `ratedUserId`, which the dashboard aggregates into each member's rating.
+// Guests can rate and be rated; a guest ratee just has a null ratedUserId, so
+// their score is recorded but never surfaces on a dashboard.
+model PlayerRating {
+  id            String   @id @default(cuid())
+  roomCode      String // which game this rating came from
+  raterPlayerId String // RoomPlayer.id who gave the score
+  ratedPlayerId String // RoomPlayer.id who received it
+  // User.id of the rated player (null for guests). SetNull keeps the row if the
+  // account is ever deleted.
+  ratedUser     User?    @relation("RatedUser", fields: [ratedUserId], references: [id], onDelete: SetNull)
+  ratedUserId   String?
+  stars         Int // 0..5
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([roomCode, raterPlayerId, ratedPlayerId]) // one score per pair per game
+  @@index([ratedUserId])
   @@index([roomCode])
 }

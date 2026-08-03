@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRoom, type RoomView } from "@/lib/useRoom";
+import { PerformanceHistory } from "@/components/PerformanceHistory";
 import { MAX_PLAYERS, MIN_PLAYERS, normalizeRoomCode } from "@/lib/room-code";
 
 type Mode = {
@@ -250,11 +251,6 @@ export function Lobby({
     else setNote(true); // a mock mode (looks normal, not wired up yet)
   };
 
-  const startShow = () => {
-    const chosen = MODES.find((m) => m.id === selected);
-    if (chosen) launch(chosen);
-  };
-
   return (
     <div className="g-right self-stretch">
       <h2 className="g-title">Modes</h2>
@@ -294,14 +290,16 @@ export function Lobby({
               </div>
             </button>
           ))}
+
+          <PerformanceHistory />
         </div>
       </div>
 
       <div className="g-actions flex-col gap-2">
-        {selected === "party" ? (
+        {selected === "party" &&
           // Party mode requires a party of at least MIN_PLAYERS. Ready → enter
           // directly; otherwise a button opens the create/gather modal.
-          partyReady ? (
+          (partyReady ? (
             <button className="g-btn g-btn-start" onClick={startParty} disabled={roomBusy}>
               Start party →
             </button>
@@ -315,12 +313,7 @@ export function Lobby({
             >
               {room ? "🎉 Set up party" : "🎉 Create a party"}
             </button>
-          )
-        ) : (
-          <button className="g-btn g-btn-start" onClick={startShow}>
-            Start the show
-          </button>
-        )}
+          ))}
         {note && <p className="text-[12px] text-cream/60">That mode is coming soon.</p>}
       </div>
 

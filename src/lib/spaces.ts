@@ -13,10 +13,12 @@ export const SPACES_PREFIX = process.env.DO_SPACES_PREFIX || "voicer/";
 const ENDPOINT = process.env.DO_SPACES_ENDPOINT || "https://fra1.digitaloceanspaces.com";
 const REGION = process.env.DO_SPACES_REGION || "fra1";
 
-// Public base for read-only file URLs (objects with public ACL).
-const PUBLIC_BASE =
+// Public base for read-only file URLs (objects with public ACL). Exported so
+// the download proxy can verify a requested URL really points at our bucket.
+export const SPACES_PUBLIC_BASE =
   process.env.NEXT_PUBLIC_SPACES_PUBLIC_BASE ||
   "https://digital-standart-lib.fra1.digitaloceanspaces.com";
+const PUBLIC_BASE = SPACES_PUBLIC_BASE;
 
 export function spacesConfigured(): boolean {
   return !!(process.env.DO_SPACES_KEY && process.env.DO_SPACES_SECRET);

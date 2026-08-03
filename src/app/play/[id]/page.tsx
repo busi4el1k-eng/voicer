@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { downloadHref } from "@/lib/download";
 import { useMic, type RecordResult } from "@/lib/audio/useMic";
 
 type Seg = { id: string; startMs: number; endMs: number; label: string; transcript: string };
@@ -167,6 +168,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
   const [finalUrl, setFinalUrl] = useState("");
   const [exportErr, setExportErr] = useState("");
   const [replaying, setReplaying] = useState("");
+  const [buffering, setBuffering] = useState(true); // spinner while the video loads/stalls
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const waveCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -420,16 +422,35 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
       <div className="w-full max-w-2xl">
         {(phase === "intro" || showStudio) && (
           <div className="g-panel mb-4">
-            <video
-              ref={videoRef}
-              src={upload.sourceUrl}
-              playsInline
-              onLoadedMetadata={(e) => {
-                const d = e.currentTarget.duration;
-                if (d && isFinite(d)) setTotalMs((prev) => Math.max(prev, Math.round(d * 1000)));
-              }}
-              className="mx-auto max-h-[42vh] w-full rounded-[10px] bg-black"
-            />
+            <div className="relative">
+              <video
+                ref={videoRef}
+                src={upload.sourceUrl}
+                playsInline
+                preload="auto"
+                onLoadStart={() => setBuffering(true)}
+                onWaiting={() => setBuffering(true)}
+                onStalled={() => setBuffering(true)}
+                onSeeking={() => setBuffering(true)}
+                onSeeked={() => setBuffering(false)}
+                onCanPlay={() => setBuffering(false)}
+                onPlaying={() => setBuffering(false)}
+                onLoadedMetadata={(e) => {
+                  const d = e.currentTarget.duration;
+                  if (d && isFinite(d)) setTotalMs((prev) => Math.max(prev, Math.round(d * 1000)));
+                }}
+                className="mx-auto max-h-[42vh] w-full rounded-[10px] bg-black"
+              />
+
+              {buffering && (
+                <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/35">
+                  <span
+                    aria-label="Loading video"
+                    className="h-11 w-11 animate-spin rounded-full border-4 border-cream/25 border-t-mint"
+                  />
+                </div>
+              )}
+            </div>
 
             {/* The audio line under the video: source waveform, sectors, playhead. */}
             <div className="relative mt-3 h-[68px] w-full overflow-hidden rounded-[10px] bg-violet-deep">
@@ -578,9 +599,12 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
               />
             )}
             <div className="flex flex-col items-center gap-3">
-              <a href={finalUrl} download className="g-btn g-btn-start">
+              <a href={downloadHref(finalUrl, `${upload?.title || "cinema-dub"}.mp4`)} className="g-btn g-btn-start">
                 ↓ Download video
               </a>
+              <Link href="/dashboard" className="g-btn g-btn-ghost">
+                ← Back to dashboard
+              </Link>
               <button className="g-btn g-btn-ghost" onClick={() => setPhase("studio")}>
                 Back to studio
               </button>

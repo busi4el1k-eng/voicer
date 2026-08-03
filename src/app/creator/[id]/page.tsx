@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { formatShareId } from "@/lib/share-id";
+import { MAX_PLAYERS } from "@/lib/room-code";
 
 type Seg = {
   key: string;
@@ -39,8 +40,9 @@ const fmt = (ms: number) => {
   const m = Math.floor(s / 60);
   return `${m}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 };
-// One fixed colour per player seat (1-4), so a player reads the same everywhere.
-const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8"];
+// One fixed colour per player seat, so a player reads the same everywhere.
+const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8", "#A78BFA", "#FB923C", "#F87171"];
+const playerColor = (player: number) => PLAYER_COLORS[(player - 1) % PLAYER_COLORS.length];
 
 // Timeline zoom: 1× fills the frame; higher values widen the track so it scrolls
 // and sectors can be placed more precisely. A drag on the track past this many
@@ -116,6 +118,10 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [copied, setCopied] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
+  // Loading state for the player: spinner while buffering, grey seek fill for
+  // how much has downloaded so far.
+  const [buffering, setBuffering] = useState(true);
+  const [bufferedMs, setBufferedMs] = useState(0);
   // How far the timeline is zoomed in (1 = fit to frame). Above 1 the track
   // grows wider than its viewport and can be scrolled.
   const [zoom, setZoom] = useState(1);
@@ -214,19 +220,22 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   }, [zoom, renderWave]);
 
   // Create a sector spanning two marked times, fitted so it can't overlap a
-  // neighbour (start pushed past any sector it lands in; end clipped to the next
-  // sector). Shared by the mouse click-to-place and the Ctrl shortcut.
+  // neighbour BELONGING TO THE SAME PLAYER (start pushed past any own sector it
+  // lands in; end clipped to the next own sector). Different players may overlap
+  // — they voice their lines at the same time in the final mix. Shared by the
+  // mouse click-to-place and the Ctrl shortcut.
   const commitSector = useCallback(
     (a: number, b: number) => {
       let start = Math.min(a, b);
       let end = Math.max(a, b);
-      for (const s of segs) if (start >= s.startMs && start < s.endMs) start = s.endMs;
-      const nextStart = segs
+      const mine = segs.filter((s) => s.player === activePlayer);
+      for (const s of mine) if (start >= s.startMs && start < s.endMs) start = s.endMs;
+      const nextStart = mine
         .filter((s) => s.startMs >= start)
         .reduce((m, s) => Math.min(m, s.startMs), durMs);
       end = Math.min(end, nextStart);
       if (end <= start) {
-        setMsg("No room for a sector there.");
+        setMsg(`No room for a Player ${activePlayer} sector there.`);
         return;
       }
       const key = uid();
@@ -400,6 +409,24 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   // page reload). When that happens, seek far past the end to force the browser
   // to compute the real duration, which then arrives via `durationchange`.
   const seekedForDurRef = useRef(false);
+  // Track the downloaded range covering the current position (grey seek fill).
+  const updateBuffered = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    const ranges = v.buffered;
+    if (!ranges || ranges.length === 0) {
+      setBufferedMs(0);
+      return;
+    }
+    const ct = v.currentTime;
+    let end = 0;
+    for (let i = 0; i < ranges.length; i++) {
+      if (ranges.start(i) <= ct + 0.25) end = Math.max(end, ranges.end(i));
+    }
+    if (end === 0) end = ranges.end(ranges.length - 1);
+    setBufferedMs(end * 1000);
+  };
+
   const applyDuration = () => {
     const v = videoRef.current;
     if (!v) return;
@@ -442,8 +469,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     const startX = e.clientX;
     const { startMs: os, endMs: oe } = seg;
 
-    // Neighbours bound resizing so an edge can't overlap another sector.
-    const others = segs.filter((s) => s.key !== seg.key);
+    // Only same-player neighbours bound resizing/moving — a sector may overlap
+    // sectors owned by other players (simultaneous lines in the final mix).
+    const others = segs.filter((s) => s.key !== seg.key && s.player === seg.player);
     const prevEnd = others.filter((s) => s.endMs <= os).reduce((m, s) => Math.max(m, s.endMs), 0);
     const nextStart = others
       .filter((s) => s.startMs >= oe)
@@ -632,12 +660,29 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   };
 
   const ordered = [...segs].sort((a, b) => a.startMs - b.startMs);
+  // Lane layout: overlapping (different-player) sectors are stacked into vertical
+  // lanes so each stays visible and draggable. Greedy first-fit over the
+  // start-sorted sectors — with no overlaps everything lands in lane 0 and the
+  // track looks exactly as before.
+  const laneEnds: number[] = [];
+  const laneOf = new Map<string, number>();
+  for (const s of ordered) {
+    let lane = laneEnds.findIndex((end) => end <= s.startMs);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(s.endMs);
+    } else {
+      laneEnds[lane] = s.endMs;
+    }
+    laneOf.set(s.key, lane);
+  }
+  const laneCount = Math.max(1, laneEnds.length);
   // The editor always shows a sector: the selected one if it still exists,
   // otherwise the first. This keeps the box static and defaulted to sector 1.
   const selKey = segs.some((s) => s.key === selected) ? selected : (ordered[0]?.key ?? "");
   const sel = segs.find((s) => s.key === selKey);
   const selIndex = ordered.findIndex((s) => s.key === selKey);
-  const selColor = sel ? PLAYER_COLORS[(sel.player - 1) % 4] : "#fff";
+  const selColor = sel ? playerColor(sel.player) : "#fff";
 
   if (!upload) {
     return (
@@ -687,18 +732,46 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             ref={playerRef}
             className="g-player overflow-hidden rounded-[10px] bg-black shadow-[inset_0_0_0_2px_rgba(137,82,220,0.5)]"
           >
-            <video
-              ref={videoRef}
-              src={upload.sourceUrl}
-              preload="metadata"
-              onClick={togglePlay}
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onTimeUpdate={onTimeUpdate}
-              onLoadedMetadata={applyDuration}
-              onDurationChange={applyDuration}
-              className="mx-auto block max-h-[46vh] w-full cursor-pointer bg-black"
-            />
+            <div className="relative">
+              <video
+                ref={videoRef}
+                src={upload.sourceUrl}
+                preload="auto"
+                onClick={togglePlay}
+                onPlay={() => setPlaying(true)}
+                onPlaying={() => {
+                  setPlaying(true);
+                  setBuffering(false);
+                }}
+                onPause={() => setPlaying(false)}
+                onWaiting={() => setBuffering(true)}
+                onStalled={() => setBuffering(true)}
+                onSeeking={() => setBuffering(true)}
+                onSeeked={() => {
+                  setBuffering(false);
+                  updateBuffered();
+                }}
+                onCanPlay={() => setBuffering(false)}
+                onLoadStart={() => setBuffering(true)}
+                onProgress={updateBuffered}
+                onTimeUpdate={() => {
+                  onTimeUpdate();
+                  updateBuffered();
+                }}
+                onLoadedMetadata={applyDuration}
+                onDurationChange={applyDuration}
+                className="mx-auto block max-h-[46vh] w-full cursor-pointer bg-black"
+              />
+
+              {buffering && (
+                <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/35">
+                  <span
+                    aria-label="Loading video"
+                    className="h-11 w-11 animate-spin rounded-full border-4 border-cream/25 border-t-mint"
+                  />
+                </div>
+              )}
+            </div>
 
             {/* Custom, app-styled controls */}
             <div className="flex items-center gap-2 bg-[#160427] px-3 py-2.5 sm:gap-3">
@@ -718,8 +791,13 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {/* Seek / progress bar */}
               <div
                 onPointerDown={onSeekBar}
-                className="group relative h-3 flex-1 cursor-pointer rounded-full bg-black/50 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
+                className="group relative h-3 flex-1 cursor-pointer overflow-hidden rounded-full bg-black/50 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
               >
+                {/* Grey "loaded so far" fill (buffered), behind the played fill. */}
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-cream/25"
+                  style={{ width: `${durMs > 0 ? Math.min(100, (bufferedMs / durMs) * 100) : 0}%` }}
+                />
                 <div
                   className="absolute inset-y-0 left-0 rounded-full bg-mint"
                   style={{ width: `${durMs > 0 ? (playhead / durMs) * 100 : 0}%` }}
@@ -778,10 +856,10 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {/* Active player (1-4): the seat any new sector is assigned to. */}
               <button
                 type="button"
-                onClick={() => setActivePlayer((p) => (p % 4) + 1)}
+                onClick={() => setActivePlayer((p) => (p % MAX_PLAYERS) + 1)}
                 title="Player the next sector is assigned to — click to change (1-4)"
                 className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_3px_0_rgba(31,7,51,0.35)] transition-transform active:translate-y-[1px] sm:px-3"
-                style={{ background: PLAYER_COLORS[(activePlayer - 1) % 4] }}
+                style={{ background: playerColor(activePlayer) }}
               >
                 🎙 <span className="sm:hidden">P{activePlayer}</span>
                 <span className="hidden sm:inline">Player {activePlayer}</span>
@@ -832,10 +910,18 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 ordered.map((s, i) => {
                   const left = (s.startMs / durMs) * 100;
                   const width = ((s.endMs - s.startMs) / durMs) * 100;
-                  // Colour by player (1-4), so a player's sectors read the same
+                  // Colour by player, so a player's sectors read the same
                   // everywhere — not a per-index rainbow.
-                  const color = PLAYER_COLORS[(s.player - 1) % 4];
+                  const color = playerColor(s.player);
                   const isSel = s.key === selKey;
+                  // Vertical lane so overlapping sectors don't hide each other.
+                  // TRACK_H matches the track's h-[104px]; PAD mirrors the old
+                  // top-2/bottom-2 (8px) so a single lane looks identical.
+                  const TRACK_H = 104;
+                  const PAD = 8;
+                  const GAP = 3;
+                  const laneH = (TRACK_H - PAD * 2 - (laneCount - 1) * GAP) / laneCount;
+                  const top = PAD + (laneOf.get(s.key) ?? 0) * (laneH + GAP);
                   return (
                     <div
                       key={s.key}
@@ -847,15 +933,18 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                         setSelected(s.key);
                         playSeg(s);
                       }}
-                      className="absolute top-2 bottom-2 z-10 flex touch-none cursor-grab items-center overflow-hidden rounded-[7px] active:cursor-grabbing"
+                      className="absolute z-10 flex touch-none cursor-grab items-center overflow-hidden rounded-[7px] active:cursor-grabbing"
                       style={{
                         left: `${left}%`,
                         width: `${Math.max(width, 0.5)}%`,
+                        top: `${top}px`,
+                        height: `${laneH}px`,
                         background: color,
                         opacity: isSel ? 1 : 0.66,
                         boxShadow: isSel
                           ? "inset 0 0 0 2px rgba(255,255,255,0.95), inset 0 0 0 4px rgba(31,7,51,0.35), 0 3px 0 rgba(31,7,51,0.4)"
                           : "inset 0 0 0 2px rgba(255,255,255,0.35), 0 3px 0 rgba(31,7,51,0.3)",
+                        zIndex: isSel ? 20 : 10,
                       }}
                       title={s.transcript || `Sector ${i + 1}`}
                     >
@@ -918,7 +1007,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 play · drag a sector to move it, drag its <b className="text-cream/80">edges</b> to
                 resize · use <b className="text-cream/80">Delete</b> below to remove ·{" "}
                 <b className="text-cream/80">zoom</b> in and drag an empty part of the timeline to
-                scroll. Sectors can&apos;t overlap.
+                scroll. Different players&apos; sectors may overlap (they play at the same time); one player&apos;s can&apos;t.
               </span>
             ) : (
               <span>
@@ -930,7 +1019,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 Drag a sector to move it, its edges to resize;{" "}
                 <kbd className="font-display font-bold text-cream/80">Delete</kbd> removes ·{" "}
                 <b className="text-cream/80">zoom</b> in and drag an empty part of the timeline to
-                scroll. Sectors can&apos;t overlap.
+                scroll. Different players&apos; sectors may overlap (they play at the same time); one player&apos;s can&apos;t.
               </span>
             )}
           </div>
@@ -950,10 +1039,10 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 {/* Player assignment (1-4): click cycles which player dubs this sector. */}
                 <button
                   type="button"
-                  onClick={() => updateSel({ player: (sel.player % 4) + 1 })}
+                  onClick={() => updateSel({ player: (sel.player % MAX_PLAYERS) + 1 })}
                   title="Which player dubs this sector — click to change (1-4)"
                   className="rounded-[9px] px-3 py-1 font-display text-[14px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_2px_0_rgba(31,7,51,0.35)] transition-transform active:translate-y-[1px]"
-                  style={{ background: PLAYER_COLORS[(sel.player - 1) % 4] }}
+                  style={{ background: playerColor(sel.player) }}
                 >
                   🎙 Player {sel.player}
                 </button>
