@@ -6,6 +6,7 @@ import { normalizeRoomCode } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
 import { SPACES_PREFIX, getObjectBuffer, putObject, spacesConfigured } from "@/lib/spaces";
 import { muxDub, withSourceFile, type DubTake } from "@/lib/ffmpeg";
+import { ensureBedForUpload } from "@/lib/bed.server";
 import { ClientError, toClientMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -71,12 +72,15 @@ export async function POST(req: NextRequest) {
       if (takes.length === 0) throw new ClientError("No recorded takes to combine.");
 
       // Use the vocals-removed bed (music + noise, no actor voices) as the
-      // continuous background so only the dubs are heard; falls back to the
-      // original audio if the bed isn't ready yet.
+      // continuous background so only the dubs are heard. Generate it inline now
+      // if it isn't ready yet, so the render never silently keeps the original
+      // dialogue; only fall back to the original audio if a bed truly can't be
+      // produced (Demucs/Storage unconfigured or separation failed).
       let bedPath: string | null = null;
-      if (upload.bedStatus === "ready" && upload.bedKey) {
+      const bedKey = await ensureBedForUpload(upload.id);
+      if (bedKey) {
         bedPath = join(dir, "bed.wav");
-        await writeFile(bedPath, await getObjectBuffer(upload.bedKey));
+        await writeFile(bedPath, await getObjectBuffer(bedKey));
       }
 
       const out = join(dir, "party-dub.mp4");
