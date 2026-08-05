@@ -1,5 +1,6 @@
 import { AccountBar } from "@/components/AccountBar";
 import { PlayPanel } from "@/components/PlayPanel";
+import { Logo } from "@/components/Logo";
 
 const STEPS = [
   { icon: "🎧", title: "Listen", text: "Hear the scene's original line — once." },
@@ -15,7 +16,8 @@ export default function Landing() {
         <AccountBar />
       </div>
 
-      <div className="flex h-[104px] items-center">
+      <div className="flex h-[104px] items-center justify-center gap-3">
+        <Logo className="h-[64px] w-[64px] shrink-0" />
         <h1 className="g-logo">
           Cinema<em>Dub</em>
         </h1>

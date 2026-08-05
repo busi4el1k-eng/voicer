@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" rx="22" fill="#6520a0"/>
+  <defs>
+    <clipPath id="fj"><rect x="16" y="40" width="68" height="12" rx="3"/></clipPath>
+    <clipPath id="fa"><rect x="14" y="22" width="74" height="17" rx="4"/></clipPath>
+  </defs>
+  <!-- slate board -->
+  <rect x="17" y="48" width="66" height="34" rx="6" fill="#fff6ec" stroke="#201255" stroke-width="4"/>
+  <path d="M43 57 L43 73 L58 65 Z" fill="#ff3d8b" stroke="#201255" stroke-width="3" stroke-linejoin="round"/>
+  <!-- fixed jaw -->
+  <rect x="16" y="40" width="68" height="12" rx="3" fill="#2a0845" stroke="#201255" stroke-width="4"/>
+  <g clip-path="url(#fj)" stroke="#fff6ec" stroke-width="8">
+    <line x1="30" y1="38" x2="23" y2="54"/>
+    <line x1="48" y1="38" x2="41" y2="54"/>
+    <line x1="66" y1="38" x2="59" y2="54"/>
+    <line x1="84" y1="38" x2="77" y2="54"/>
+  </g>
+  <!-- hinged arm, open -->
+  <g transform="rotate(-13 19 41)">
+    <rect x="14" y="22" width="74" height="17" rx="4" fill="#2a0845" stroke="#201255" stroke-width="4"/>
+    <g clip-path="url(#fa)" stroke="#fff6ec" stroke-width="8">
+      <line x1="28" y1="20" x2="20" y2="41"/>
+      <line x1="46" y1="20" x2="38" y2="41"/>
+      <line x1="64" y1="20" x2="56" y2="41"/>
+      <line x1="82" y1="20" x2="74" y2="41"/>
+    </g>
+  </g>
+</svg>
