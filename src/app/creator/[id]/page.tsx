@@ -4,6 +4,16 @@ import { use, useCallback, useEffect, useRef, useState, useSyncExternalStore } f
 import Link from "next/link";
 import { formatShareId } from "@/lib/share-id";
 import { MAX_PLAYERS } from "@/lib/room-code";
+import { AutoDetectProgress, type AutoState } from "@/components/AutoDetectProgress";
+
+// Label for the auto-detect progress window, derived from the eased bar since
+// the backend job only reports a coarse status.
+function autoPhaseFor(p: number): string {
+  if (p < 0.3) return "Listening to the audio…";
+  if (p < 0.62) return "Transcribing the dialogue…";
+  if (p < 0.95) return "Placing the sectors…";
+  return "Finishing up…";
+}
 
 type Seg = {
   key: string;
@@ -48,7 +58,7 @@ const playerColor = (player: number) => PLAYER_COLORS[(player - 1) % PLAYER_COLO
 // and sectors can be placed more precisely. A drag on the track past this many
 // pixels is treated as a scroll (pan) rather than a tap that marks a sector — so
 // scrolling is never mistaken for placing a sector start.
-const ZOOM_STEPS = [1, 1.5, 2, 4];
+const ZOOM_STEPS = [1, 1.5, 2, 4, 8, 16];
 const MAX_ZOOM = ZOOM_STEPS[ZOOM_STEPS.length - 1];
 const PAN_THRESHOLD = 6;
 
@@ -131,6 +141,17 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   // The player (1-4) newly-created sectors are assigned to. Chosen before
   // marking a sector so multi-player dubs can be laid out in one pass.
   const [activePlayer, setActivePlayer] = useState(1);
+  // How many distinct voices auto-detect should look for (diarization hint).
+  // Most clips are a two-hander, so default to 2.
+  const [speakers, setSpeakers] = useState(2);
+  // Auto-detect progress window (the "downloading" pop-up, 0→100%).
+  const [autoOpen, setAutoOpen] = useState(false);
+  const [autoProg, setAutoProg] = useState(0);
+  const [autoPhase, setAutoPhase] = useState("");
+  const [autoDetState, setAutoDetState] = useState<AutoState>("working");
+  const [autoCount, setAutoCount] = useState(0);
+  const [autoErr, setAutoErr] = useState("");
+  const autoEaseRef = useRef<number | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -536,15 +557,6 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     window.addEventListener("pointerup", up);
   };
 
-  const addSeg = () => {
-    const at = playhead || 0;
-    const end = Math.min(durMs || at + 2000, at + 2000);
-    setSegs((prev) => [
-      ...prev,
-      { key: uid(), startMs: Math.round(at), endMs: Math.round(end), label: "", transcript: "", emotionTag: "", player: activePlayer },
-    ]);
-  };
-
   // Time (ms) at a click x-position on the track.
   const timeAtClientX = (clientX: number) => {
     const track = trackRef.current;
@@ -639,7 +651,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   };
 
   const updateSel = (patch: Partial<Seg>) =>
-    setSegs((prev) => prev.map((s) => (s.key === selected ? { ...s, ...patch } : s)));
+    setSegs((prev) => {
+      // Target the sector the panel is actually showing: the explicitly-selected
+      // one, or (when nothing is selected, e.g. right after auto-detect) the
+      // first sector — same fallback the render uses for `selKey`.
+      const key = prev.some((s) => s.key === selected)
+        ? selected
+        : [...prev].sort((a, b) => a.startMs - b.startMs)[0]?.key;
+      return prev.map((s) => (s.key === key ? { ...s, ...patch } : s));
+    });
 
   const save = async () => {
     setBusy("save");
@@ -658,6 +678,94 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       setBusy("");
     }
   };
+
+  // AI auto-detect: transcribe the audio and let Claude build the sectors,
+  // replacing whatever's on the timeline. Runs in the background, so we kick it
+  // off then poll until it's ready and load the detected sectors. The creator
+  // can then tweak and save as usual.
+  const stopAutoEase = () => {
+    if (autoEaseRef.current) {
+      window.clearInterval(autoEaseRef.current);
+      autoEaseRef.current = null;
+    }
+  };
+
+  const autoDetect = async () => {
+    setBusy("auto");
+    setMsg("");
+    // Pop the progress window and start easing the bar toward ~95% (the backend
+    // job only reports processing → ready, so there's no true % to read).
+    setAutoErr("");
+    setAutoCount(0);
+    setAutoDetState("working");
+    setAutoProg(0);
+    setAutoPhase(autoPhaseFor(0));
+    setAutoOpen(true);
+    const startedAt = Date.now();
+    stopAutoEase();
+    autoEaseRef.current = window.setInterval(() => {
+      const el = (Date.now() - startedAt) / 1000;
+      const p = Math.min(0.95, 0.04 + 0.91 * (1 - Math.exp(-el / 22)));
+      setAutoProg(p);
+      setAutoPhase(autoPhaseFor(p));
+    }, 120);
+
+    try {
+      const start = await fetch("/api/creator/autosector", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadId: id, speakersExpected: speakers }),
+      });
+      if (!start.ok) throw new Error((await start.json()).error || "Auto-detect failed.");
+
+      // Poll for completion (up to ~10 min for long clips).
+      const deadline = Date.now() + 10 * 60_000;
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const r = await fetch(`/api/creator/autosector?uploadId=${id}`);
+        const d = (await r.json()) as {
+          status?: string;
+          error?: string;
+          segments?: Upload["segments"];
+        };
+        if (!r.ok) throw new Error(d.error || "Auto-detect failed.");
+        if (d.status === "error") throw new Error(d.error || "Auto-detect failed.");
+        if (d.status === "ready") {
+          const detected = d.segments ?? [];
+          setSegs(
+            detected.map((s) => ({
+              key: s.id,
+              startMs: s.startMs,
+              endMs: s.endMs,
+              label: s.label,
+              transcript: s.transcript,
+              emotionTag: s.emotionTag,
+              player: s.player ?? 1,
+              partUrl: s.partUrl,
+            })),
+          );
+          // Snap the window to 100% and switch it to the "done" state.
+          stopAutoEase();
+          setAutoProg(1);
+          setAutoCount(detected.length);
+          setAutoDetState("done");
+          setMsg(detected.length ? `Detected ${detected.length} sectors.` : "No speech detected.");
+          break;
+        }
+        if (Date.now() > deadline) throw new Error("Auto-detect timed out.");
+      }
+    } catch (e) {
+      stopAutoEase();
+      setAutoDetState("error");
+      setAutoErr(e instanceof Error ? e.message : "Auto-detect failed.");
+      setMsg(e instanceof Error ? e.message : "Auto-detect failed.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  // Stop the easing timer if the editor unmounts mid-detect.
+  useEffect(() => stopAutoEase, []);
 
   const ordered = [...segs].sort((a, b) => a.startMs - b.startMs);
   // Lane layout: overlapping (different-player) sectors are stacked into vertical
@@ -681,8 +789,6 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   // otherwise the first. This keeps the box static and defaulted to sector 1.
   const selKey = segs.some((s) => s.key === selected) ? selected : (ordered[0]?.key ?? "");
   const sel = segs.find((s) => s.key === selKey);
-  const selIndex = ordered.findIndex((s) => s.key === selKey);
-  const selColor = sel ? playerColor(sel.player) : "#fff";
 
   if (!upload) {
     return (
@@ -695,7 +801,16 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   return (
     <main className="g-screen">
       <div className="flex h-[72px] items-center justify-between gap-4">
-        <h1 className="g-logo">{upload.title || "Untitled"}</h1>
+        <div className="flex min-w-0 items-center gap-3">
+          <Link
+            href="/creator"
+            title="Back to my videos"
+            className="grid h-10 w-10 flex-none place-items-center rounded-[10px] border-2 border-violet-lift bg-violet-deep/60 text-[18px] text-cream transition hover:border-mint"
+          >
+            ←
+          </Link>
+          <h1 className="g-logo truncate">{upload.title || "Untitled"}</h1>
+        </div>
         {upload.shareId && (
           <button
             type="button"
@@ -833,6 +948,18 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           </div>
         </div>
 
+        {/* The selected sector's line, sitting between the video and the
+            timeline. Editable so you can fix what the AI transcribed. */}
+        {sel && (
+          <textarea
+            value={sel.transcript}
+            onChange={(e) => updateSel({ transcript: e.target.value })}
+            placeholder="Type the line spoken in this sector…"
+            rows={2}
+            className="w-full resize-none rounded-[12px] bg-violet-deep/60 px-4 py-3 text-center font-display text-[20px] leading-[1.4] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+          />
+        )}
+
         {/* Timeline */}
         <div className="g-panel">
           <SectionHead icon="🎞️" title="Timeline">
@@ -853,23 +980,58 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <Badge className="hidden text-mint sm:inline-flex">
                 {segs.length} {segs.length === 1 ? "sector" : "sectors"}
               </Badge>
-              {/* Active player (1-4): the seat any new sector is assigned to. */}
+              {/* Player of the SELECTED sector — click cycles which player dubs
+                  it (and becomes the default for the next new sector). */}
               <button
                 type="button"
-                onClick={() => setActivePlayer((p) => (p % MAX_PLAYERS) + 1)}
-                title="Player the next sector is assigned to — click to change (1-4)"
+                onClick={() => {
+                  const base = sel?.player ?? activePlayer;
+                  const np = (base % MAX_PLAYERS) + 1;
+                  if (sel) updateSel({ player: np });
+                  setActivePlayer(np);
+                }}
+                title="Which player dubs the selected sector — click to change"
                 className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_3px_0_rgba(31,7,51,0.35)] transition-transform active:translate-y-[1px] sm:px-3"
-                style={{ background: playerColor(activePlayer) }}
+                style={{ background: playerColor(sel?.player ?? activePlayer) }}
               >
-                🎙 <span className="sm:hidden">P{activePlayer}</span>
-                <span className="hidden sm:inline">Player {activePlayer}</span>
+                🎙 <span className="sm:hidden">P{sel?.player ?? activePlayer}</span>
+                <span className="hidden sm:inline">Player {sel?.player ?? activePlayer}</span>
+              </button>
+              {/* Expected number of speakers for auto-detect — click to cycle
+                  1..MAX_PLAYERS. Hints the diarizer so it separates the voices. */}
+              <button
+                type="button"
+                onClick={() => setSpeakers((n) => (n % MAX_PLAYERS) + 1)}
+                disabled={durMs <= 0 || busy === "auto"}
+                title="How many people speak in this clip — auto-detect uses this to separate voices"
+                className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black tabular-nums text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[1px] disabled:opacity-35 sm:px-3"
+                style={{ background: "rgba(37, 28, 92, 0.6)" }}
+              >
+                👥 {speakers}
               </button>
               <button
-                onClick={addSeg}
+                onClick={autoDetect}
                 className="g-btn g-btn-ghost h-9 flex-none px-3 text-[13px] sm:px-4"
-                disabled={durMs <= 0}
+                disabled={durMs <= 0 || busy === "auto"}
+                title="Let AI listen to the audio and create sectors (replaces current ones)"
               >
-                + Add<span className="hidden sm:inline"> sector</span>
+                {busy === "auto" ? "🪄 Detecting…" : (
+                  <>
+                    🪄 Auto<span className="hidden sm:inline">-detect</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => sel && deleteSeg(sel.key)}
+                disabled={!sel}
+                title="Delete the selected sector"
+                className="g-btn h-9 flex-none px-3 text-[13px] text-cream disabled:opacity-35 sm:px-4"
+                style={{
+                  background: "linear-gradient(0deg, #d61f6c 0%, #ff3d8b 100%)",
+                  boxShadow: "inset 0 0 0 2px #ffb0d2, 0 4px 0 0 #a4165a",
+                }}
+              >
+                ✕ Delete<span className="hidden sm:inline"> sector</span>
               </button>
             </div>
           </SectionHead>
@@ -1005,7 +1167,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 Tap the timeline to mark a sector start, then tap again for its end · drag the{" "}
                 <span className="text-sun">◆</span> playhead to scrub · tap a sector to select &amp;
                 play · drag a sector to move it, drag its <b className="text-cream/80">edges</b> to
-                resize · use <b className="text-cream/80">Delete</b> below to remove ·{" "}
+                resize · tap a sector then <b className="text-cream/80">Delete</b> in the toolbar to remove ·{" "}
                 <b className="text-cream/80">zoom</b> in and drag an empty part of the timeline to
                 scroll. Different players&apos; sectors may overlap (they play at the same time); one player&apos;s can&apos;t.
               </span>
@@ -1024,72 +1186,6 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             )}
           </div>
         </div>
-
-        {/* Selected sector editor */}
-        {sel ? (
-          <div className="g-panel">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span
-                  className="rounded-[9px] px-3 py-1 font-display text-[14px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_2px_0_rgba(31,7,51,0.35)]"
-                  style={{ background: selColor }}
-                >
-                  Sector {selIndex + 1}
-                </span>
-                {/* Player assignment (1-4): click cycles which player dubs this sector. */}
-                <button
-                  type="button"
-                  onClick={() => updateSel({ player: (sel.player % MAX_PLAYERS) + 1 })}
-                  title="Which player dubs this sector — click to change (1-4)"
-                  className="rounded-[9px] px-3 py-1 font-display text-[14px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_2px_0_rgba(31,7,51,0.35)] transition-transform active:translate-y-[1px]"
-                  style={{ background: playerColor(sel.player) }}
-                >
-                  🎙 Player {sel.player}
-                </button>
-                <Badge>
-                  {fmt(sel.startMs)}–{fmt(sel.endMs)} · {((sel.endMs - sel.startMs) / 1000).toFixed(1)}s
-                </Badge>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => playSeg(sel)}
-                  className="g-btn g-btn-ghost h-9 px-4 text-[13px]"
-                >
-                  ▶ Play
-                </button>
-                <button
-                  onClick={() => deleteSeg(sel.key)}
-                  className="g-btn h-9 px-4 text-[13px] text-cream"
-                  style={{
-                    background: "linear-gradient(0deg, #d61f6c 0%, #ff3d8b 100%)",
-                    boxShadow: "inset 0 0 0 2px #ffb0d2, 0 4px 0 0 #a4165a",
-                  }}
-                >
-                  ✕ Delete
-                </button>
-              </div>
-            </div>
-            <label className="mb-1 block font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-              Replica line
-            </label>
-            <textarea
-              value={sel.transcript}
-              onChange={(e) => updateSel({ transcript: e.target.value })}
-              placeholder="Type the line spoken in this sector…"
-              rows={4}
-              className="w-full rounded-[12px] bg-violet-deep/60 px-4 py-3 text-center font-display text-[20px] leading-[1.4] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
-            />
-          </div>
-        ) : (
-          <div className="g-panel text-center">
-            <p className="py-6 text-[14px] leading-[1.6] text-cream/55">
-              No sectors yet. Move the playhead and press{" "}
-              <span className="font-display font-bold text-cream">Add sector</span> (or{" "}
-              <kbd className="font-display font-bold text-cream">Ctrl</kbd> on the timeline) to mark
-              your first line.
-            </p>
-          </div>
-        )}
 
         {/* Actions bar */}
         <div className="g-panel flex flex-wrap items-center justify-between gap-3">
@@ -1119,6 +1215,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           </div>
         </div>
       </div>
+      <AutoDetectProgress
+        open={autoOpen}
+        progress={autoProg}
+        phase={autoPhase}
+        state={autoDetState}
+        count={autoCount}
+        error={autoErr}
+        onClose={() => setAutoOpen(false)}
+      />
     </main>
   );
 }

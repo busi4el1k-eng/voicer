@@ -15,6 +15,12 @@ const serverSchema = z.object({
   // Optional: without it, renders fall back to muting the sector (no music).
   DEMUCS_URL: z.string().url().optional(),
   DEMUCS_API_KEY: z.string().optional(),
+  // AssemblyAI speech-to-text, for auto-detecting dub sectors from a video's
+  // audio. Optional: without it, the editor's Auto-detect button is disabled.
+  ASSEMBLYAI_API_KEY: z.string().optional(),
+  // Anthropic (Claude), used to correct auto-detect's speaker labels by reading
+  // the dialogue. Optional: without it, sectors keep the acoustic diarization.
+  ANTHROPIC_API_KEY: z.string().optional(),
 });
 
 const clientSchema = z.object({

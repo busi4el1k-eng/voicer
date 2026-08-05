@@ -117,6 +117,11 @@ model VideoUpload {
   // When the current bed job entered "processing". Lets a later trigger reclaim
   // a job whose worker died mid-separation (status stuck on "processing").
   bedStartedAt DateTime?
+  // AI auto-sectoring job (isolate vocals → transcribe/diarize → build sectors).
+  // Runs in the background like the bed. idle|processing|ready|error.
+  autoStatus    String    @default("idle")
+  autoStartedAt DateTime?
+  autoError     String    @default("")
   segments   VideoSegment[]
   ratings    VideoRating[]
   createdAt  DateTime       @default(now())
