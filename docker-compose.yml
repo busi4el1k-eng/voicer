@@ -36,6 +36,10 @@ services:
       - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
       - DEMUCS_URL=${DEMUCS_URL}
       - DEMUCS_API_KEY=${DEMUCS_API_KEY}
+      # AI auto-detect (optional): AssemblyAI transcribes, Anthropic corrects the
+      # speaker labels. Without these in the server .env, auto-detect stays off.
+      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     networks:
       - shared
 
