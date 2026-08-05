@@ -4,6 +4,8 @@ import {
   GetObjectCommand,
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import type { Readable } from "node:stream";
 
 // DigitalOcean Spaces access, same construction as
 // ../digital_standarts/src/app/api/products-library/route.ts.
@@ -59,6 +61,32 @@ export async function putObject(
       ACL: publicRead ? "public-read" : "private",
     }),
   );
+  return { key, url: publicUrl(key) };
+}
+
+// Stream an object straight to Spaces without ever holding the whole file in
+// memory. Uses S3 multipart upload under the hood (lib-storage), so RAM use is
+// bounded to a few small in-flight parts (~5 MB each) regardless of file size —
+// this is what lets big video uploads run concurrently on a memory-tight host.
+export async function putObjectStream(
+  key: string,
+  body: Readable,
+  contentType: string,
+  publicRead = true,
+): Promise<{ key: string; url: string }> {
+  const upload = new Upload({
+    client: getSpaces(),
+    params: {
+      Bucket: SPACES_BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      ACL: publicRead ? "public-read" : "private",
+    },
+    queueSize: 3, // up to 3 parts in flight
+    partSize: 8 * 1024 * 1024, // 8 MB parts
+  });
+  await upload.done();
   return { key, url: publicUrl(key) };
 }
 

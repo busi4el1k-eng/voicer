@@ -5,6 +5,7 @@ import db from "@/lib/db";
 import { SPACES_PREFIX, getObjectBuffer, putObject, spacesConfigured } from "@/lib/spaces";
 import { muxDub, withSourceFile, type DubTake } from "@/lib/ffmpeg";
 import { ensureBedForUpload } from "@/lib/bed.server";
+import { RenderBusyError, withRenderSlot } from "@/lib/render-queue";
 import { ClientError, toClientMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -34,47 +35,55 @@ export async function POST(req: NextRequest) {
   });
   if (!upload) return NextResponse.json({ error: "Upload not found." }, { status: 404 });
 
-  const src = await getObjectBuffer(upload.sourceKey);
-  const ext = upload.sourceKey.split(".").pop() || "mp4";
-
   try {
-    const outBuf = await withSourceFile(src, ext, async ({ dir, input }) => {
-      // Match each uploaded take to its sector (by id), in chronological order.
-      const takes: DubTake[] = [];
-      let i = 0;
-      for (const seg of upload.segments) {
-        const file = form.get(`take:${seg.id}`);
-        if (!(file instanceof File) || file.size === 0) continue;
-        const path = join(dir, `take-${i}.webm`);
-        await writeFile(path, Buffer.from(await file.arrayBuffer()));
-        takes.push({ path, startMs: seg.startMs, endMs: seg.endMs });
-        i++;
-      }
-      if (takes.length === 0) throw new ClientError("No recorded takes were sent.");
+    // Gate the heavy work (load source into RAM + ffmpeg) behind the render
+    // limiter so simultaneous exports can't saturate the host.
+    const url = await withRenderSlot(async () => {
+      const src = await getObjectBuffer(upload.sourceKey);
+      const ext = upload.sourceKey.split(".").pop() || "mp4";
 
-      // Use the vocals-removed bed (music + noise, no actor voices) as the
-      // continuous background so only the dub is heard. Generate it inline now
-      // if it isn't ready yet, so the render never silently keeps the original
-      // dialogue; only fall back to the original audio if a bed truly can't be
-      // produced (Demucs/Storage unconfigured or separation failed).
-      let bedPath: string | null = null;
-      const bedKey = await ensureBedForUpload(upload.id);
-      if (bedKey) {
-        bedPath = join(dir, "bed.wav");
-        await writeFile(bedPath, await getObjectBuffer(bedKey));
-      }
+      const outBuf = await withSourceFile(src, ext, async ({ dir, input }) => {
+        // Match each uploaded take to its sector (by id), in chronological order.
+        const takes: DubTake[] = [];
+        let i = 0;
+        for (const seg of upload.segments) {
+          const file = form.get(`take:${seg.id}`);
+          if (!(file instanceof File) || file.size === 0) continue;
+          const path = join(dir, `take-${i}.webm`);
+          await writeFile(path, Buffer.from(await file.arrayBuffer()));
+          takes.push({ path, startMs: seg.startMs, endMs: seg.endMs });
+          i++;
+        }
+        if (takes.length === 0) throw new ClientError("No recorded takes were sent.");
 
-      const out = join(dir, "dub.mp4");
-      return muxDub(input, takes, out, { bedPath });
+        // Use the vocals-removed bed (music + noise, no actor voices) as the
+        // continuous background so only the dub is heard. Generate it inline now
+        // if it isn't ready yet, so the render never silently keeps the original
+        // dialogue; only fall back to the original audio if a bed truly can't be
+        // produced (Demucs/Storage unconfigured or separation failed).
+        let bedPath: string | null = null;
+        const bedKey = await ensureBedForUpload(upload.id);
+        if (bedKey) {
+          bedPath = join(dir, "bed.wav");
+          await writeFile(bedPath, await getObjectBuffer(bedKey));
+        }
+
+        const out = join(dir, "dub.mp4");
+        return muxDub(input, takes, out, { bedPath });
+      });
+
+      const key = `${SPACES_PREFIX}sources/${upload.id}/dubs/${Date.now()}.mp4`;
+      const { url } = await putObject(key, outBuf, "video/mp4");
+      return url;
     });
 
-    const key = `${SPACES_PREFIX}sources/${upload.id}/dubs/${Date.now()}.mp4`;
-    const { url } = await putObject(key, outBuf, "video/mp4");
     return NextResponse.json({ url });
   } catch (e) {
+    // Queue full — tell the client to retry shortly rather than fail outright.
+    const status = e instanceof RenderBusyError ? 503 : 500;
     return NextResponse.json(
       { error: toClientMessage(e, "Export failed. Please try again.") },
-      { status: 500 },
+      { status },
     );
   }
 }

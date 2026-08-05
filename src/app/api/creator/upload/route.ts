@@ -1,7 +1,9 @@
 import { NextResponse, after, type NextRequest } from "next/server";
+import { Readable } from "node:stream";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
-import { SPACES_PREFIX, putObject, spacesConfigured } from "@/lib/spaces";
+import { SPACES_PREFIX, putObjectStream, spacesConfigured } from "@/lib/spaces";
 import { rateLimit } from "@/lib/rate-limit";
 import { generateShareId } from "@/lib/share-id.server";
 import { generateBedForUpload } from "@/lib/bed.server";
@@ -10,6 +12,12 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 // Step 1 of the creator pipeline: upload a source video to Spaces and record it.
+//
+// The video is sent as the raw request body (not multipart form-data) with its
+// title/filename in the query string, so we can pipe it straight to Spaces in a
+// stream. That keeps memory use flat (a few MB of in-flight parts) instead of
+// loading the whole file — up to 1 GB — into RAM, which is what let concurrent
+// large uploads exhaust the host.
 export async function POST(req: NextRequest) {
   if (!spacesConfigured()) {
     return NextResponse.json({ error: "Storage isn't configured." }, { status: 500 });
@@ -28,22 +36,19 @@ export async function POST(req: NextRequest) {
   const gate = rateLimit(`upload:${user.id}`, { maxRequests: 10, windowMs: 60_000 });
   if (!gate.allowed) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
 
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
-    return NextResponse.json({ error: "Expected a file upload." }, { status: 400 });
-  }
-
-  const file = form.get("file");
-  const title = String(form.get("title") ?? "").slice(0, 120);
-  if (!(file instanceof File)) return NextResponse.json({ error: "No file." }, { status: 400 });
-  if (!file.type.startsWith("video/")) {
+  // File metadata rides in the query string; the body is the raw video bytes.
+  const params = req.nextUrl.searchParams;
+  const filename = (params.get("filename") || "").slice(0, 200);
+  const title = (params.get("title") || "").slice(0, 120);
+  const contentType = req.headers.get("content-type") || "";
+  if (!contentType.startsWith("video/")) {
     return NextResponse.json({ error: "Please upload a video file." }, { status: 400 });
   }
+  if (!req.body) {
+    return NextResponse.json({ error: "No file." }, { status: 400 });
+  }
 
-  const ext = (file.name.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const buf = Buffer.from(await file.arrayBuffer());
+  const ext = (filename.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
 
   // Create the row first so its id keys the storage path. Each video gets a
   // short shareable code so it can be opened later (e.g. in a solo run).
@@ -51,14 +56,24 @@ export async function POST(req: NextRequest) {
   const upload = await db.videoUpload.create({
     data: {
       userId: user.id,
-      title: title || file.name,
+      title: title || filename || "Untitled",
       sourceKey: "",
       sourceUrl: "",
       shareId,
     },
   });
   const key = `${SPACES_PREFIX}sources/${upload.id}/source.${ext}`;
-  const { url } = await putObject(key, buf, file.type);
+
+  let url: string;
+  try {
+    // Pipe the request body straight to Spaces — never buffered whole in RAM.
+    const nodeStream = Readable.fromWeb(req.body as NodeReadableStream<Uint8Array>);
+    ({ url } = await putObjectStream(key, nodeStream, contentType));
+  } catch {
+    // Storage failed — drop the orphan row so it doesn't show as a broken video.
+    await db.videoUpload.delete({ where: { id: upload.id } }).catch(() => {});
+    return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 502 });
+  }
 
   const saved = await db.videoUpload.update({
     where: { id: upload.id },

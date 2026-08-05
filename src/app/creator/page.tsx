@@ -44,10 +44,14 @@ type Overlay = {
 };
 
 // POST the file with real upload progress (fetch can't report upload progress).
+// The file is sent as the raw request body (metadata in the query string) so the
+// server can stream it to storage without buffering the whole video in memory.
 function uploadXhr(file: File, title: string, onProgress: (frac: number) => void): Promise<Upload> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/creator/upload");
+    const qs = new URLSearchParams({ filename: file.name, title });
+    xhr.open("POST", `/api/creator/upload?${qs.toString()}`);
+    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(e.loaded / e.total);
     };
@@ -61,10 +65,7 @@ function uploadXhr(file: File, title: string, onProgress: (frac: number) => void
       }
     };
     xhr.onerror = () => reject(new Error("Network error during upload."));
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("title", title);
-    xhr.send(fd);
+    xhr.send(file);
   });
 }
 
