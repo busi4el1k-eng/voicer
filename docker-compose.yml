@@ -19,6 +19,14 @@ services:
         NEXT_PUBLIC_SPACES_PUBLIC_BASE: ${NEXT_PUBLIC_SPACES_PUBLIC_BASE}
         NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL}
     restart: unless-stopped
+    # Each realtime (SSE) player holds one long-lived connection = one file
+    # descriptor. The default 1024 soft limit caps concurrent players at ~1k;
+    # raise it (hard limit is already 524288) so the box's real headroom — not a
+    # config default — sets the ceiling.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     environment:
       - HOSTNAME=0.0.0.0
       - NODE_ENV=production
