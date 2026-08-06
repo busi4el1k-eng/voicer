@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { downloadHref } from "@/lib/download";
 import { useMic, type RecordResult } from "@/lib/audio/useMic";
+import { CombineProgress } from "@/components/CombineProgress";
 
 type Seg = { id: string; startMs: number; endMs: number; label: string; transcript: string };
 type Upload = { id: string; title: string; sourceUrl: string; segments: Seg[] };
@@ -574,15 +575,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
           </div>
         )}
 
-        {phase === "exporting" && (
-          <div className="g-panel text-center">
-            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cream/20 border-t-mint" />
-            <h2 className="g-title">Building your video…</h2>
-            <p className="text-[13px] text-cream/60">
-              Replacing the original lines with your voice and rendering the full video.
-            </p>
-          </div>
-        )}
+        {phase === "exporting" && <CombineProgress open />}
 
         {phase === "done" && (
           <div className="g-panel text-center">

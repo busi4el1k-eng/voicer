@@ -8,6 +8,8 @@ import { decodeAudio, type Pcm } from "@/lib/audio/waveform";
 import { RecorderWave } from "@/components/RecorderWave";
 import { VideoStage, type VideoStageHandle } from "@/components/VideoStage";
 import { RateVideo } from "@/components/RateVideo";
+import { ScenarioWindow, scenarioFromSegments } from "@/components/ScenarioWindow";
+import { CombineProgress } from "@/components/CombineProgress";
 import { getClientId } from "@/lib/client-id";
 
 type Seg = {
@@ -249,13 +251,17 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
 
   const recordedCount = Object.keys(takes).length;
 
+  // The active dubbing view uses a wider, split-screen layout (video on the
+  // left, scenario script on the right), so the page container widens to match.
+  const isRunView = phase === "run" && !!seg;
+
   return (
     <main className="g-screen">
       <div className="flex h-[72px] items-center">
         <h1 className="g-logo">{video.title || "Solo run"}</h1>
       </div>
 
-      <div className="w-full max-w-2xl">
+      <div className={`w-full ${isRunView ? "max-w-6xl" : "max-w-2xl"}`}>
         {phase === "run" && seg && (
           <>
             {/* Progress */}
@@ -284,100 +290,113 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
               </div>
             </div>
 
-            {/* Video — app-styled player, restricted to just this sector */}
-            <div className="g-panel mb-4">
-              <div className="relative">
-                <VideoStage
-                  ref={stageRef}
-                  src={video.sourceUrl}
-                  sector={{ startMs: seg.startMs, endMs: seg.endMs }}
-                />
-                {counting && (
-                  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-black/55">
-                    <span
-                      key={countdown}
-                      className="animate-[pulse_1s_ease-in-out] font-display text-[96px] font-bold leading-none text-cream drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
-                    >
-                      {countdown}
-                    </span>
+            {/* Split screen: video + recorder on the left, scenario script on
+                the right. Stacks on small screens. */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
+              {/* Left — the current sector's video player and recorder. */}
+              <div className="flex flex-col">
+                {/* Video — app-styled player, restricted to just this sector */}
+                <div className="g-panel mb-4">
+                  <div className="relative">
+                    <VideoStage
+                      ref={stageRef}
+                      src={video.sourceUrl}
+                      sector={{ startMs: seg.startMs, endMs: seg.endMs }}
+                    />
+                    {counting && (
+                      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-black/55">
+                        <span
+                          key={countdown}
+                          className="animate-[pulse_1s_ease-in-out] font-display text-[96px] font-bold leading-none text-cream drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
+                        >
+                          {countdown}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <p className="mt-2 text-center font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
-                {fmt(seg.startMs)} – {fmt(seg.endMs)} · space = play / pause
-              </p>
-            </div>
+                  <p className="mt-2 text-center font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
+                    {fmt(seg.startMs)} – {fmt(seg.endMs)} · space = play / pause
+                  </p>
+                </div>
 
-            {/* Line text */}
-            {seg.transcript && (
-              <div className="g-panel mb-4 text-center text-[16px] text-cream">
-                &ldquo;{seg.transcript}&rdquo;
-              </div>
-            )}
+                {/* Recorder + voice waveform over the original */}
+                <div className="g-panel mb-4">
+                  <div className="mb-2 flex justify-between text-[11px] font-bold uppercase tracking-[0.08em]">
+                    <span className="text-sky-400">Original</span>
+                    <span className="text-red-400">Your voice</span>
+                  </div>
+                  <RecorderWave
+                    original={origWave[seg.id]}
+                    take={takeWave[seg.id]}
+                    recording={mic.recording}
+                    getLevel={mic.getLevel}
+                    durationMs={seg.endMs - seg.startMs}
+                  />
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <button
+                      onClick={() =>
+                        mic.recording
+                          ? void stopRecording()
+                          : counting
+                            ? cancelCountdown()
+                            : beginCountdown()
+                      }
+                      className={`g-btn h-11 text-[14px] ${
+                        mic.recording || counting ? "bg-magenta text-cream" : "g-btn-start"
+                      }`}
+                    >
+                      {mic.recording
+                        ? "■ Stop"
+                        : counting
+                          ? `Starting in ${countdown}…`
+                          : takes[seg.id]
+                            ? "● Re-record"
+                            : "● Record"}
+                    </button>
+                    <button
+                      onClick={playMyTake}
+                      disabled={!takes[seg.id] || busy}
+                      className="g-btn g-btn-ghost h-11 text-[14px]"
+                    >
+                      ▶ My take
+                    </button>
+                    <button
+                      onClick={next}
+                      disabled={busy}
+                      className="g-btn g-btn-primary col-span-2 h-11 text-[14px] sm:col-span-1"
+                    >
+                      {cur >= segs.length - 1 ? "Finish sectors →" : "Next sector →"}
+                    </button>
+                  </div>
+                  {mic.error && <p className="mt-3 text-[13px] text-magenta">{mic.error}</p>}
+                </div>
 
-            {/* Recorder + voice waveform over the original */}
-            <div className="g-panel mb-4">
-              <div className="mb-2 flex justify-between text-[11px] font-bold uppercase tracking-[0.08em]">
-                <span className="text-sky-400">Original</span>
-                <span className="text-red-400">Your voice</span>
+                <div className="mt-auto flex items-center justify-between">
+                  <button
+                    onClick={() => goTo(cur - 1)}
+                    disabled={cur === 0 || busy}
+                    className="text-[13px] text-cream/50 underline disabled:opacity-40"
+                  >
+                    ◀ Previous sector
+                  </button>
+                  <Link href="/play" className="text-[13px] text-cream/50 underline">
+                    Quit
+                  </Link>
+                </div>
               </div>
-              <RecorderWave
-                original={origWave[seg.id]}
-                take={takeWave[seg.id]}
-                recording={mic.recording}
-                getLevel={mic.getLevel}
-                durationMs={seg.endMs - seg.startMs}
-              />
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <button
-                  onClick={() =>
-                    mic.recording
-                      ? void stopRecording()
-                      : counting
-                        ? cancelCountdown()
-                        : beginCountdown()
-                  }
-                  className={`g-btn h-11 text-[14px] ${
-                    mic.recording || counting ? "bg-magenta text-cream" : "g-btn-start"
-                  }`}
-                >
-                  {mic.recording
-                    ? "■ Stop"
-                    : counting
-                      ? `Starting in ${countdown}…`
-                      : takes[seg.id]
-                        ? "● Re-record"
-                        : "● Record"}
-                </button>
-                <button
-                  onClick={playMyTake}
-                  disabled={!takes[seg.id] || busy}
-                  className="g-btn g-btn-ghost h-11 text-[14px]"
-                >
-                  ▶ My take
-                </button>
-                <button
-                  onClick={next}
-                  disabled={busy}
-                  className="g-btn g-btn-primary col-span-2 h-11 text-[14px] sm:col-span-1"
-                >
-                  {cur >= segs.length - 1 ? "Finish sectors →" : "Next sector →"}
-                </button>
-              </div>
-              {mic.error && <p className="mt-3 text-[13px] text-magenta">{mic.error}</p>}
-            </div>
 
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => goTo(cur - 1)}
-                disabled={cur === 0 || busy}
-                className="text-[13px] text-cream/50 underline disabled:opacity-40"
-              >
-                ◀ Previous sector
-              </button>
-              <Link href="/play" className="text-[13px] text-cream/50 underline">
-                Quit
-              </Link>
+              {/* Right — the scene's real script; the current line is highlighted
+                  and doubles as your "what to say" cue. Fills the column height
+                  (absolute on lg) so it never grows taller than the recorder. */}
+              <div className="relative min-h-0">
+                <div className="lg:absolute lg:inset-0">
+                  <ScenarioWindow
+                    mySeat={1}
+                    lines={scenarioFromSegments(segs)}
+                    currentKey={seg.id}
+                  />
+                </div>
+              </div>
             </div>
           </>
         )}
@@ -437,15 +456,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
           </div>
         )}
 
-        {phase === "exporting" && (
-          <div className="g-panel text-center">
-            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cream/20 border-t-mint" />
-            <h2 className="g-title">Combining your dub…</h2>
-            <p className="text-[13px] text-cream/60">
-              Stitching every recorded sector back into the full video.
-            </p>
-          </div>
-        )}
+        {phase === "exporting" && <CombineProgress open />}
 
         {phase === "result" && (
           <div className="g-panel text-center">

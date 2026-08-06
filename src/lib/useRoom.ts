@@ -20,7 +20,10 @@ export type RoomView = {
 };
 
 const STORAGE_KEY = "cd_room";
-const POLL_MS = 2500;
+// Safety-net poll interval. Live updates come over SSE (see the effect below);
+// this only fires while the stream is NOT connected (reconnecting / unsupported),
+// so a healthy client makes ~zero polling requests instead of one every 2.5s.
+const POLL_FALLBACK_MS = 8000;
 // Fired whenever membership changes so every useRoom instance in the tab (e.g.
 // the dashboard's StudioPanel and Lobby) re-reads it immediately — otherwise a
 // join/leave in one panel wouldn't reflect in the other until a reload.
@@ -119,30 +122,66 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
     };
   }, [applyMembership]);
 
-  // Poll while we have a membership (not just a loaded room) so joins/leaves
-  // show up for everyone, a room that failed to load initially keeps retrying,
-  // and a dead/stale membership self-heals instead of trapping the user.
+  // Stay in sync while we have a membership (not just a loaded room) so
+  // joins/leaves show up for everyone, a room that failed to load initially
+  // keeps retrying, and a dead/stale membership self-heals.
+  //
+  // Primary transport is SSE (server pushes on every change) instead of the old
+  // constant polling — that was the app's main scaling bottleneck. A slow poll
+  // stays as a safety net but only fires while the stream is disconnected.
   useEffect(() => {
     const code = membership?.code;
     if (!code) return;
     let cancelled = false;
-    const tick = () => {
+
+    const applyRoom = (room: RoomView | null | undefined) => {
+      if (cancelled || !room) return;
+      // Still in the roster → sync; otherwise the room recycled without us.
+      if (room.players.some((p) => p.id === playerId)) setRoom(room);
+      else reset();
+    };
+
+    const fetchOnce = () => {
       fetch(`/api/room/${code}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((d: { room?: RoomView } | null) => {
-          if (cancelled || !d?.room) return;
-          // Still in the roster → sync; otherwise the room recycled without us.
-          if (d.room.players.some((p) => p.id === playerId)) setRoom(d.room);
-          else reset();
-        })
+        .then((d: { room?: RoomView } | null) => applyRoom(d?.room))
         .catch((status) => {
           if (!cancelled && status === 404) reset(); // room closed by host
         });
     };
-    const id = setInterval(tick, POLL_MS);
+
+    // Server-pushed updates. EventSource auto-reconnects on error; on each frame
+    // we get either the fresh room or a "closed" signal (host ended the room).
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`/api/room/${code}/stream`);
+      es.onmessage = (ev) => {
+        try {
+          const d = JSON.parse(ev.data) as { room?: RoomView; closed?: boolean };
+          if (d.closed) {
+            if (!cancelled) reset();
+            return;
+          }
+          applyRoom(d.room);
+        } catch {
+          /* ignore malformed frame */
+        }
+      };
+    } catch {
+      es = null; // SSE unsupported → the fallback poll below carries the load
+    }
+
+    // Immediate snapshot (in case the stream is slow to connect) + safety poll
+    // that only runs when the stream isn't OPEN (readyState 1).
+    fetchOnce();
+    const id = setInterval(() => {
+      if (!es || es.readyState !== 1) fetchOnce();
+    }, POLL_FALLBACK_MS);
+
     return () => {
       cancelled = true;
       clearInterval(id);
+      es?.close();
     };
   }, [membership?.code, playerId, reset]);
 

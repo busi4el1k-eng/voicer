@@ -8,6 +8,7 @@ import { SPACES_PREFIX, getObjectBuffer, putObject, spacesConfigured } from "@/l
 import { muxDub, withSourceFile, type DubTake } from "@/lib/ffmpeg";
 import { ensureBedForUpload } from "@/lib/bed.server";
 import { RenderBusyError, withRenderSlot } from "@/lib/render-queue";
+import { emitRoom } from "@/lib/room-events";
 import { ClientError, toClientMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -94,6 +95,7 @@ export async function POST(req: NextRequest) {
       const key = `${SPACES_PREFIX}rooms/${code}/final/${Date.now()}.mp4`;
       const { url } = await putObject(key, outBuf, "video/mp4");
       await db.room.update({ where: { code }, data: { finalUrl: url, status: "finished" } });
+      emitRoom(code); // everyone's screen flips to the finished result
       return url;
     });
 

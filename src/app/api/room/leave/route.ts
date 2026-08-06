@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import db from "@/lib/db";
 import { normalizeRoomCode } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
+import { emitRoom } from "@/lib/room-events";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
   if (player.isHost) {
     // Host closes the room for everyone (cascade deletes the player rows).
     await db.room.delete({ where: { code } }).catch(() => {});
+    emitRoom(code); // streams for this room push a "closed" signal
     return NextResponse.json({ room: null });
   }
 
@@ -34,8 +36,10 @@ export async function POST(req: NextRequest) {
   const remaining = await db.roomPlayer.count({ where: { roomCode: code } });
   if (remaining === 0) {
     await db.room.delete({ where: { code } }).catch(() => {});
+    emitRoom(code);
     return NextResponse.json({ room: null });
   }
 
+  emitRoom(code); // remaining players see the seat free up
   return NextResponse.json({ room: await roomView(code) });
 }

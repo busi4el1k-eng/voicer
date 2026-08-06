@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
 import { normalizeRoomCode, MAX_PLAYERS } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
+import { emitRoom } from "@/lib/room-events";
 
 export const runtime = "nodejs";
 
@@ -44,5 +45,6 @@ export async function POST(req: NextRequest) {
   });
 
   const view = await roomView(code);
+  emitRoom(code); // existing members see the new player instantly
   return NextResponse.json({ room: view, playerId: player.id });
 }

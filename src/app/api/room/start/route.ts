@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import db from "@/lib/db";
 import { normalizeRoomCode, MIN_PLAYERS } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
+import { emitRoom } from "@/lib/room-events";
 
 export const runtime = "nodejs";
 
@@ -35,5 +36,6 @@ export async function POST(req: NextRequest) {
   }
 
   await db.room.update({ where: { code }, data: { status: "playing" } });
+  emitRoom(code); // waiting members follow the host into the game
   return NextResponse.json({ room: await roomView(code) });
 }

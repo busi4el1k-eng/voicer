@@ -40,6 +40,10 @@ services:
       # speaker labels. Without these in the server .env, auto-detect stays off.
       - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Upstash Redis (optional): fans out live room events across app instances
+      # so SSE keeps working when running more than one. Single instance ignores it.
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
     networks:
       - shared
 

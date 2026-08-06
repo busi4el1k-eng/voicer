@@ -6,4 +6,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { startBedWorker } = await import("@/lib/bed-worker");
   startBedWorker();
+  // Cross-instance room events via Redis (no-op unless Upstash is configured).
+  const { startRoomEvents } = await import("@/lib/room-events");
+  startRoomEvents();
 }

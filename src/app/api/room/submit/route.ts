@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import db from "@/lib/db";
 import { normalizeRoomCode } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
+import { emitRoom } from "@/lib/room-events";
 import { SPACES_PREFIX, putObject, spacesConfigured } from "@/lib/spaces";
 
 export const runtime = "nodejs";
@@ -71,5 +72,6 @@ export async function POST(req: NextRequest) {
   }
 
   await db.roomPlayer.update({ where: { id: playerId }, data: { status: "finished" } });
+  emitRoom(code); // host sees this player flip to "finished" right away
   return NextResponse.json({ room: await roomView(code) });
 }

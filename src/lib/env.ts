@@ -21,6 +21,11 @@ const serverSchema = z.object({
   // Anthropic (Claude), used to correct auto-detect's speaker labels by reading
   // the dialogue. Optional: without it, sectors keep the acoustic diarization.
   ANTHROPIC_API_KEY: z.string().optional(),
+  // Upstash Redis (REST) — fans out live room events across app instances so
+  // SSE works when running more than one. Optional: without it, the in-process
+  // event bus still drives realtime for a single instance.
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 });
 
 const clientSchema = z.object({

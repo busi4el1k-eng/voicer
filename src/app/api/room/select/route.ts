@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import db from "@/lib/db";
 import { normalizeRoomCode } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
+import { emitRoom } from "@/lib/room-events";
 
 export const runtime = "nodejs";
 
@@ -58,5 +59,6 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
+  emitRoom(code); // everyone jumps into the studio on the chosen video
   return NextResponse.json({ room: await roomView(code) });
 }
