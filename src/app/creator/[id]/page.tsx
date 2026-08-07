@@ -132,11 +132,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   // how much has downloaded so far.
   const [buffering, setBuffering] = useState(true);
   const [bufferedMs, setBufferedMs] = useState(0);
-  // Step-by-step editor readiness. The timeline, sector tools and buttons only
-  // work once the VIDEO's metadata (duration) is loaded AND the audio waveform
-  // is decoded — so we gate the whole editor behind these instead of letting it
-  // go interactive while `durMs` is still 0 and the audio line is blank.
-  const [videoMetaReady, setVideoMetaReady] = useState(false);
+  // Editor readiness: the timeline, sector tools and buttons only work once the
+  // clip's DURATION is known (durMs > 0) and the audio decode has finished. We
+  // gate the whole editor on that so it never goes interactive while durMs is 0
+  // (blank timeline, can't place sectors). durMs is set from whichever resolves
+  // first — the video's metadata or the audio decode.
   const [waveDone, setWaveDone] = useState(false);
   // How far the timeline is zoomed in (1 = fit to frame). Above 1 the track
   // grows wider than its viewport and can be scrolled.
@@ -229,6 +229,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         const audio = await ac.decodeAudioData(buf);
         await ac.close();
         waveDataRef.current = audio.getChannelData(0).slice();
+        // The decoded audio also gives us a reliable duration — use it if the
+        // video element hasn't reported one yet, so the editor can open.
+        if (isFinite(audio.duration) && audio.duration > 0) {
+          setDurMs((d) => (d > 0 ? d : Math.round(audio.duration * 1000)));
+        }
         renderWave();
       } catch {
         /* waveform is optional — the editor still opens without it */
@@ -244,14 +249,18 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     else if (upload) setWaveDone(true); // no audio to decode
   }, [upload, drawWave]);
 
-  // Never hang the editor on a broken / CDN-blocked video: after a grace period,
-  // open it anyway (the waveform may simply be missing).
+  // Don't hang on a slow/optional waveform: after a grace period, grab the
+  // duration straight off the video element (if it has one by now) and stop
+  // waiting on the audio decode. Never opens the editor with durMs still 0.
   useEffect(() => {
     if (!upload) return;
     const t = window.setTimeout(() => {
-      setVideoMetaReady(true);
+      const v = videoRef.current;
+      if (v && isFinite(v.duration) && v.duration > 0) {
+        setDurMs((d) => (d > 0 ? d : Math.round(v.duration * 1000)));
+      }
       setWaveDone(true);
-    }, 15000);
+    }, 12000);
     return () => window.clearTimeout(t);
   }, [upload]);
 
@@ -473,7 +482,6 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     if (!v) return;
     if (isFinite(v.duration) && v.duration > 0) {
       setDurMs(Math.round(v.duration * 1000));
-      setVideoMetaReady(true);
       if (seekedForDurRef.current) {
         seekedForDurRef.current = false;
         try {
@@ -819,11 +827,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     );
   }
 
-  // The editor is only interactive once the video's duration is known and the
-  // audio is decoded — until then a full-screen loader covers it (the video
-  // still loads underneath), so there's never a window where the timeline is
-  // blank or the sector tools/buttons silently do nothing.
-  const ready = videoMetaReady && waveDone;
+  // The editor is only interactive once the duration is known (durMs > 0) and
+  // the audio decode has finished — until then a full-screen loader covers it
+  // (the video still loads underneath), so there's never a window where the
+  // timeline is blank or the sector tools/buttons silently do nothing.
+  const ready = durMs > 0 && waveDone;
 
   return (
     <main className="g-screen">
@@ -834,14 +842,14 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-cream/20 border-t-mint" />
           <div className="text-center">
             <p className="font-display text-[17px] font-black text-cream">
-              {!videoMetaReady ? "Loading the video…" : "Reading the audio…"}
+              {durMs <= 0 ? "Loading the video…" : "Reading the audio…"}
             </p>
             <p className="mt-1 text-[13px] text-cream/50">Getting your timeline ready</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em]">
-              <span className={`h-2 w-2 rounded-full ${videoMetaReady ? "bg-mint" : "bg-cream/25"}`} />
-              <span className={videoMetaReady ? "text-mint" : "text-cream/40"}>Video</span>
+              <span className={`h-2 w-2 rounded-full ${durMs > 0 ? "bg-mint" : "bg-cream/25"}`} />
+              <span className={durMs > 0 ? "text-mint" : "text-cream/40"}>Video</span>
             </span>
             <span className="h-px w-6 bg-cream/20" />
             <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em]">
@@ -927,7 +935,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 }}
                 onLoadedMetadata={applyDuration}
                 onDurationChange={applyDuration}
-                onError={() => setVideoMetaReady(true)}
+                onError={() => setWaveDone(true)}
                 className="mx-auto block max-h-[46vh] w-full cursor-pointer bg-black"
               />
 
