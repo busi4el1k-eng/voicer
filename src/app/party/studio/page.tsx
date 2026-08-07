@@ -9,6 +9,7 @@ import { VideoStage, type VideoStageHandle } from "@/components/VideoStage";
 import { RatePlayers } from "@/components/RatePlayers";
 import { ScenarioWindow, scenarioFromSegments } from "@/components/ScenarioWindow";
 import { CombineProgress } from "@/components/CombineProgress";
+import { ClapperCountdown } from "@/components/ClapperCountdown";
 import { RateVideo } from "@/components/RateVideo";
 import { downloadHref } from "@/lib/download";
 import { useRoom } from "@/lib/useRoom";
@@ -526,16 +527,7 @@ export default function PartyStudioPage() {
                         src={video?.sourceUrl}
                         sector={{ startMs: seg.startMs, endMs: seg.endMs }}
                       />
-                      {counting && (
-                        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-black/55">
-                          <span
-                            key={countdown}
-                            className="animate-[pulse_1s_ease-in-out] font-display text-[96px] font-bold leading-none text-cream drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
-                          >
-                            {countdown}
-                          </span>
-                        </div>
-                      )}
+                      {counting && countdown != null && <ClapperCountdown count={countdown} />}
                     </div>
                     <p className="mt-2 text-center font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
                       {fmt(seg.startMs)} – {fmt(seg.endMs)} · space = play / pause
