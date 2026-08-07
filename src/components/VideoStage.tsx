@@ -24,8 +24,11 @@ const fmt = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 };
 
-export const VideoStage = forwardRef<VideoStageHandle, { src?: string; sector?: Sector | null }>(
-  function VideoStage({ src, sector }, ref) {
+export const VideoStage = forwardRef<
+  VideoStageHandle,
+  { src?: string; sector?: Sector | null; onReadyChange?: (ready: boolean) => void }
+>(
+  function VideoStage({ src, sector, onReadyChange }, ref) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const playerRef = useRef<HTMLDivElement>(null);
     const stopAtRef = useRef<number | null>(null);
@@ -81,12 +84,13 @@ export const VideoStage = forwardRef<VideoStageHandle, { src?: string; sector?: 
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sector?.startMs, sector?.endMs]);
 
-    // A fresh source starts unloaded: show the spinner and reset the buffer bar
-    // until the new video reports it can play.
+    // A fresh source starts unloaded: show the spinner, reset the buffer bar and
+    // tell the parent the clip isn't playable yet (so it can gate recording).
     useEffect(() => {
       setBuffering(true);
       setBufferedMs(0);
-    }, [src]);
+      onReadyChange?.(false);
+    }, [src, onReadyChange]);
 
     const onTimeUpdate = () => {
       const v = videoRef.current;
@@ -223,7 +227,10 @@ export const VideoStage = forwardRef<VideoStageHandle, { src?: string; sector?: 
               setBuffering(false);
               updateBuffered();
             }}
-            onCanPlay={() => setBuffering(false)}
+            onCanPlay={() => {
+              setBuffering(false);
+              onReadyChange?.(true);
+            }}
             onLoadStart={() => setBuffering(true)}
             onProgress={updateBuffered}
             onTimeUpdate={() => {

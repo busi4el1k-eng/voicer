@@ -48,6 +48,8 @@ export default function PartyStudioPage() {
   const [takes, setTakes] = useState<Record<string, RecordResult>>({});
   const [origWave, setOrigWave] = useState<Record<string, Float32Array>>({});
   const [takeWave, setTakeWave] = useState<Record<string, Float32Array>>({});
+  // The clip must be playable before recording — VideoStage reports this.
+  const [videoReady, setVideoReady] = useState(false);
   const [err, setErr] = useState("");
   const [renderBusy, setRenderBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -135,6 +137,9 @@ export default function PartyStudioPage() {
   }, []);
 
   const seg = segs[cur];
+  // Ready to record only when the video can play AND this sector's original
+  // audio envelope is decoded — until then the Record button shows a loader.
+  const sectorReady = videoReady && !!(seg && origWave[seg.id]);
 
   const stopRecording = useCallback(async () => {
     if (capRef.current != null) {
@@ -526,6 +531,7 @@ export default function PartyStudioPage() {
                         ref={stageRef}
                         src={video?.sourceUrl}
                         sector={{ startMs: seg.startMs, endMs: seg.endMs }}
+                        onReadyChange={setVideoReady}
                       />
                       {counting && countdown != null && <ClapperCountdown count={countdown} />}
                     </div>
@@ -555,17 +561,20 @@ export default function PartyStudioPage() {
                               ? cancelCountdown()
                               : beginCountdown()
                         }
-                        className={`g-btn h-11 text-[14px] ${
+                        disabled={!sectorReady && !mic.recording && !counting}
+                        className={`g-btn h-11 text-[14px] disabled:opacity-60 ${
                           mic.recording || counting ? "bg-magenta text-cream" : "g-btn-start"
                         }`}
                       >
-                        {mic.recording
-                          ? "■ Stop"
-                          : counting
-                            ? `Starting in ${countdown}…`
-                            : takes[seg.id]
-                              ? "● Re-record"
-                              : "● Record"}
+                        {!sectorReady && !mic.recording && !counting
+                          ? "🎬 Loading scene…"
+                          : mic.recording
+                            ? "■ Stop"
+                            : counting
+                              ? `Starting in ${countdown}…`
+                              : takes[seg.id]
+                                ? "● Re-record"
+                                : "● Record"}
                       </button>
                       <button
                         onClick={playMyTake}
