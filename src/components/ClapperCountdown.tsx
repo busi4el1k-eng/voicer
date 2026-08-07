@@ -1,29 +1,59 @@
+"use client";
+
+import { useEffect } from "react";
+
 // The pre-record countdown, as a film clapperboard instead of plain 3-2-1
-// numbers. On each beat the clapper arm snaps shut (a "clap") with a camera
-// flash, and the classic on-set call runs across the three counts:
+// numbers. On each beat the clapper arm snaps shut (a "clap") and a short beep
+// plays — three beeps across the count — with the classic on-set call:
 // 3 → "Lights", 2 → "Camera", 1 → "Action!". Ties into the Cinema Dub logo.
 //
-// Driven purely by the `count` prop (3, 2, 1). Re-keying on `count` replays the
-// clap + flash every beat. Overlays its video container (absolute inset-0).
+// Driven by the `count` prop (3, 2, 1). It re-renders each beat, so the clap
+// animation replays (keyed) and one beep fires per count.
+
+// A single short beep via Web Audio — no asset needed. Reuses one AudioContext.
+let _ac: AudioContext | null = null;
+function beep(freq: number, ms: number) {
+  if (typeof window === "undefined") return;
+  try {
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    _ac = _ac || new AC();
+    if (_ac.state === "suspended") void _ac.resume();
+    const t = _ac.currentTime;
+    const osc = _ac.createOscillator();
+    const gain = _ac.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.28, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+    osc.connect(gain);
+    gain.connect(_ac.destination);
+    osc.start(t);
+    osc.stop(t + ms / 1000 + 0.02);
+  } catch {
+    /* audio unavailable — the visual clap still plays */
+  }
+}
 
 export function ClapperCountdown({ count }: { count: number }) {
   const label = count >= 3 ? "Lights" : count === 2 ? "Camera" : "Action!";
   const isAction = count <= 1;
 
+  // One short beep per beat — three identical "peep"s across the count.
+  useEffect(() => {
+    beep(820, 140);
+  }, [count]);
+
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 overflow-hidden rounded-[inherit] bg-black/60">
       <style>{`
-        .cd-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;animation:cd-flash .9s ease-out both;}
-        @keyframes cd-flash{0%,12%{opacity:0}16%{opacity:.72}30%{opacity:0}100%{opacity:0}}
         .cd-stage{position:relative;width:clamp(108px,34vw,158px);filter:drop-shadow(3px 4px 0 rgba(17,0,45,.55));}
         .cd-arm{transform-box:view-box;transform-origin:17px 40px;transform:rotate(-26deg);animation:cd-clap .9s cubic-bezier(.3,.85,.35,1) both;}
         @keyframes cd-clap{0%{transform:rotate(-26deg)}16%{transform:rotate(0deg)}24%{transform:rotate(-4deg)}42%{transform:rotate(-26deg)}100%{transform:rotate(-26deg)}}
         .cd-label{font-family:var(--font-fredoka),system-ui,sans-serif;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--color-cream);text-shadow:0 2px 10px rgba(0,0,0,.6);animation:cd-pop .9s ease-out both;}
         @keyframes cd-pop{0%{transform:scale(.7);opacity:0}18%{transform:scale(1.12);opacity:1}34%{transform:scale(1)}100%{transform:scale(1);opacity:1}}
-        @media (prefers-reduced-motion: reduce){.cd-flash,.cd-arm,.cd-label{animation:none}.cd-arm{transform:rotate(-18deg)}}
+        @media (prefers-reduced-motion: reduce){.cd-arm,.cd-label{animation:none}.cd-arm{transform:rotate(-18deg)}}
       `}</style>
-
-      <div key={`f${count}`} className="cd-flash" />
 
       <div key={`s${count}`} className="cd-stage">
         <svg viewBox="0 0 100 100" width="100%" role="img" aria-label={`${label} — recording in ${count}`}>
