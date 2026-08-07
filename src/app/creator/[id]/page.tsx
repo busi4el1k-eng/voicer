@@ -132,6 +132,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   // how much has downloaded so far.
   const [buffering, setBuffering] = useState(true);
   const [bufferedMs, setBufferedMs] = useState(0);
+  // Step-by-step editor readiness. The timeline, sector tools and buttons only
+  // work once the VIDEO's metadata (duration) is loaded AND the audio waveform
+  // is decoded — so we gate the whole editor behind these instead of letting it
+  // go interactive while `durMs` is still 0 and the audio line is blank.
+  const [videoMetaReady, setVideoMetaReady] = useState(false);
+  const [waveDone, setWaveDone] = useState(false);
   // How far the timeline is zoomed in (1 = fit to frame). Above 1 the track
   // grows wider than its viewport and can be scrolled.
   const [zoom, setZoom] = useState(1);
@@ -225,7 +231,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         waveDataRef.current = audio.getChannelData(0).slice();
         renderWave();
       } catch {
-        /* waveform is optional */
+        /* waveform is optional — the editor still opens without it */
+      } finally {
+        setWaveDone(true);
       }
     },
     [renderWave],
@@ -233,7 +241,19 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   useEffect(() => {
     if (upload?.sourceUrl) void drawWave(upload.sourceUrl);
-  }, [upload?.sourceUrl, drawWave]);
+    else if (upload) setWaveDone(true); // no audio to decode
+  }, [upload, drawWave]);
+
+  // Never hang the editor on a broken / CDN-blocked video: after a grace period,
+  // open it anyway (the waveform may simply be missing).
+  useEffect(() => {
+    if (!upload) return;
+    const t = window.setTimeout(() => {
+      setVideoMetaReady(true);
+      setWaveDone(true);
+    }, 15000);
+    return () => window.clearTimeout(t);
+  }, [upload]);
 
   // Re-render the waveform crisply after the track width changes with the zoom.
   useEffect(() => {
@@ -453,6 +473,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     if (!v) return;
     if (isFinite(v.duration) && v.duration > 0) {
       setDurMs(Math.round(v.duration * 1000));
+      setVideoMetaReady(true);
       if (seekedForDurRef.current) {
         seekedForDurRef.current = false;
         try {
@@ -798,8 +819,39 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     );
   }
 
+  // The editor is only interactive once the video's duration is known and the
+  // audio is decoded — until then a full-screen loader covers it (the video
+  // still loads underneath), so there's never a window where the timeline is
+  // blank or the sector tools/buttons silently do nothing.
+  const ready = videoMetaReady && waveDone;
+
   return (
     <main className="g-screen">
+      {/* Step-by-step loader — video first, then the audio/timeline. The editor
+          renders underneath (so the <video> loads) but is covered until ready. */}
+      {!ready && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-violet-deep/95">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-cream/20 border-t-mint" />
+          <div className="text-center">
+            <p className="font-display text-[17px] font-black text-cream">
+              {!videoMetaReady ? "Loading the video…" : "Reading the audio…"}
+            </p>
+            <p className="mt-1 text-[13px] text-cream/50">Getting your timeline ready</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em]">
+              <span className={`h-2 w-2 rounded-full ${videoMetaReady ? "bg-mint" : "bg-cream/25"}`} />
+              <span className={videoMetaReady ? "text-mint" : "text-cream/40"}>Video</span>
+            </span>
+            <span className="h-px w-6 bg-cream/20" />
+            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em]">
+              <span className={`h-2 w-2 rounded-full ${waveDone ? "bg-mint" : "bg-cream/25"}`} />
+              <span className={waveDone ? "text-mint" : "text-cream/40"}>Audio</span>
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex h-[72px] items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Link
@@ -875,6 +927,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 }}
                 onLoadedMetadata={applyDuration}
                 onDurationChange={applyDuration}
+                onError={() => setVideoMetaReady(true)}
                 className="mx-auto block max-h-[46vh] w-full cursor-pointer bg-black"
               />
 
