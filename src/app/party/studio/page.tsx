@@ -35,7 +35,7 @@ const fmt = (ms: number) => {
 export default function PartyStudioPage() {
   const router = useRouter();
   const mic = useMic();
-  const { room, playerId, inRoom, isHost, hydrated, leave } = useRoom({
+  const { room, playerId, inRoom, isHost, hydrated, restart } = useRoom({
     displayName: "",
     avatarColor: "",
   });
@@ -69,15 +69,17 @@ export default function PartyStudioPage() {
   // hasn't started yet, go back to the pick screen; if you're not in a room,
   // back to the dashboard.
   useEffect(() => {
-    if (!hydrated) return; // wait until membership is read from storage
+    if (!hydrated || leaving) return; // wait for storage; skip during our own exit
     if (!inRoom) {
       router.replace("/dashboard");
       return;
     }
+    // The host reset the room out from under us: regroup where they went —
+    // "lobby" → dashboard waiting room, "playing" → pick-a-video screen.
     if (room && room.status !== "dubbing" && room.status !== "finished") {
-      router.replace("/party");
+      router.replace(room.status === "lobby" ? "/dashboard" : "/party");
     }
-  }, [hydrated, inRoom, room, router]);
+  }, [hydrated, inRoom, room, router, leaving]);
 
   // Load the room's video, then keep only the sectors assigned to my seat.
   useEffect(() => {
@@ -263,14 +265,22 @@ export default function PartyStudioPage() {
     }
   }, [room, playerId]);
 
-  // Leave to the dashboard. Members must actually leave the room, otherwise the
-  // dashboard's "follow the host" effect would immediately pull them back in.
-  // The host just navigates (leaving would tear the room down for everyone).
+  // Host returns to the lobby but KEEPS the party — members stay in the room and
+  // will be pulled into the next game. Members just navigate; they never leave
+  // the room on their own (only the host controls it).
   const backToLobby = useCallback(async () => {
     setLeaving(true);
-    if (!isHost) await leave();
+    if (isHost) await restart("lobby");
     router.push("/dashboard");
-  }, [isHost, leave, router]);
+  }, [isHost, restart, router]);
+
+  // Host-only: start another game with the same party right away — reset to
+  // "playing" and go pick a new video; members follow to the waiting screen.
+  const playAgain = useCallback(async () => {
+    setLeaving(true);
+    if (await restart("playing")) router.push("/party");
+    else setLeaving(false);
+  }, [restart, router]);
 
   // --- render ---------------------------------------------------------------
 
@@ -351,12 +361,21 @@ export default function PartyStudioPage() {
               <a href={downloadHref(room.finalUrl, `${title}.mp4`)} className="g-btn g-btn-start">
                 ↓ Download video
               </a>
+              {isHost && (
+                <button
+                  onClick={() => void playAgain()}
+                  disabled={leaving}
+                  className="g-btn g-btn-primary w-full"
+                >
+                  {leaving ? "…" : "🔁 Play again"}
+                </button>
+              )}
               <button
                 onClick={() => void backToLobby()}
                 disabled={leaving}
                 className="g-btn g-btn-ghost w-full"
               >
-                {leaving ? "Leaving…" : "← Back to dashboard"}
+                {leaving ? "…" : isHost ? "← Back to lobby" : "← Back to dashboard"}
               </button>
               {playerId && (
                 <button

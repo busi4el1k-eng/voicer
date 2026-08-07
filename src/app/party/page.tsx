@@ -48,8 +48,10 @@ export default function PartyHome() {
   // member follow into the studio together. Also covers "finished" so a late
   // poll still routes correctly.
   useEffect(() => {
-    if (room?.status === "dubbing" || room?.status === "finished") router.push("/party/studio");
-  }, [room?.status, router]);
+    if (room?.status === "dubbing") router.push("/party/studio");
+    // Host reset the party back to the lobby → members regroup on the dashboard.
+    else if (isMember && room?.status === "lobby") router.push("/dashboard");
+  }, [room?.status, isMember, router]);
 
   // Host locks in the found video and starts the game for the whole party.
   const startForEveryone = async () => {

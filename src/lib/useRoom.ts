@@ -281,6 +281,30 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
     }
   }, [room, membership, playerId, reset]);
 
+  // Host-only: end the current game but keep the party together. `target`
+  // "lobby" returns everyone to the waiting room; "playing" jumps straight to
+  // picking a new video. Members follow automatically via the live stream.
+  const restart = useCallback(
+    async (target: "lobby" | "playing" = "lobby"): Promise<boolean> => {
+      const code = room?.code ?? membership?.code ?? null;
+      if (!code || !playerId) return false;
+      try {
+        const res = await fetch("/api/room/reset", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ code, playerId, target }),
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (data.room) setRoom(data.room);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [room, membership, playerId],
+  );
+
   // Authoritative host flag once the room is loaded; before that, fall back to
   // the membership snapshot so the UI (e.g. the waiting room) is correct
   // instantly. `inRoom` is optimistic for the same reason.
@@ -301,6 +325,7 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
     create,
     join,
     start,
+    restart,
     leave,
   };
 }

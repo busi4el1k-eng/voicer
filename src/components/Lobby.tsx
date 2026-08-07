@@ -213,8 +213,11 @@ export function Lobby({
   // the host already picked a video — still gets pulled to the right place.
   useEffect(() => {
     if (!room || isHost) return;
-    if (room.status === "dubbing" || room.status === "finished") router.push("/party/studio");
+    if (room.status === "dubbing") router.push("/party/studio");
     else if (room.status === "playing") router.push("/party");
+    // "lobby" → wait here on the dashboard. "finished" → don't yank a member
+    // resting on the dashboard into a finished game; they stay in the room and
+    // get pulled in when the host starts the next one.
   }, [room, isHost, router]);
 
   // Host action: start the party for everyone, then head in.
