@@ -274,14 +274,6 @@ export default function PartyStudioPage() {
     router.push("/dashboard");
   }, [isHost, restart, router]);
 
-  // Host-only: start another game with the same party right away — reset to
-  // "playing" and go pick a new video; members follow to the waiting screen.
-  const playAgain = useCallback(async () => {
-    setLeaving(true);
-    if (await restart("playing")) router.push("/party");
-    else setLeaving(false);
-  }, [restart, router]);
-
   // --- render ---------------------------------------------------------------
 
   const recordedCount = Object.keys(takes).length;
@@ -361,21 +353,12 @@ export default function PartyStudioPage() {
               <a href={downloadHref(room.finalUrl, `${title}.mp4`)} className="g-btn g-btn-start">
                 ↓ Download video
               </a>
-              {isHost && (
-                <button
-                  onClick={() => void playAgain()}
-                  disabled={leaving}
-                  className="g-btn g-btn-primary w-full"
-                >
-                  {leaving ? "…" : "🔁 Play again"}
-                </button>
-              )}
               <button
                 onClick={() => void backToLobby()}
                 disabled={leaving}
                 className="g-btn g-btn-ghost w-full"
               >
-                {leaving ? "…" : isHost ? "← Back to lobby" : "← Back to dashboard"}
+                {leaving ? "…" : "← Back to dashboard"}
               </button>
               {playerId && (
                 <button
