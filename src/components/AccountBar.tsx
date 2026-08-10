@@ -6,7 +6,8 @@ import { useAuth, useUser, useClerk } from "@clerk/nextjs";
 import { isClerkConfigured } from "@/lib/clerk";
 import { useClerkFailed } from "@/components/ClerkResilientProvider";
 
-// Settings dialog: change the username shown across the app.
+// Settings dialog: change the username shown across the app, and — for members
+// who signed up with a password — change that password via Clerk.
 function SettingsModal({ onClose }: { onClose: () => void }) {
   const { user } = useUser();
   const current =
@@ -86,6 +87,118 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             Cancel
           </button>
         </div>
+
+        {/* Change (or, for OAuth-only accounts, set) the password via Clerk. */}
+        <ChangePassword />
+      </div>
+    </div>
+  );
+}
+
+// Collapsible "Change password" section that talks to Clerk directly. Accounts
+// that already have a password must confirm the current one; OAuth-only accounts
+// (no password yet) just set a new one.
+function ChangePassword() {
+  const { user } = useUser();
+  const hasPassword = !!user?.passwordEnabled;
+  const [open, setOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+
+  const save = async () => {
+    if (!user) return;
+    if (newPassword.length < 8) return setErr("Use at least 8 characters.");
+    setBusy(true);
+    setErr("");
+    setDone(false);
+    try {
+      // currentPassword only matters when one already exists; Clerk ignores it
+      // for accounts setting a password for the first time.
+      await user.updatePassword({
+        ...(hasPassword ? { currentPassword } : {}),
+        newPassword,
+        signOutOfOtherSessions: true,
+      });
+      setDone(true);
+      setCurrentPassword("");
+      setNewPassword("");
+    } catch (e: unknown) {
+      const clerkErr = e as { errors?: { longMessage?: string; message?: string }[] };
+      setErr(
+        clerkErr?.errors?.[0]?.longMessage ||
+          clerkErr?.errors?.[0]?.message ||
+          "Couldn't change password.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-3 w-full text-left font-display text-[13px] font-bold uppercase tracking-[0.06em] text-mint hover:text-cream"
+      >
+        {hasPassword ? "Change password →" : "Set a password →"}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-5 border-t border-cream/10 pt-4">
+      {hasPassword && (
+        <>
+          <label className="mb-1 block font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
+            Current password
+          </label>
+          <input
+            type="password"
+            value={currentPassword}
+            autoFocus
+            autoComplete="current-password"
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void save();
+            }}
+            placeholder="••••••••"
+            className="mb-3 w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+          />
+        </>
+      )}
+      <label className="mb-1 block font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
+        New password
+      </label>
+      <input
+        type="password"
+        value={newPassword}
+        autoComplete="new-password"
+        onChange={(e) => setNewPassword(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void save();
+        }}
+        placeholder="At least 8 characters"
+        className="w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+      />
+      {err && <p className="mt-2 text-[13px] text-magenta">{err}</p>}
+      {done && <p className="mt-2 text-[13px] text-mint">Password updated!</p>}
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={save}
+          disabled={busy}
+          className="g-btn g-btn-primary h-11 flex-1 text-[14px] disabled:opacity-60"
+        >
+          {busy ? "Updating…" : "Update password"}
+        </button>
+        <button
+          onClick={() => setOpen(false)}
+          className="g-btn g-btn-ghost h-11 flex-1 text-[14px]"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
