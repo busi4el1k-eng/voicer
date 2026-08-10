@@ -46,6 +46,10 @@ export async function GET() {
   // Backfill any missing or legacy-length codes on read (same as the jobs list).
   const videos = [];
   for (const u of uploads) {
+    // Skip videos with fewer than one line (no cut sectors) — there's nothing
+    // to dub yet, so they shouldn't clutter the public library.
+    if (u.segments.length < 1) continue;
+
     let shareId = u.shareId;
     if (!shareId || shareId.length !== SHARE_ID_LENGTH) {
       shareId = await generateShareId();
