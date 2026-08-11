@@ -199,6 +199,11 @@ model RoomPlayer {
   displayName String
   avatarColor String   @default("#6F48FF")
   isHost      Boolean  @default(false)
+  // The player's sector assignment, frozen when the host starts the game
+  // (select). 0 while in the lobby (unassigned). Once dubbing, this is what maps
+  // a player to their video sectors — NOT their live position in the roster — so
+  // a mid-game leave can't reshuffle who dubs what. Cleared back to 0 on reset.
+  seat        Int      @default(0)
   // 'playing' (still dubbing their sectors) | 'finished' (submitted takes)
   status      String   @default("playing")
   createdAt   DateTime @default(now())

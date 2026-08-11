@@ -2,6 +2,8 @@ import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
 import { isClerkConfigured } from "@/lib/clerk";
 import { AccountBar } from "@/components/AccountBar";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { T } from "@/components/LanguageProvider";
 import { Lobby } from "@/components/Lobby";
 import { StudioPanel, type Stat } from "@/components/StudioPanel";
 
@@ -27,11 +29,12 @@ export default async function DashboardPage() {
   const initial = name.charAt(0).toUpperCase();
 
   // Real stats from the DB for the signed-in user. Guests have none yet → zeros.
+  // Labels are i18n keys, translated client-side in StudioPanel.
   let stats: Stat[] = [
-    { label: "Runs", value: 0 },
-    { label: "Scenes played", value: 0 },
-    { label: "Rating", value: "—" },
-    { label: "Best scene", value: 0 },
+    { label: "stat.runs", value: 0 },
+    { label: "stat.scenes", value: 0 },
+    { label: "stat.rating", value: "—" },
+    { label: "stat.best", value: 0 },
   ];
   if (user) {
     try {
@@ -49,10 +52,10 @@ export default async function DashboardPage() {
           ? `${(Math.round(avgStars * 10) / 10).toFixed(1)} ★ (${rating._count})`
           : "—";
       stats = [
-        { label: "Runs", value: runCount },
-        { label: "Scenes played", value: agg._count },
-        { label: "Rating", value: ratingLabel },
-        { label: "Best scene", value: best._max.judgeScore ?? 0 },
+        { label: "stat.runs", value: runCount },
+        { label: "stat.scenes", value: agg._count },
+        { label: "stat.rating", value: ratingLabel },
+        { label: "stat.best", value: best._max.judgeScore ?? 0 },
       ];
     } catch {
       dbError = true;
@@ -61,7 +64,8 @@ export default async function DashboardPage() {
 
   return (
     <main className="g-screen">
-      <div className="absolute right-4 top-4 z-10">
+      <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        <LanguageSwitcher />
         <AccountBar />
       </div>
 
@@ -73,14 +77,16 @@ export default async function DashboardPage() {
 
       {dbError && (
         <div className="mb-3 rounded-[10px] bg-magenta/20 px-4 py-2 text-center text-[12px] text-cream">
-          Database is waking up or unreachable — some data may be missing. Refresh in a moment.
+          <T k="dash.dbError" />
         </div>
       )}
 
       <div className="g-center">
         {/* LEFT — profile + stats */}
         <div className="g-left">
-          <h2 className="g-title">Your studio</h2>
+          <h2 className="g-title">
+            <T k="dash.studioTitle" />
+          </h2>
           <StudioPanel
             name={name}
             isGuest={isGuest}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRoom } from "@/lib/useRoom";
+import { useI18n } from "@/components/LanguageProvider";
 import { MAX_PLAYERS, normalizeRoomCode } from "@/lib/room-code";
 
 export type Stat = { label: string; value: number | string };
@@ -21,6 +22,7 @@ export function StudioPanel({
   initial: string;
   stats: Stat[];
 }) {
+  const { t } = useI18n();
   const [showStats, setShowStats] = useState(false);
   const [joining, setJoining] = useState(false);
   const [codeInput, setCodeInput] = useState("");
@@ -75,7 +77,13 @@ export function StudioPanel({
         <div>
           <div className="g-uname">{name}</div>
           <div className="g-utag">
-            {room ? (room.players.find((p) => p.id === playerId)?.isHost ? "HOST" : "IN ROOM") : isGuest ? "GUEST" : "MEMBER"}
+            {room
+              ? room.players.find((p) => p.id === playerId)?.isHost
+                ? t("studio.tag.host")
+                : t("studio.tag.inRoom")
+              : isGuest
+                ? t("studio.tag.guest")
+                : t("studio.tag.member")}
           </div>
         </div>
 
@@ -84,7 +92,7 @@ export function StudioPanel({
           type="button"
           className="g-dots"
           aria-expanded={showStats}
-          aria-label={showStats ? "Hide statistics" : "Show statistics"}
+          aria-label={showStats ? t("studio.stats.hide") : t("studio.stats.show")}
           onClick={() => setShowStats((v) => !v)}
         >
           <span />
@@ -98,7 +106,7 @@ export function StudioPanel({
         <div className="g-stats-inner flex flex-col gap-2">
           {stats.map((s) => (
             <div key={s.label} className="g-stat">
-              <span className="g-stat-label">{s.label}</span>
+              <span className="g-stat-label">{t(s.label)}</span>
               <span className="g-stat-value">{s.value}</span>
             </div>
           ))}
@@ -109,7 +117,7 @@ export function StudioPanel({
           it re-opens the invite window. */}
       {room && !full && (
         <button type="button" className="g-invite" onClick={() => setInviteOpen(true)}>
-          <span className="g-invite-cap">Invite code — tap to show</span>
+          <span className="g-invite-cap">{t("studio.invite.tap")}</span>
           <span className="g-invite-code">{room.code}</span>
         </button>
       )}
@@ -138,7 +146,11 @@ export function StudioPanel({
               <GhostIcon />
             </span>
             <span className="g-ghost-label">
-              {busy && !room ? "Opening room…" : room ? "Invite a player…" : "Add a player…"}
+              {busy && !room
+                ? t("studio.seat.opening")
+                : room
+                  ? t("studio.seat.invite")
+                  : t("studio.seat.add")}
             </span>
           </button>
         ))}
@@ -149,7 +161,7 @@ export function StudioPanel({
       {/* Enter / leave a room */}
       {room ? (
         <button type="button" className="g-btn g-btn-ghost h-[42px] w-full text-[14px]" onClick={leave}>
-          Leave room
+          {t("common.leaveRoom")}
         </button>
       ) : joining ? (
         <form onSubmit={submitJoin} className="flex flex-col gap-2">
@@ -160,13 +172,13 @@ export function StudioPanel({
               setCodeInput(normalizeRoomCode(e.target.value));
               setError(null);
             }}
-            placeholder="ROOM CODE"
+            placeholder={t("common.roomCode")}
             maxLength={4}
             className="g-code-input"
           />
           <div className="flex flex-col gap-2">
             <button type="submit" className="g-btn g-btn-primary h-[42px] w-full text-[14px]" disabled={busy}>
-              {busy ? "Joining…" : "Join"}
+              {busy ? t("common.joining") : t("common.join")}
             </button>
             <button
               type="button"
@@ -176,7 +188,7 @@ export function StudioPanel({
                 setError(null);
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </form>
@@ -186,14 +198,12 @@ export function StudioPanel({
           className="g-btn g-btn-ghost h-[42px] w-full text-[14px]"
           onClick={() => setJoining(true)}
         >
-          Enter a room
+          {t("studio.enterRoom")}
         </button>
       )}
 
       {isGuest && !room && (
-        <p className="mt-auto text-[12px] leading-[1.5] text-cream/55">
-          You&apos;re playing as a guest. Sign in to track your runs and scores.
-        </p>
+        <p className="mt-auto text-[12px] leading-[1.5] text-cream/55">{t("studio.guestNote")}</p>
       )}
 
       {/* Invite popup window — shows the room code to share */}
@@ -203,7 +213,7 @@ export function StudioPanel({
             <button
               type="button"
               className="g-modal-x"
-              aria-label="Close"
+              aria-label={t("common.close")}
               onClick={() => setInviteOpen(false)}
             >
               ×
@@ -211,30 +221,28 @@ export function StudioPanel({
             <div className="mx-auto mb-1 grid h-12 w-12 place-items-center rounded-full bg-mint/20 text-[24px]">
               🎟️
             </div>
-            <h3 className="g-modal-title">Invite a player</h3>
+            <h3 className="g-modal-title">{t("studio.inviteTitle")}</h3>
 
             {room ? (
               <>
-                <p className="g-modal-sub">
-                  Share this code — up to {MAX_PLAYERS} players can join your room.
-                </p>
+                <p className="g-modal-sub">{t("studio.shareCode", { n: MAX_PLAYERS })}</p>
                 <div className="g-modal-code">{room.code}</div>
                 <button type="button" className="g-btn g-btn-primary w-full" onClick={copyCode}>
-                  {copied ? "Copied!" : "Copy code"}
+                  {copied ? t("common.copied") : t("common.copyCode")}
                 </button>
                 <p className="g-modal-count">
-                  {room.players.length}/{MAX_PLAYERS} in room · waiting for players…
+                  {t("studio.waiting", { a: room.players.length, b: MAX_PLAYERS })}
                 </p>
               </>
             ) : error ? (
               <>
                 <p className="g-modal-sub text-magenta">{error}</p>
                 <button type="button" className="g-btn g-btn-primary w-full" onClick={() => create()}>
-                  Try again
+                  {t("common.tryAgain")}
                 </button>
               </>
             ) : (
-              <p className="g-modal-sub">Opening room…</p>
+              <p className="g-modal-sub">{t("studio.seat.opening")}</p>
             )}
           </div>
         </div>

@@ -41,18 +41,30 @@ export async function POST(req: NextRequest) {
 
   // Party size must exactly match the number of distinct seats the creator used.
   const seats = new Set(playableSegs.map((s) => s.player ?? 1)).size;
-  const partySize = await db.roomPlayer.count({ where: { roomCode: code } });
-  if (partySize !== seats) {
+  // Freeze the roster order NOW so each player's seat (→ sector assignment) is
+  // fixed for the whole game. The id tiebreaker keeps the order deterministic
+  // even when two players joined in the same instant. This is the same order
+  // roomView presents, so seat 1 is the host, then join order.
+  const roster = await db.roomPlayer.findMany({
+    where: { roomCode: code },
+    orderBy: [{ isHost: "desc" }, { createdAt: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  if (roster.length !== seats) {
     return NextResponse.json(
-      { error: `This video needs exactly ${seats} players; your party has ${partySize}.` },
+      { error: `This video needs exactly ${seats} players; your party has ${roster.length}.` },
       { status: 409 },
     );
   }
 
-  // Reset per-player status and clear any prior takes/result, then launch.
+  // Reset per-player status, assign frozen seats, clear any prior takes/result,
+  // then launch. Seat is stored per row so a mid-game leave can never shift who
+  // dubs which sector.
   await db.$transaction([
     db.roomTake.deleteMany({ where: { roomCode: code } }),
-    db.roomPlayer.updateMany({ where: { roomCode: code }, data: { status: "playing" } }),
+    ...roster.map((p, i) =>
+      db.roomPlayer.update({ where: { id: p.id }, data: { seat: i + 1, status: "playing" } }),
+    ),
     db.room.update({
       where: { code },
       data: { videoUploadId: uploadId, finalUrl: "", status: "dubbing" },

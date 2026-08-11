@@ -38,6 +38,11 @@ html {
   height: 100%;
   /* Deepest fallback so no white ever shows through (e.g. overscroll). */
   background-color: var(--color-violet-deep);
+  /* Kill the mobile rubber-band. The backdrop gradient lives on a fixed layer
+     (.g-bg), so overscrolling past the content used to bounce the page beyond
+     that layer and flash a black gap (a repaint of the reveal area) on phones.
+     Disabling overscroll bounce stops the reveal from ever happening. */
+  overscroll-behavior: none;
 }
 
 body {
@@ -48,12 +53,15 @@ body {
   color: var(--color-cream);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
-/* Fixed, non-scrolling stage backdrop (gradient + floating emojis). */
+/* Fixed, non-scrolling stage backdrop (gradient + floating emojis). Overshoots
+   the viewport on every side so a momentary mobile overscroll / address-bar
+   collapse can never expose a bare (black) edge behind it. */
 .g-bg {
   position: fixed;
-  inset: 0;
+  inset: -10vh -5vw;
   z-index: -1;
   overflow: hidden;
   pointer-events: none;

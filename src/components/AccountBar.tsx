@@ -5,10 +5,12 @@ import { useState } from "react";
 import { useAuth, useUser, useClerk } from "@clerk/nextjs";
 import { isClerkConfigured } from "@/lib/clerk";
 import { useClerkFailed } from "@/components/ClerkResilientProvider";
+import { useI18n } from "@/components/LanguageProvider";
 
 // Settings dialog: change the username shown across the app, and — for members
 // who signed up with a password — change that password via Clerk.
 function SettingsModal({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
   const { user } = useUser();
   const current =
     user?.firstName ||
@@ -22,7 +24,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
 
   const save = async () => {
     const value = name.trim();
-    if (!value) return setErr("Enter a username.");
+    if (!value) return setErr(t("settings.enterUsername"));
     setBusy(true);
     setErr("");
     try {
@@ -32,7 +34,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName: value }),
       });
-      if (!r.ok) throw new Error((await r.json()).error || "Couldn't save.");
+      if (!r.ok) throw new Error((await r.json()).error || t("settings.couldntSave"));
       // Mirror it into Clerk too so the menu/name updates live (best-effort).
       try {
         await user?.update({ firstName: value });
@@ -42,7 +44,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
       setDone(true);
       setTimeout(onClose, 700);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't save.");
+      setErr(e instanceof Error ? e.message : t("settings.couldntSave"));
     } finally {
       setBusy(false);
     }
@@ -56,10 +58,10 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
         style={{ backgroundColor: "#251c5c" }}
       >
         <h3 className="mb-3 font-display text-[20px] font-black uppercase tracking-[0.04em] text-cream">
-          Settings
+          {t("settings.title")}
         </h3>
         <label className="mb-1 block font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-          Username
+          {t("settings.username")}
         </label>
         <input
           value={name}
@@ -70,21 +72,21 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             if (e.key === "Enter") void save();
             if (e.key === "Escape") onClose();
           }}
-          placeholder="Your username"
+          placeholder={t("settings.usernamePh")}
           className="w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
         />
         {err && <p className="mt-2 text-[13px] text-magenta">{err}</p>}
-        {done && <p className="mt-2 text-[13px] text-mint">Saved!</p>}
+        {done && <p className="mt-2 text-[13px] text-mint">{t("common.saved")}</p>}
         <div className="mt-5 flex gap-2">
           <button
             onClick={save}
             disabled={busy}
             className="g-btn g-btn-primary h-11 flex-1 text-[14px] disabled:opacity-60"
           >
-            {busy ? "Saving…" : "Save"}
+            {busy ? t("common.saving") : t("common.save")}
           </button>
           <button onClick={onClose} className="g-btn g-btn-ghost h-11 flex-1 text-[14px]">
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
 
@@ -99,6 +101,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
 // that already have a password must confirm the current one; OAuth-only accounts
 // (no password yet) just set a new one.
 function ChangePassword() {
+  const { t } = useI18n();
   const { user } = useUser();
   const hasPassword = !!user?.passwordEnabled;
   const [open, setOpen] = useState(false);
@@ -110,7 +113,7 @@ function ChangePassword() {
 
   const save = async () => {
     if (!user) return;
-    if (newPassword.length < 8) return setErr("Use at least 8 characters.");
+    if (newPassword.length < 8) return setErr(t("settings.use8"));
     setBusy(true);
     setErr("");
     setDone(false);
@@ -130,7 +133,7 @@ function ChangePassword() {
       setErr(
         clerkErr?.errors?.[0]?.longMessage ||
           clerkErr?.errors?.[0]?.message ||
-          "Couldn't change password.",
+          t("settings.couldntChange"),
       );
     } finally {
       setBusy(false);
@@ -143,7 +146,7 @@ function ChangePassword() {
         onClick={() => setOpen(true)}
         className="mt-3 w-full text-left font-display text-[13px] font-bold uppercase tracking-[0.06em] text-mint hover:text-cream"
       >
-        {hasPassword ? "Change password →" : "Set a password →"}
+        {hasPassword ? t("settings.changePassword") : t("settings.setPassword")}
       </button>
     );
   }
@@ -153,7 +156,7 @@ function ChangePassword() {
       {hasPassword && (
         <>
           <label className="mb-1 block font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-            Current password
+            {t("settings.currentPassword")}
           </label>
           <input
             type="password"
@@ -170,7 +173,7 @@ function ChangePassword() {
         </>
       )}
       <label className="mb-1 block font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-        New password
+        {t("settings.newPassword")}
       </label>
       <input
         type="password"
@@ -180,24 +183,24 @@ function ChangePassword() {
         onKeyDown={(e) => {
           if (e.key === "Enter") void save();
         }}
-        placeholder="At least 8 characters"
+        placeholder={t("settings.atLeast8")}
         className="w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
       />
       {err && <p className="mt-2 text-[13px] text-magenta">{err}</p>}
-      {done && <p className="mt-2 text-[13px] text-mint">Password updated!</p>}
+      {done && <p className="mt-2 text-[13px] text-mint">{t("settings.passwordUpdated")}</p>}
       <div className="mt-4 flex gap-2">
         <button
           onClick={save}
           disabled={busy}
           className="g-btn g-btn-primary h-11 flex-1 text-[14px] disabled:opacity-60"
         >
-          {busy ? "Updating…" : "Update password"}
+          {busy ? t("settings.updating") : t("settings.updatePassword")}
         </button>
         <button
           onClick={() => setOpen(false)}
           className="g-btn g-btn-ghost h-11 flex-1 text-[14px]"
         >
-          Cancel
+          {t("common.cancel")}
         </button>
       </div>
     </div>
@@ -208,6 +211,7 @@ function ChangePassword() {
 // opens a small app-styled dropdown. Signed-in members get Settings and a
 // working Sign out; guests get a single Log in redirect.
 function AccountMenu({ signedIn }: { signedIn: boolean }) {
+  const { t } = useI18n();
   const { user } = useUser();
   const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
@@ -224,7 +228,7 @@ function AccountMenu({ signedIn }: { signedIn: boolean }) {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        aria-label="Account menu"
+        aria-label={t("acct.menu")}
         className="grid h-9 w-9 place-items-center rounded-[12px] text-ink shadow-[inset_0_0_0_2px_#fff2c2,0_3px_0_0_#c99a1e] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#fff2c2,0_1px_0_0_#c99a1e]"
         style={{ background: "linear-gradient(0deg, #ffcf3f 0%, #ffe27a 100%)" }}
       >
@@ -259,7 +263,7 @@ function AccountMenu({ signedIn }: { signedIn: boolean }) {
                   }}
                   className="flex w-full items-center gap-2 px-4 py-3 text-left font-display text-[14px] font-semibold text-cream hover:bg-violet-lift/50"
                 >
-                  <span aria-hidden>⚙️</span> Settings
+                  <span aria-hidden>⚙️</span> {t("acct.settings")}
                 </button>
 
                 <button
@@ -269,7 +273,7 @@ function AccountMenu({ signedIn }: { signedIn: boolean }) {
                   }}
                   className="flex w-full items-center gap-2 border-t border-cream/10 px-4 py-3 text-left font-display text-[14px] font-semibold text-magenta hover:bg-magenta/15"
                 >
-                  <span aria-hidden>🚪</span> Sign out
+                  <span aria-hidden>🚪</span> {t("acct.signOut")}
                 </button>
               </>
             ) : (
@@ -278,7 +282,7 @@ function AccountMenu({ signedIn }: { signedIn: boolean }) {
                 onClick={() => setOpen(false)}
                 className="flex w-full items-center gap-2 px-4 py-3 text-left font-display text-[14px] font-semibold text-cream hover:bg-violet-lift/50"
               >
-                <span aria-hidden>🔑</span> Log in
+                <span aria-hidden>🔑</span> {t("acct.login")}
               </Link>
             )}
           </div>

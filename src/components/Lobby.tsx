@@ -4,14 +4,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRoom, type RoomView } from "@/lib/useRoom";
+import { useI18n } from "@/components/LanguageProvider";
 import { PerformanceHistory } from "@/components/PerformanceHistory";
 import { MAX_PLAYERS, MIN_PLAYERS, normalizeRoomCode } from "@/lib/room-code";
 
 type Mode = {
   id: string;
   icon: string;
-  title: string;
-  text: string;
+  titleKey: string; // i18n key, translated at render
+  textKey: string;
   href?: string; // present = working; absent = placeholder (coming soon)
   ghost?: boolean; // hidden/unrevealed slot ("???")
 };
@@ -20,36 +21,36 @@ const MODES: Mode[] = [
   {
     id: "creator",
     icon: "✂️",
-    title: "Video creator",
-    text: "Upload a video, AI finds the moments, backend cuts it into parts.",
+    titleKey: "mode.creator.title",
+    textKey: "mode.creator.text",
     href: "/creator",
   },
   {
     id: "solo",
     icon: "🎬",
-    title: "Solo run",
-    text: "Dub a media you created, line by line, in your own voice.",
+    titleKey: "mode.solo.title",
+    textKey: "mode.solo.text",
     href: "/play",
   },
   {
     id: "party",
     icon: "🎉",
-    title: "Party game",
-    text: "Play online with friends in real time — pass the mic, race the clock.",
+    titleKey: "mode.party.title",
+    textKey: "mode.party.text",
     href: "/party",
   },
   {
     id: "library",
     icon: "🎞️",
-    title: "Video library",
-    text: "Browse videos other creators made public — pick one and dub it.",
+    titleKey: "mode.library.title",
+    textKey: "mode.library.text",
     href: "/library",
   },
   {
     id: "ghost",
     icon: "❓",
-    title: "???",
-    text: "Coming soon",
+    titleKey: "mode.soon.title",
+    textKey: "mode.soon.text",
     ghost: true,
   },
 ];
@@ -57,6 +58,7 @@ const MODES: Mode[] = [
 // Appears when a guest tries to open the members-only creator, instead of a
 // static notice sitting under the cards.
 function GuestGate({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-ink/70" onClick={onClose} />
@@ -68,18 +70,15 @@ function GuestGate({ onClose }: { onClose: () => void }) {
           🔒
         </div>
         <h3 className="font-display text-[20px] font-black uppercase tracking-[0.04em] text-cream">
-          Members only
+          {t("gate.title")}
         </h3>
-        <p className="mt-2 text-[13px] leading-[1.5] text-cream/70">
-          Creating videos is a members-only feature. You&apos;re playing as a guest, so you can only
-          play. Sign in to upload and cut your own videos.
-        </p>
+        <p className="mt-2 text-[13px] leading-[1.5] text-cream/70">{t("gate.text")}</p>
         <div className="mt-5 flex flex-col gap-2">
           <Link href="/login" className="g-btn g-btn-primary w-full">
-            Sign in
+            {t("gate.signIn")}
           </Link>
           <button onClick={onClose} className="g-btn g-btn-ghost w-full">
-            Maybe later
+            {t("gate.later")}
           </button>
         </div>
       </div>
@@ -101,6 +100,7 @@ function WaitingRoom({
   busy: boolean;
   onLeave: () => void;
 }) {
+  const { t } = useI18n();
   const host = room?.players.find((p) => p.isHost);
   return (
     <div className="g-modal-overlay">
@@ -108,19 +108,16 @@ function WaitingRoom({
         <div className="mx-auto mb-1 grid h-12 w-12 place-items-center rounded-full bg-mint/20 text-[24px]">
           ⏳
         </div>
-        <h3 className="g-modal-title">Waiting room</h3>
+        <h3 className="g-modal-title">{t("wait.title")}</h3>
         <p className="g-modal-sub">
-          {host ? (
-            <>
-              <b className="text-cream">{host.displayName}</b> is the host and picks what you play.
-              Sit tight — the game starts when they do.
-            </>
-          ) : (
-            "The host picks what you play — sit tight."
-          )}
+          {host
+            ? t("wait.hostLead", { host: host.displayName })
+            : t("wait.hostLeadNoName")}
         </p>
         <p className="g-modal-count">
-          {room ? `${room.players.length}/${MAX_PLAYERS} in room` : "Connecting…"}
+          {room
+            ? t("wait.inRoom", { a: room.players.length, b: MAX_PLAYERS })
+            : t("wait.connecting")}
         </p>
 
         <ul className="flex w-full flex-col gap-2">
@@ -137,11 +134,11 @@ function WaitingRoom({
               </span>
               <span className="flex-1 font-display text-[14px] font-bold text-cream">
                 {p.displayName}
-                {p.id === playerId && <span className="text-cream/50"> (you)</span>}
+                {p.id === playerId && <span className="text-cream/50"> {t("common.you")}</span>}
               </span>
               {p.isHost && (
                 <span className="rounded-[6px] bg-sun px-2 py-0.5 font-display text-[10px] font-black uppercase text-ink">
-                  Host
+                  {t("common.host")}
                 </span>
               )}
             </li>
@@ -154,7 +151,7 @@ function WaitingRoom({
           onClick={onLeave}
           disabled={busy}
         >
-          Leave room
+          {t("common.leaveRoom")}
         </button>
       </div>
     </div>
@@ -174,6 +171,7 @@ export function Lobby({
   playerName?: string;
   avatarColor?: string;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [selected, setSelected] = useState("creator");
   const [note, setNote] = useState(false);
@@ -256,7 +254,7 @@ export function Lobby({
 
   return (
     <div className="g-right self-stretch">
-      <h2 className="g-title">Modes</h2>
+      <h2 className="g-title">{t("lobby.modes")}</h2>
 
       <div className="g-panel min-h-[340px] flex-1">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -274,19 +272,19 @@ export function Lobby({
                 {m.ghost ? (
                   // Greyed-out, locked placeholder — unrevealed mode.
                   <>
-                    <span className="g-soontag">Soon</span>
+                    <span className="g-soontag">{t("lobby.soonTag")}</span>
                     <div className="g-ficon">❓</div>
                     <section>
-                      <h4>???</h4>
-                      <p>Coming soon</p>
+                      <h4>{t("mode.soon.title")}</h4>
+                      <p>{t("mode.soon.text")}</p>
                     </section>
                   </>
                 ) : (
                   <>
                     <div className="g-ficon">{m.icon}</div>
                     <section>
-                      <h4>{m.title}</h4>
-                      <p>{m.text}</p>
+                      <h4>{t(m.titleKey)}</h4>
+                      <p>{t(m.textKey)}</p>
                     </section>
                   </>
                 )}
@@ -304,7 +302,7 @@ export function Lobby({
           // directly; otherwise a button opens the create/gather modal.
           (partyReady ? (
             <button className="g-btn g-btn-start" onClick={startParty} disabled={roomBusy}>
-              Start party →
+              {t("party.startParty")}
             </button>
           ) : (
             <button
@@ -314,10 +312,10 @@ export function Lobby({
                 setPartyOpen(true);
               }}
             >
-              {room ? "🎉 Set up party" : "🎉 Create a party"}
+              {room ? t("party.setup") : t("party.create")}
             </button>
           ))}
-        {note && <p className="text-[12px] text-cream/60">That mode is coming soon.</p>}
+        {note && <p className="text-[12px] text-cream/60">{t("lobby.comingSoon")}</p>}
       </div>
 
       {gate && <GuestGate onClose={() => setGate(false)} />}
@@ -337,7 +335,7 @@ export function Lobby({
             <button
               type="button"
               className="g-modal-x"
-              aria-label="Close"
+              aria-label={t("common.close")}
               onClick={() => setPartyOpen(false)}
             >
               ×
@@ -345,19 +343,17 @@ export function Lobby({
             <div className="mx-auto mb-1 grid h-12 w-12 place-items-center rounded-full bg-mint/20 text-[24px]">
               🎉
             </div>
-            <h3 className="g-modal-title">Party mode</h3>
+            <h3 className="g-modal-title">{t("party.title")}</h3>
 
             {room ? (
               <>
-                <p className="g-modal-sub">
-                  Share this code — up to {MAX_PLAYERS} players can join your room.
-                </p>
+                <p className="g-modal-sub">{t("studio.shareCode", { n: MAX_PLAYERS })}</p>
                 <div className="g-modal-code">{room.code}</div>
                 <button type="button" className="g-btn g-btn-primary w-full" onClick={copyCode}>
-                  {copied ? "Copied!" : "Copy code"}
+                  {copied ? t("common.copied") : t("common.copyCode")}
                 </button>
                 <p className="g-modal-count">
-                  {room.players.length}/{MAX_PLAYERS} in room
+                  {t("wait.inRoom", { a: room.players.length, b: MAX_PLAYERS })}
                 </p>
                 {partyReady ? (
                   <button
@@ -366,28 +362,26 @@ export function Lobby({
                     onClick={startParty}
                     disabled={roomBusy}
                   >
-                    Start party →
+                    {t("party.startParty")}
                   </button>
                 ) : (
-                  <p className="g-modal-sub text-sun">
-                    Party needs at least {MIN_PLAYERS} players — invite one more to start.
-                  </p>
+                  <p className="g-modal-sub text-sun">{t("party.needMore", { n: MIN_PLAYERS })}</p>
                 )}
               </>
             ) : roomBusy ? (
-              <p className="g-modal-sub">Working…</p>
+              <p className="g-modal-sub">{t("common.working")}</p>
             ) : (
               <>
                 {roomError && <p className="g-modal-sub text-magenta">{roomError}</p>}
-                <p className="g-modal-sub">Host a party, or join a friend&apos;s with their code.</p>
+                <p className="g-modal-sub">{t("party.host")}</p>
                 <button type="button" className="g-btn g-btn-primary w-full" onClick={() => create()}>
-                  🎟️ Generate code
+                  {t("party.generate")}
                 </button>
 
                 <div className="my-1 flex w-full items-center gap-2">
                   <span className="h-px flex-1 bg-white/15" />
                   <span className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/40">
-                    or join
+                    {t("party.orJoin")}
                   </span>
                   <span className="h-px flex-1 bg-white/15" />
                 </div>
@@ -401,7 +395,7 @@ export function Lobby({
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && joinCode) void join(joinCode);
                   }}
-                  placeholder="ROOM CODE"
+                  placeholder={t("common.roomCode")}
                   maxLength={4}
                   className="g-code-input"
                 />
@@ -411,7 +405,7 @@ export function Lobby({
                   onClick={() => void join(joinCode)}
                   disabled={!joinCode}
                 >
-                  Join room
+                  {t("party.joinRoom")}
                 </button>
               </>
             )}

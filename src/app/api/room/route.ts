@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
-import { generateRoomCode, roomView } from "@/lib/room.server";
+import {
+  generateRoomCode,
+  pruneStaleRooms,
+  RoomCodeExhaustedError,
+  roomView,
+} from "@/lib/room.server";
 
 export const runtime = "nodejs";
 
@@ -23,7 +28,23 @@ export async function POST(req: NextRequest) {
     // DB hiccup fetching the user must not block guest room creation.
   }
 
-  const code = await generateRoomCode();
+  // Reclaim abandoned rooms before allocating a code so the small 4-char space
+  // stays healthy over time (best-effort; won't block creation if it fails).
+  await pruneStaleRooms();
+
+  let code: string;
+  try {
+    code = await generateRoomCode();
+  } catch (e) {
+    if (e instanceof RoomCodeExhaustedError) {
+      return NextResponse.json(
+        { error: "Rooms are busy right now. Please try again in a moment." },
+        { status: 503 },
+      );
+    }
+    throw e;
+  }
+
   await db.room.create({
     data: {
       code,

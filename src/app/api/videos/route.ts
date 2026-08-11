@@ -14,7 +14,7 @@ export async function GET() {
   const uploads = await db.videoUpload.findMany({
     where: { visibility: "public" },
     orderBy: { createdAt: "desc" },
-    take: 60,
+    take: 300,
     include: { segments: { select: { id: true, player: true } } },
   });
 

@@ -39,8 +39,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "The game isn't in progress." }, { status: 409 });
   }
 
-  const seat = room.players.findIndex((p) => p.id === playerId) + 1;
-  if (seat === 0) return NextResponse.json({ error: "You're not in this room." }, { status: 403 });
+  const me = room.players.find((p) => p.id === playerId);
+  if (!me) return NextResponse.json({ error: "You're not in this room." }, { status: 403 });
+  // Frozen seat from select — the authoritative sector assignment. Never the
+  // live roster position, which shifts if someone left mid-game.
+  const seat = me.seat;
   if (!room.videoUploadId) {
     return NextResponse.json({ error: "No video selected." }, { status: 409 });
   }

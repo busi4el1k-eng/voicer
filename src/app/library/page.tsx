@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AccountBar } from "@/components/AccountBar";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useI18n } from "@/components/LanguageProvider";
 import { VideoThumb } from "@/components/VideoThumb";
 import { formatShareId } from "@/lib/share-id";
 
@@ -23,6 +25,7 @@ type Video = {
   creatorColor: string;
   rating: number; // average 0–5 rank (0 = unrated)
   ratingCount: number;
+  createdAt: string;
 };
 
 const fmtDuration = (ms: number) => {
@@ -31,14 +34,71 @@ const fmtDuration = (ms: number) => {
   return `${m}:${String(s % 60).padStart(2, "0")}`;
 };
 
+// ── Sorting: pick one field to order by, plus one direction (ascending or
+// descending). Fields are mutually exclusive; the direction toggle flips them. ─
+type SortField = "date" | "rating" | "sectors" | "length";
+type SortDir = "asc" | "desc";
+// Labels are i18n keys, translated where the chips render.
+const FIELDS: { key: SortField; labelKey: string }[] = [
+  { key: "date", labelKey: "lib.field.date" },
+  { key: "rating", labelKey: "lib.field.rated" },
+  { key: "sectors", labelKey: "lib.field.sectors" },
+  { key: "length", labelKey: "lib.field.length" },
+];
+
+// The comparable number behind each sort field.
+const fieldValue = (v: Video, field: SortField): number => {
+  switch (field) {
+    case "date":
+      return new Date(v.createdAt).getTime() || 0;
+    case "rating":
+      return v.rating;
+    case "sectors":
+      return v.lines;
+    case "length":
+      return v.durationMs;
+  }
+};
+
+const sortVideos = (list: Video[], field: SortField, dir: SortDir): Video[] => {
+  const mul = dir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => (fieldValue(a, field) - fieldValue(b, field)) * mul);
+};
+
+// How many videos to show per page in the library.
+const PER_PAGE = 25;
+
 // The shared Video library: public videos any user can browse and dub. Mirrors
 // the creator's "Your videos" list layout, but read-only + open to everyone.
 export default function LibraryPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [videos, setVideos] = useState<Video[]>([]);
   const [loaded, setLoaded] = useState(false);
   // The video whose "how do you want to play?" chooser is open (null = closed).
   const [chosen, setChosen] = useState<Video | null>(null);
+  // Sort field (single-select) + direction. Default: newest first.
+  const [field, setField] = useState<SortField>("date");
+  const [dir, setDir] = useState<SortDir>("desc");
+  // Pagination: browse the library 25 at a time.
+  const [page, setPage] = useState(1);
+
+  // Ordered list, recomputed only when the videos or sort inputs change.
+  const shown = useMemo(() => sortVideos(videos, field, dir), [videos, field, dir]);
+
+  const pageCount = Math.max(1, Math.ceil(shown.length / PER_PAGE));
+  const current = Math.min(page, pageCount); // clamp if the list shrank
+  const paged = shown.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+
+  // Change the ordering and jump back to the first page.
+  const applyField = (key: SortField) => {
+    setField(key);
+    setPage(1);
+  };
+  const toggleDir = () => {
+    setDir((d) => (d === "desc" ? "asc" : "desc"));
+    setPage(1);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -60,7 +120,8 @@ export default function LibraryPage() {
 
   return (
     <main className="g-screen">
-      <div className="absolute right-4 top-4 z-10">
+      <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        <LanguageSwitcher />
         <AccountBar />
       </div>
 
@@ -72,28 +133,67 @@ export default function LibraryPage() {
 
       <div className="w-full max-w-3xl">
         <h2 className="g-title">
-          Public videos{" "}
+          {t("lib.publicVideos")}{" "}
           {loaded ? (
             `(${videos.length})`
           ) : (
             <span
-              aria-label="Loading videos"
+              aria-label={t("lib.loadingAria")}
               className="ml-1 inline-block h-[15px] w-[15px] animate-spin rounded-full border-2 border-cream/25 border-t-mint align-[-2px]"
             />
           )}
         </h2>
 
+        {/* Sort bar: pick one field to order by + a direction toggle. Only
+            shown once there are videos to sort. */}
+        {loaded && videos.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.08em] text-cream/40">
+              {t("lib.sortBy")}
+            </span>
+            {FIELDS.map((f) => {
+              const active = field === f.key;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => applyField(f.key)}
+                  aria-pressed={active}
+                  className={
+                    "rounded-full px-3 py-1 text-[12px] font-bold transition " +
+                    (active
+                      ? "bg-mint/20 text-mint shadow-[inset_0_0_0_2px_#5cffb6]"
+                      : "bg-violet-deep/40 text-cream/70 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] hover:text-cream")
+                  }
+                >
+                  {t(f.labelKey)}
+                </button>
+              );
+            })}
+            {/* Direction toggle: descending (high→low / newest first) ↔ ascending. */}
+            <button
+              onClick={toggleDir}
+              title={dir === "desc" ? t("lib.descTitle") : t("lib.ascTitle")}
+              aria-label={dir === "desc" ? t("lib.descTitle") : t("lib.ascTitle")}
+              className="ml-1 flex items-center gap-1 rounded-full bg-violet-deep/40 px-3 py-1 text-[12px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] transition hover:text-cream"
+            >
+              <span aria-hidden>{dir === "desc" ? "↓" : "↑"}</span>
+              {dir === "desc" ? t("lib.desc") : t("lib.asc")}
+            </button>
+          </div>
+        )}
+
         <div className="g-panel min-h-[300px]">
           {!loaded ? (
-            <p className="text-center text-[13px] text-cream/50">Loading the library…</p>
+            <p className="text-center text-[13px] text-cream/50">{t("lib.loading")}</p>
           ) : videos.length === 0 ? (
             <p className="text-center text-[13px] leading-[1.6] text-cream/50">
-              No public videos yet. Creators can share their videos here by switching one to{" "}
-              <span className="font-bold text-mint">Public</span> in the video creator.
+              {t("lib.empty1")}
+              <span className="font-bold text-mint">{t("lib.emptyPublic")}</span>
+              {t("lib.empty2")}
             </p>
           ) : (
             <ul className="flex flex-col gap-3">
-              {videos.map((v) => {
+              {paged.map((v) => {
                 return (
                   <li
                     key={v.id}
@@ -110,7 +210,7 @@ export default function LibraryPage() {
                       {/* Title + creator + meta */}
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-display text-[17px] font-bold text-cream">
-                          {v.title || "Untitled"}
+                          {v.title || t("lib.untitled")}
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-cream/70">
                           <span className="flex items-center gap-1.5">
@@ -125,12 +225,14 @@ export default function LibraryPage() {
                           </span>
                           <span className="flex items-center gap-1.5">
                             <span className="font-display font-bold text-cream/85">{v.lines}</span>
-                            <span className="text-cream/45">line{v.lines === 1 ? "" : "s"}</span>
+                            <span className="text-cream/45">
+                              {v.lines === 1 ? t("lib.line") : t("lib.lines")}
+                            </span>
                           </span>
                           {v.ratingCount > 0 ? (
                             <span
                               className="flex items-center gap-1"
-                              title={`Rated by ${v.ratingCount} player${v.ratingCount === 1 ? "" : "s"}`}
+                              title={t("lib.ratedBy", { n: v.ratingCount })}
                             >
                               <span className="text-sun">★</span>
                               <span className="font-display font-bold text-cream/85">
@@ -141,7 +243,7 @@ export default function LibraryPage() {
                           ) : (
                             <span className="flex items-center gap-1 text-cream/35">
                               <span>★</span>
-                              <span>unrated</span>
+                              <span>{t("lib.unrated")}</span>
                             </span>
                           )}
                           {v.players > 0 && (
@@ -149,7 +251,7 @@ export default function LibraryPage() {
                               {Array.from({ length: v.players }, (_, i) => (
                                 <span
                                   key={i}
-                                  title={`Player ${i + 1}`}
+                                  title={t("lib.playerN", { n: i + 1 })}
                                   className="h-2.5 w-2.5 rounded-full shadow-[inset_0_0_0_1.5px_rgba(31,7,51,0.4)]"
                                   style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] }}
                                 />
@@ -171,10 +273,10 @@ export default function LibraryPage() {
                       <div className="flex flex-none items-center gap-2">
                         <button
                           onClick={() => setChosen(v)}
-                          title="Dub this video"
+                          title={t("lib.dubThis")}
                           className="g-btn g-btn-start flex h-10 flex-1 items-center justify-center px-5 text-[13px] sm:flex-none"
                         >
-                          Play
+                          {t("lib.play")}
                         </button>
                       </div>
                     </div>
@@ -185,9 +287,33 @@ export default function LibraryPage() {
           )}
         </div>
 
+        {/* Pagination: prev / page indicator / next — only when there's more
+            than one page. Buttons disable at the ends. */}
+        {loaded && pageCount > 1 && (
+          <div className="mt-3 flex items-center justify-center gap-3">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={current <= 1}
+              className="rounded-full bg-violet-deep/40 px-4 py-1.5 text-[13px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-cream/85"
+            >
+              ← {t("lib.prev")}
+            </button>
+            <span className="text-[13px] font-bold text-cream/60">
+              {t("lib.pageOf", { a: current, b: pageCount })}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              disabled={current >= pageCount}
+              className="rounded-full bg-violet-deep/40 px-4 py-1.5 text-[13px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-cream/85"
+            >
+              {t("lib.next")} →
+            </button>
+          </div>
+        )}
+
         <div className="mt-6 text-center">
           <Link href="/dashboard" className="text-[13px] text-cream/50 underline">
-            Back to lobby
+            {t("lib.backToLobby")}
           </Link>
         </div>
       </div>
@@ -201,7 +327,7 @@ export default function LibraryPage() {
             <button
               type="button"
               className="g-modal-x"
-              aria-label="Close"
+              aria-label={t("common.close")}
               onClick={() => setChosen(null)}
             >
               ×
@@ -209,16 +335,16 @@ export default function LibraryPage() {
             <div className="mx-auto mb-1 grid h-12 w-12 place-items-center rounded-full bg-mint/20 text-[24px]">
               🎬
             </div>
-            <h3 className="g-modal-title">How do you want to play?</h3>
+            <h3 className="g-modal-title">{t("lib.chooseTitle")}</h3>
             <p className="g-modal-sub">
-              <b className="text-cream">{chosen.title || "Untitled"}</b> — pick a mode to dub it.
+              {t("lib.chooseSub", { title: chosen.title || t("lib.untitled") })}
             </p>
             <button
               type="button"
               className="g-btn g-btn-start w-full"
               onClick={() => router.push(`/play/run/${chosen.id}`)}
             >
-              🎬 Solo run
+              {t("lib.soloRun")}
             </button>
             <button
               type="button"
@@ -227,7 +353,7 @@ export default function LibraryPage() {
                 router.push(chosen.shareId ? `/party?code=${chosen.shareId}` : "/party")
               }
             >
-              🎉 Party mode
+              {t("lib.partyMode")}
             </button>
           </div>
         </div>

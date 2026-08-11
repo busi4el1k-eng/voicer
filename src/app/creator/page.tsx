@@ -167,7 +167,9 @@ export default function CreatorPage() {
         message: res === "ready" ? "Music ready!" : "Uploaded!",
       }));
       await load();
-      window.setTimeout(() => setOv((o) => ({ ...o, active: false })), 1200);
+      // Don't auto-dismiss: the video isn't playable yet — the creator must
+      // open the editor to mark the sectors. Keep the overlay up with a
+      // prominent "Open editor" CTA so that next step is unmissable.
     },
     [load],
   );
@@ -586,6 +588,33 @@ export default function CreatorPage() {
               <div className="g-modal-sub">
                 Keeping the original music under your dub — this can take a few minutes.
               </div>
+            )}
+            {ov.phase === "ready" && (
+              <>
+                <div className="g-modal-sub">
+                  <strong className="text-mint">Next step:</strong> open the editor to mark the
+                  lines (sectors) on the timeline. Your video isn&apos;t playable in games until you
+                  do this.
+                </div>
+                <div className="flex flex-col items-center gap-2 pt-1">
+                  {ov.uploadId && (
+                    <Link
+                      href={`/creator/${ov.uploadId}`}
+                      className="g-btn g-btn-start flex w-full items-center justify-center gap-2"
+                      style={{ height: 52, padding: "0 24px", fontSize: 17 }}
+                    >
+                      <span aria-hidden>🎬</span> Open editor
+                    </Link>
+                  )}
+                  <button
+                    className="g-btn g-btn-ghost"
+                    style={{ height: 40, padding: "0 18px", fontSize: 14 }}
+                    onClick={() => setOv((o) => ({ ...o, active: false }))}
+                  >
+                    Later
+                  </button>
+                </div>
+              </>
             )}
             {ov.phase === "error" && (
               <div className="flex gap-2 pt-1">

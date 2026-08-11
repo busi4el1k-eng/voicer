@@ -141,6 +141,19 @@ export function AutoDetectProgress({
           </div>
         )}
 
+        {/* Accuracy warning — auto-detect is a rough draft, not final. */}
+        {done && count > 0 && (
+          <div className="mt-4 flex gap-2.5 rounded-xl bg-[rgba(255,210,63,.12)] px-4 py-3 text-[13px] font-semibold leading-[1.5] text-cream/85 shadow-[inset_0_0_0_2px_rgba(255,210,63,.35)]">
+            <span aria-hidden className="text-[16px] leading-none">
+              ⚠️
+            </span>
+            <span>
+              Auto-detect isn&apos;t always precise. Review each sector and adjust the timing,
+              text, and speaker by hand before saving.
+            </span>
+          </div>
+        )}
+
         {/* Footer */}
         {closable && (
           <button

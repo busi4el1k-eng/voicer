@@ -32,7 +32,9 @@ export async function POST(req: NextRequest) {
   const status = target === "playing" ? "playing" : "lobby";
   await db.$transaction([
     db.roomTake.deleteMany({ where: { roomCode: code } }),
-    db.roomPlayer.updateMany({ where: { roomCode: code }, data: { status: "playing" } }),
+    // Clear frozen seats too — the next game re-assigns them in select, so a
+    // party that changed size between rounds gets fresh, correct seating.
+    db.roomPlayer.updateMany({ where: { roomCode: code }, data: { status: "playing", seat: 0 } }),
     db.room.update({ where: { code }, data: { status, videoUploadId: null, finalUrl: "" } }),
   ]);
   emitRoom(code);
