@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { downloadHref } from "@/lib/download";
 import { useMic, type RecordResult } from "@/lib/audio/useMic";
 import { decodeAudio, type Pcm } from "@/lib/audio/waveform";
@@ -11,6 +12,7 @@ import { RateVideo } from "@/components/RateVideo";
 import { ScenarioWindow, scenarioFromSegments } from "@/components/ScenarioWindow";
 import { CombineProgress } from "@/components/CombineProgress";
 import { ClapperCountdown } from "@/components/ClapperCountdown";
+import { useI18n } from "@/components/LanguageProvider";
 import { getClientId } from "@/lib/client-id";
 
 type Seg = {
@@ -32,6 +34,8 @@ const fmt = (ms: number) => {
 export default function SoloRunPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const mic = useMic();
+  const { t } = useI18n();
+  const router = useRouter();
 
   const [video, setVideo] = useState<Video | null>(null);
   const [segs, setSegs] = useState<Seg[]>([]);
@@ -50,6 +54,10 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   const [clientId] = useState(() => (typeof window !== "undefined" ? getClientId() : ""));
 
   const [countdown, setCountdown] = useState<number | null>(null);
+  // Rating is mandatory before leaving: pressing "back to dashboard" reveals it,
+  // and the exit only unlocks once the video score is saved.
+  const [showRating, setShowRating] = useState(false);
+  const [videoSaved, setVideoSaved] = useState(false);
 
   const stageRef = useRef<VideoStageHandle>(null);
   const pcmRef = useRef<Pcm | null>(null);
@@ -199,7 +207,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   const finish = useCallback(async () => {
     const recorded = Object.entries(takesRef.current);
     if (recorded.length === 0) {
-      setExportErr("Record at least one sector first.");
+      setExportErr(t("srun.recordFirst"));
       return;
     }
     setExportErr("");
@@ -209,22 +217,22 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
       fd.append("uploadId", id);
       for (const [segId, take] of recorded) fd.append(`take:${segId}`, take.blob, `${segId}.webm`);
       const r = await fetch("/api/creator/dub", { method: "POST", body: fd });
-      if (!r.ok) throw new Error((await r.json()).error || "Export failed.");
+      if (!r.ok) throw new Error((await r.json()).error || t("srun.exportFailed"));
       const d = (await r.json()) as { url: string };
       setResultUrl(d.url);
       setPhase("result");
     } catch (e) {
-      setExportErr(e instanceof Error ? e.message : "Export failed.");
+      setExportErr(e instanceof Error ? e.message : t("srun.exportFailed"));
       setPhase("summary");
     }
-  }, [id]);
+  }, [id, t]);
 
   // --- render ---------------------------------------------------------------
 
   if (phase === "loading") {
     return (
       <main className="g-screen">
-        <p className="mt-20 text-cream/60">Loading…</p>
+        <p className="mt-20 text-cream/60">{t("game.loading")}</p>
       </main>
     );
   }
@@ -232,10 +240,10 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   if (phase === "error" || !video) {
     return (
       <main className="g-screen">
-        <h1 className="g-logo mt-10">Couldn&apos;t load</h1>
-        <p className="mt-2 text-[14px] text-cream/60">That video isn&apos;t available.</p>
+        <h1 className="g-logo mt-10">{t("game.cantLoad")}</h1>
+        <p className="mt-2 text-[14px] text-cream/60">{t("srun.notAvailable")}</p>
         <Link href="/play" className="mt-4 text-[13px] text-cream/60 underline">
-          Back
+          {t("game.back")}
         </Link>
       </main>
     );
@@ -244,12 +252,10 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   if (phase === "empty") {
     return (
       <main className="g-screen">
-        <h1 className="g-logo mt-10">No sectors</h1>
-        <p className="mt-2 text-[14px] text-cream/60">
-          This video has no sectors to dub yet.
-        </p>
+        <h1 className="g-logo mt-10">{t("game.noSectors")}</h1>
+        <p className="mt-2 text-[14px] text-cream/60">{t("srun.noSectorsBody")}</p>
         <Link href="/play" className="mt-4 text-[13px] text-cream/60 underline">
-          Back
+          {t("game.back")}
         </Link>
       </main>
     );
@@ -264,7 +270,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   return (
     <main className="g-screen">
       <div className="flex h-[72px] items-center">
-        <h1 className="g-logo">{video.title || "Solo run"}</h1>
+        <h1 className="g-logo">{video.title || t("solo.title")}</h1>
       </div>
 
       <div className={`w-full ${isRunView ? "max-w-6xl" : "max-w-2xl"}`}>
@@ -273,7 +279,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
             {/* Progress */}
             <div className="mb-3 flex items-center justify-between">
               <span className="font-display text-[14px] font-bold uppercase tracking-[0.1em] text-mint">
-                Sector {cur + 1} / {segs.length}
+                {t("game.sectorOf", { a: cur + 1, b: segs.length })}
               </span>
               <div className="flex flex-1 gap-1 pl-4">
                 {segs.map((s, i) => (
@@ -281,7 +287,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                     key={s.id}
                     onClick={() => goTo(i)}
                     disabled={busy}
-                    title={`Sector ${i + 1}`}
+                    title={t("editor.sectorN", { n: i + 1 })}
                     className="h-2 flex-1 rounded-full transition-colors"
                     style={{
                       background:
@@ -313,15 +319,15 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                     {counting && countdown != null && <ClapperCountdown count={countdown} />}
                   </div>
                   <p className="mt-2 text-center font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
-                    {fmt(seg.startMs)} – {fmt(seg.endMs)} · space = play / pause
+                    {fmt(seg.startMs)} – {fmt(seg.endMs)} · {t("game.spaceHint")}
                   </p>
                 </div>
 
                 {/* Recorder + voice waveform over the original */}
                 <div className="g-panel mb-4">
                   <div className="mb-2 flex justify-between text-[11px] font-bold uppercase tracking-[0.08em]">
-                    <span className="text-sky-400">Original</span>
-                    <span className="text-red-400">Your voice</span>
+                    <span className="text-sky-400">{t("game.original")}</span>
+                    <span className="text-red-400">{t("game.yourVoice")}</span>
                   </div>
                   <RecorderWave
                     original={origWave[seg.id]}
@@ -345,28 +351,28 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                       }`}
                     >
                       {!sectorReady && !mic.recording && !counting
-                        ? "🎬 Loading scene…"
+                        ? t("game.loadingScene")
                         : mic.recording
-                          ? "■ Stop"
+                          ? t("game.stop")
                           : counting
-                            ? `Starting in ${countdown}…`
+                            ? t("game.startingIn", { n: countdown ?? "" })
                             : takes[seg.id]
-                              ? "● Re-record"
-                              : "● Record"}
+                              ? t("game.reRecord")
+                              : t("game.record")}
                     </button>
                     <button
                       onClick={playMyTake}
                       disabled={!takes[seg.id] || busy}
                       className="g-btn g-btn-ghost h-11 text-[14px]"
                     >
-                      ▶ My take
+                      {t("game.myTake")}
                     </button>
                     <button
                       onClick={next}
                       disabled={busy}
                       className="g-btn g-btn-primary col-span-2 h-11 text-[14px] sm:col-span-1"
                     >
-                      {cur >= segs.length - 1 ? "Finish sectors →" : "Next sector →"}
+                      {cur >= segs.length - 1 ? t("game.finishSectors") : t("game.nextSector")}
                     </button>
                   </div>
                   {mic.error && <p className="mt-3 text-[13px] text-magenta">{mic.error}</p>}
@@ -378,10 +384,10 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                     disabled={cur === 0 || busy}
                     className="text-[13px] text-cream/50 underline disabled:opacity-40"
                   >
-                    ◀ Previous sector
+                    {t("game.previousSector")}
                   </button>
                   <Link href="/play" className="text-[13px] text-cream/50 underline">
-                    Quit
+                    {t("game.quit")}
                   </Link>
                 </div>
               </div>
@@ -404,9 +410,9 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
 
         {phase === "summary" && (
           <div className="g-panel">
-            <h2 className="g-title">All sectors done</h2>
+            <h2 className="g-title">{t("srun.allDone")}</h2>
             <p className="mb-4 text-center text-[13px] text-cream/60">
-              {recordedCount} of {segs.length} sectors recorded.
+              {t("srun.recordedOf", { a: recordedCount, b: segs.length })}
             </p>
 
             <div className="flex flex-col gap-2">
@@ -419,7 +425,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <span className="flex-1 truncate text-[14px] text-cream">
-                    {s.transcript || `Sector ${i + 1}`}
+                    {s.transcript || t("editor.sectorN", { n: i + 1 })}
                   </span>
                   <span className="font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
                     {fmt(s.startMs)}–{fmt(s.endMs)}
@@ -429,7 +435,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                       takes[s.id] ? "text-mint" : "text-cream/30"
                     }`}
                   >
-                    {takes[s.id] ? "● Recorded" : "— Skipped"}
+                    {takes[s.id] ? t("game.recorded") : t("game.skipped")}
                   </span>
                 </div>
               ))}
@@ -441,7 +447,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                 disabled={recordedCount === 0}
                 onClick={() => void finish()}
               >
-                Finish &amp; combine ({recordedCount}/{segs.length})
+                {t("srun.finishCombine", { a: recordedCount, b: segs.length })}
               </button>
               {exportErr && <p className="text-[13px] text-magenta">{exportErr}</p>}
               <button
@@ -451,7 +457,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                 }}
                 className="text-[13px] text-cream/50 underline"
               >
-                ◀ Back to sectors
+                {t("game.backToSectors")}
               </button>
             </div>
           </div>
@@ -461,9 +467,9 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
 
         {phase === "result" && (
           <div className="g-panel text-center">
-            <h2 className="g-title">Your dub is ready</h2>
+            <h2 className="g-title">{t("game.dubReady")}</h2>
             <p className="mb-4 text-[13px] text-cream/60">
-              {recordedCount} of {segs.length} sectors replaced with your voice.
+              {t("srun.dubReadyBody", { a: recordedCount, b: segs.length })}
             </p>
             {resultUrl && (
               <div className="mb-4">
@@ -472,15 +478,35 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
             )}
             <div className="flex flex-col items-center gap-3">
               <a href={downloadHref(resultUrl, `${video?.title || "cinema-dub"}.mp4`)} className="g-btn g-btn-start">
-                ↓ Download video
+                {t("game.downloadVideo")}
               </a>
-              <Link href="/dashboard" className="g-btn g-btn-ghost w-full">
-                ← Back to dashboard
-              </Link>
+              {/* Before the rating is shown, this button reveals it instead of
+                  leaving; once it's revealed it exits only when the score is saved. */}
+              {!showRating && video && clientId ? (
+                <button
+                  onClick={() => setShowRating(true)}
+                  className="g-btn g-btn-ghost w-full"
+                >
+                  {t("game.backToDashboard")}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => router.push("/dashboard")}
+                    disabled={!!(video && clientId) && !videoSaved}
+                    className="g-btn g-btn-ghost w-full"
+                  >
+                    {t("game.backToDashboard")}
+                  </button>
+                  {video && clientId && !videoSaved && (
+                    <p className="text-[12px] text-sun">{t("srun.rateToContinue")}</p>
+                  )}
+                </>
+              )}
             </div>
 
-            {video && clientId && (
-              <RateVideo uploadId={video.id} raterKey={clientId} />
+            {showRating && video && clientId && (
+              <RateVideo uploadId={video.id} raterKey={clientId} onSaved={setVideoSaved} />
             )}
           </div>
         )}

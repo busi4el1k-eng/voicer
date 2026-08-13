@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AccountBar } from "@/components/AccountBar";
 import { VideoStage } from "@/components/VideoStage";
+import { useI18n } from "@/components/LanguageProvider";
 import { formatShareId, formatShareInput } from "@/lib/share-id";
 import { useRoom } from "@/lib/useRoom";
 
@@ -26,6 +27,7 @@ const fmtDuration = (ms: number) => {
 
 export default function PartyHome() {
   const router = useRouter();
+  const { t } = useI18n();
   const [code, setCode] = useState("");
   const [video, setVideo] = useState<Video | null>(null);
   const [err, setErr] = useState("");
@@ -65,27 +67,27 @@ export default function PartyHome() {
         body: JSON.stringify({ code: room.code, playerId, uploadId: video.id }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Couldn't start the game.");
+      if (!r.ok) throw new Error(d.error || t("ppick.cantStart"));
       router.push("/party/studio");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't start the game.");
+      setErr(e instanceof Error ? e.message : t("ppick.cantStart"));
       setLaunching(false);
     }
   };
 
   const search = async (override?: string) => {
     const trimmed = (override ?? code).trim();
-    if (!trimmed) return setErr("Enter a share code.");
+    if (!trimmed) return setErr(t("solo.enterShareCode"));
     setBusy(true);
     setErr("");
     setVideo(null);
     try {
       const r = await fetch(`/api/solo/lookup?code=${encodeURIComponent(trimmed)}`);
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Lookup failed.");
+      if (!r.ok) throw new Error(d.error || t("solo.lookupFailed"));
       setVideo(d.video as Video);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Lookup failed.");
+      setErr(e instanceof Error ? e.message : t("solo.lookupFailed"));
     } finally {
       setBusy(false);
     }
@@ -121,17 +123,17 @@ export default function PartyHome() {
           // Renders instantly from the membership hint; the roster fills in
           // once the room loads.
           <>
-            <h2 className="g-title">Waiting room</h2>
+            <h2 className="g-title">{t("wait.title")}</h2>
             <div className="g-panel">
               <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-full bg-mint/20 text-[24px]">
                 ⏳
               </div>
               <p className="text-center text-[14px] leading-[1.5] text-cream">
-                <b>{room?.players.find((p) => p.isHost)?.displayName ?? "The host"}</b> is choosing a
-                video. The game starts when they pick — sit tight.
+                <b>{room?.players.find((p) => p.isHost)?.displayName ?? t("ppick.theHost")}</b>{" "}
+                {t("ppick.choosingTail")}
               </p>
               <p className="mt-2 text-center font-display text-[11px] font-bold uppercase tracking-[0.05em] text-cream/50">
-                {room ? `${room.players.length} in your party` : "Connecting…"}
+                {room ? t("ppick.inYourParty", { n: room.players.length }) : t("wait.connecting")}
               </p>
               <div className="mt-4 flex flex-col gap-2">
                 {(room?.players ?? []).map((p) => (
@@ -147,11 +149,11 @@ export default function PartyHome() {
                     </span>
                     <span className="flex-1 font-display text-[14px] font-bold text-cream">
                       {p.displayName}
-                      {p.id === playerId && <span className="text-cream/50"> (you)</span>}
+                      {p.id === playerId && <span className="text-cream/50"> {t("common.you")}</span>}
                     </span>
                     {p.isHost && (
                       <span className="rounded-[6px] bg-sun px-2 py-0.5 font-display text-[10px] font-black uppercase text-ink">
-                        Host
+                        {t("common.host")}
                       </span>
                     )}
                   </div>
@@ -164,13 +166,13 @@ export default function PartyHome() {
                   void leave();
                 }}
               >
-                Leave room
+                {t("common.leaveRoom")}
               </button>
             </div>
           </>
         ) : (
           <>
-        <h2 className="g-title">Find a video to party-dub</h2>
+        <h2 className="g-title">{t("ppick.findVideo")}</h2>
 
         {/* Code search */}
         <div className="g-panel">
@@ -181,20 +183,17 @@ export default function PartyHome() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void search();
               }}
-              placeholder="e.g. ABCD-EFGH"
+              placeholder={t("solo.codePh")}
               maxLength={9}
               autoFocus
               className="flex-1 rounded-[10px] bg-violet-deep/60 px-4 py-3 font-display text-[16px] font-bold uppercase tracking-[0.12em] text-cream placeholder:font-normal placeholder:tracking-normal placeholder:text-cream/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
             />
             <button onClick={() => void search()} disabled={busy} className="g-btn g-btn-primary px-5">
-              {busy ? "…" : "Search"}
+              {busy ? "…" : t("solo.search")}
             </button>
           </div>
           {err && <p className="mt-3 text-[13px] text-magenta">{err}</p>}
-          <p className="mt-3 text-[12px] leading-[1.5] text-cream/50">
-            Ask the creator for the video&apos;s share code, then enter it here to set up a party dub
-            with friends.
-          </p>
+          <p className="mt-3 text-[12px] leading-[1.5] text-cream/50">{t("ppick.hint")}</p>
         </div>
 
         {/* Found video — game info + mock play */}
@@ -204,13 +203,13 @@ export default function PartyHome() {
               <VideoStage src={video.sourceUrl} />
             </div>
             <h3 className="font-display text-[22px] font-black text-cream">
-              {video.title || "Untitled"}
+              {video.title || t("lib.untitled")}
             </h3>
 
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div className="rounded-[10px] bg-white/5 p-3 text-center">
                 <div className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-                  Code
+                  {t("solo.code")}
                 </div>
                 <div className="mt-1 font-display text-[15px] font-black tracking-[0.1em] text-mint">
                   {video.shareId ? formatShareId(video.shareId) : "—"}
@@ -231,14 +230,14 @@ export default function PartyHome() {
                 return (
                   <div className={`rounded-[10px] p-3 text-center ${tile}`}>
                     <div className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-                      Players
+                      {t("ppick.players")}
                     </div>
                     <div className={`mt-1 font-display text-[15px] font-black ${num}`}>
                       {video.players > 0 ? video.players : "—"}
                     </div>
                     {partyCount !== null && (
                       <div className="mt-0.5 font-display text-[10px] font-bold uppercase tracking-[0.06em] text-cream/45">
-                        your party: {partyCount}
+                        {t("ppick.yourParty", { n: partyCount })}
                       </div>
                     )}
                   </div>
@@ -246,7 +245,7 @@ export default function PartyHome() {
               })()}
               <div className="rounded-[10px] bg-white/5 p-3 text-center">
                 <div className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-                  Lines
+                  {t("solo.lines")}
                 </div>
                 <div className="mt-1 font-display text-[15px] font-black text-cream">
                   {video.lines}
@@ -254,7 +253,7 @@ export default function PartyHome() {
               </div>
               <div className="rounded-[10px] bg-white/5 p-3 text-center">
                 <div className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-                  Length
+                  {t("solo.length")}
                 </div>
                 <div className="mt-1 font-display text-[15px] font-black text-cream">
                   {video.durationMs ? fmtDuration(video.durationMs) : "—"}
@@ -271,27 +270,32 @@ export default function PartyHome() {
                 className="g-btn g-btn-start w-full disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {launching
-                  ? "Starting…"
+                  ? t("ppick.starting")
                   : video.lines === 0
-                    ? "No lines to dub yet"
+                    ? t("solo.noLinesYet")
                     : partyMatches
-                      ? "Start for everyone →"
-                      : "Party size must match"}
+                      ? t("ppick.startEveryone")
+                      : t("ppick.sizeMustMatch")}
               </button>
 
               {video.lines > 0 && !partyMatches && (
                 <p className="text-center text-[13px] leading-[1.5] text-sun">
                   {partyCount === null
-                    ? `You're not in a party. This video needs exactly ${video.players} ${
-                        video.players === 1 ? "player" : "players"
-                      } — create or join a room from the dashboard.`
+                    ? t("ppick.notInParty", {
+                        n: video.players,
+                        players: video.players === 1 ? t("creator.player") : t("creator.players"),
+                      })
                     : partyCount < video.players
-                      ? `Your party has ${partyCount}. This video needs exactly ${video.players} — invite ${
-                          video.players - partyCount
-                        } more.`
-                      : `Your party has ${partyCount}. This video needs exactly ${video.players} — remove ${
-                          partyCount - video.players
-                        }.`}
+                      ? t("ppick.inviteMore", {
+                          a: partyCount,
+                          b: video.players,
+                          c: video.players - partyCount,
+                        })
+                      : t("ppick.removeSome", {
+                          a: partyCount,
+                          b: video.players,
+                          c: partyCount - video.players,
+                        })}
                 </p>
               )}
             </div>
@@ -310,7 +314,7 @@ export default function PartyHome() {
             }}
             className="text-[13px] text-cream/50 underline"
           >
-            Back to lobby
+            {t("lib.backToLobby")}
           </button>
         </div>
       </div>

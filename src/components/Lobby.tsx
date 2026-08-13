@@ -257,7 +257,7 @@ export function Lobby({
       <h2 className="g-title">{t("lobby.modes")}</h2>
 
       <div className="g-panel min-h-[340px] flex-1">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 [&_.g-card-inner]:min-h-[104px]">
           {MODES.map((m) => (
             <button
               key={m.id}

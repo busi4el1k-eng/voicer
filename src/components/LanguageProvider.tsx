@@ -13,24 +13,32 @@ type Ctx = {
 const I18nContext = createContext<Ctx | null>(null);
 const STORAGE_KEY = "cinemadub.locale";
 
-// Wraps the whole app so any component can read the chosen language. SSR always
-// renders the default (English) and the client re-applies the saved locale after
-// mount — same first paint on both sides, so no hydration mismatch, just a brief
-// switch to the saved language on load.
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
+// Wraps the whole app so any component can read the chosen language. The root
+// layout reads the locale cookie server-side and passes it as `initialLocale`,
+// so SSR and the first client render already paint in the chosen language — no
+// English flash on reload and no hydration mismatch. The post-mount effect only
+// reconciles with localStorage (the source of truth the switcher writes to).
+export function LanguageProvider({
+  children,
+  initialLocale,
+}: {
+  children: React.ReactNode;
+  initialLocale?: Locale;
+}) {
+  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? DEFAULT_LOCALE);
 
-  // Apply the saved language after mount. SSR + first client render both use
-  // the default, so this deliberate post-mount setState is what avoids a
-  // hydration mismatch (rather than causing a problematic cascade).
+  // Reconcile with localStorage after mount. This matches the cookie in the
+  // normal case; it only changes anything if the two ever diverge (e.g. storage
+  // was updated in another tab), so it won't cause a hydration mismatch.
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (isLocale(stored)) setLocaleState(stored);
+      if (isLocale(stored) && stored !== locale) setLocaleState(stored);
     } catch {
-      /* storage blocked — stay on the default */
+      /* storage blocked — stay on the initial locale */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

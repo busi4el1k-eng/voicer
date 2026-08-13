@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Fredoka, Nunito } from "next/font/google";
+import { cookies } from "next/headers";
 import { ClerkResilientProvider } from "@/components/ClerkResilientProvider";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { BackButton } from "@/components/BackButton";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
 import { isClerkConfigured } from "@/lib/clerk";
 import "./globals.css";
 import "./mobile.css";
@@ -28,13 +30,19 @@ export const metadata: Metadata = {
   description: "Everyone gets a mic. Nobody gets away with it.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // The switcher mirrors the chosen language into a cookie. Reading it here lets
+  // SSR paint every page in that language (not just the dashboard), so navigating
+  // to any page — or reloading — keeps the language with no English flash.
+  const cookieLocale = (await cookies()).get("cinemadub.locale")?.value;
+  const locale = isLocale(cookieLocale) ? cookieLocale : DEFAULT_LOCALE;
+
   const shell = (
-    <html lang="en" className={`${fredoka.variable} ${nunito.variable} h-full`}>
+    <html lang={locale} className={`${fredoka.variable} ${nunito.variable} h-full`}>
       <body className="min-h-full flex flex-col">
-        <LanguageProvider>
+        <LanguageProvider initialLocale={locale}>
           <AnimatedBackground />
           <BackButton />
           {children}

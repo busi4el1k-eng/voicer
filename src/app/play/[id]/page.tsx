@@ -5,6 +5,7 @@ import Link from "next/link";
 import { downloadHref } from "@/lib/download";
 import { useMic, type RecordResult } from "@/lib/audio/useMic";
 import { CombineProgress } from "@/components/CombineProgress";
+import { useI18n } from "@/components/LanguageProvider";
 
 type Seg = { id: string; startMs: number; endMs: number; label: string; transcript: string };
 type Upload = { id: string; title: string; sourceUrl: string; segments: Seg[] };
@@ -94,7 +95,19 @@ function normPitch(hz: number): number | null {
 }
 
 // Waveform history (amplitude bars) with the pitch/tone contour drawn over it.
-function WaveTone({ trace, color, label }: { trace?: Trace; color: string; label: string }) {
+function WaveTone({
+  trace,
+  color,
+  label,
+  toneLabel,
+  noDataLabel,
+}: {
+  trace?: Trace;
+  color: string;
+  label: string;
+  toneLabel: string;
+  noDataLabel: string;
+}) {
   const peaks = trace?.peaks ?? [];
   const pitch = trace?.pitch ?? [];
   const count = peaks.length || N;
@@ -116,12 +129,12 @@ function WaveTone({ trace, color, label }: { trace?: Trace; color: string; label
     <div>
       <div className="mb-1 flex justify-between text-[10px] uppercase tracking-[0.08em] text-cream/40">
         <span>{label}</span>
-        <span style={{ color }}>tone</span>
+        <span style={{ color }}>{toneLabel}</span>
       </div>
       <div className="relative flex h-12 items-end gap-[2px] rounded-[8px] bg-violet-deep px-2 py-1">
         {peaks.length === 0 && (
           <span className="absolute inset-0 grid place-items-center text-[11px] text-cream/30">
-            no data
+            {noDataLabel}
           </span>
         )}
         {(peaks.length ? peaks : new Array(count).fill(0)).map((p, i) => (
@@ -157,6 +170,7 @@ function WaveTone({ trace, color, label }: { trace?: Trace; color: string; label
 export default function PlayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const mic = useMic();
+  const { t } = useI18n();
 
   const [upload, setUpload] = useState<Upload | null>(null);
   const [segs, setSegs] = useState<Seg[]>([]);
@@ -368,7 +382,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
   const exportDub = useCallback(async () => {
     const recorded = Object.entries(takesRef.current);
     if (recorded.length === 0) {
-      setExportErr("Record at least one line first.");
+      setExportErr(t("pid.recordLineFirst"));
       setPhase("error");
       return;
     }
@@ -379,32 +393,30 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
       fd.append("uploadId", id);
       for (const [segId, take] of recorded) fd.append(`take:${segId}`, take.blob, `${segId}.webm`);
       const r = await fetch("/api/creator/dub", { method: "POST", body: fd });
-      if (!r.ok) throw new Error((await r.json()).error || "Export failed.");
+      if (!r.ok) throw new Error((await r.json()).error || t("srun.exportFailed"));
       const d = (await r.json()) as { url: string };
       setFinalUrl(d.url);
       setPhase("done");
     } catch (e) {
-      setExportErr(e instanceof Error ? e.message : "Export failed.");
+      setExportErr(e instanceof Error ? e.message : t("srun.exportFailed"));
       setPhase("error");
     }
-  }, [id]);
+  }, [id, t]);
 
   if (phase === "loading")
     return (
       <main className="g-screen">
-        <p className="mt-20 text-cream/60">Loading…</p>
+        <p className="mt-20 text-cream/60">{t("game.loading")}</p>
       </main>
     );
 
   if (phase === "empty" || !upload)
     return (
       <main className="g-screen">
-        <h1 className="g-logo mt-10">No sectors</h1>
-        <p className="mt-2 text-[14px] text-cream/60">
-          This media has no sectors yet. Open it in the creator and mark the lines first.
-        </p>
+        <h1 className="g-logo mt-10">{t("game.noSectors")}</h1>
+        <p className="mt-2 text-[14px] text-cream/60">{t("pid.noSectorsBody")}</p>
         <Link href="/play" className="mt-4 text-[13px] text-cream/60 underline">
-          Back
+          {t("game.back")}
         </Link>
       </main>
     );
@@ -417,7 +429,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
   return (
     <main className="g-screen">
       <div className="flex h-[72px] items-center">
-        <h1 className="g-logo">{upload.title || "Dub"}</h1>
+        <h1 className="g-logo">{upload.title || t("pid.dub")}</h1>
       </div>
 
       <div className="w-full max-w-2xl">
@@ -446,7 +458,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
               {buffering && (
                 <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/35">
                   <span
-                    aria-label="Loading video"
+                    aria-label={t("editor.loadingVideoAria")}
                     className="h-11 w-11 animate-spin rounded-full border-4 border-cream/25 border-t-mint"
                   />
                 </div>
@@ -479,13 +491,10 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
 
         {phase === "intro" && (
           <div className="g-panel text-center">
-            <h2 className="g-title">Dub {segs.length} lines</h2>
-            <p className="mb-4 text-[13px] text-cream/60">
-              You&apos;re in control: pick a line, listen to it, record your voice, and compare —
-              all at your own pace. Export the final video when you&apos;re ready.
-            </p>
+            <h2 className="g-title">{t("pid.dubLines", { n: segs.length })}</h2>
+            <p className="mb-4 text-[13px] text-cream/60">{t("pid.introBody")}</p>
             <button className="g-btn g-btn-start mx-auto" onClick={() => void begin()}>
-              Enter studio
+              {t("pid.enterStudio")}
             </button>
             {mic.error && <p className="mt-3 text-[13px] text-magenta">{mic.error}</p>}
           </div>
@@ -503,8 +512,8 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
                 ◀
               </button>
               <span className="font-display text-[13px] uppercase tracking-[0.1em] text-cream/60">
-                Line {cur + 1} / {segs.length} · {fmt(seg.startMs)}–{fmt(seg.endMs)}
-                {hasTake && <span className="ml-2 text-mint">● recorded</span>}
+                {t("pid.lineOf", { a: cur + 1, b: segs.length })} · {fmt(seg.startMs)}–{fmt(seg.endMs)}
+                {hasTake && <span className="ml-2 text-mint">{t("pid.recordedTag")}</span>}
               </span>
               <button
                 className="g-btn g-btn-ghost h-8 px-3 text-[13px]"
@@ -526,36 +535,36 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
                 disabled={mic.recording || !!replaying}
                 onClick={replayOriginal}
               >
-                {replaying === "orig" ? "…" : "▶ Listen"}
+                {replaying === "orig" ? "…" : t("pid.listen")}
               </button>
               <button
                 className={`g-btn h-10 text-[13px] ${mic.recording ? "bg-magenta text-cream" : "g-btn-start"}`}
                 disabled={!!replaying}
                 onClick={() => void toggleRecord()}
               >
-                {mic.recording ? "■ Stop" : hasTake ? "● Re-record" : "● Record"}
+                {mic.recording ? t("game.stop") : hasTake ? t("game.reRecord") : t("game.record")}
               </button>
               <button
                 className="g-btn g-btn-ghost h-10 text-[13px]"
                 disabled={!hasTake || mic.recording || !!replaying}
                 onClick={() => void replayMine()}
               >
-                {replaying === "mine" ? "…" : "▶ My take"}
+                {replaying === "mine" ? "…" : t("game.myTake")}
               </button>
               <button
                 className="g-btn g-btn-ghost h-10 text-[13px]"
                 disabled={cur === segs.length - 1 || mic.recording}
                 onClick={() => goTo(cur + 1)}
               >
-                Next line →
+                {t("pid.nextLine")}
               </button>
             </div>
 
             {/* Compare: original vs. yours (waveform + tone), shown once recorded */}
             {hasTake && (
               <div className="mt-4 flex flex-col gap-3">
-                <WaveTone trace={segTrace?.orig} color="#8FD4FF" label="Original" />
-                <WaveTone trace={segTrace?.mine} color="#FF3D8B" label="You" />
+                <WaveTone trace={segTrace?.orig} color="#8FD4FF" label={t("game.original")} toneLabel={t("pid.tone")} noDataLabel={t("pid.noData")} />
+                <WaveTone trace={segTrace?.mine} color="#FF3D8B" label={t("pid.you")} toneLabel={t("pid.tone")} noDataLabel={t("pid.noData")} />
               </div>
             )}
 
@@ -566,10 +575,10 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
                 disabled={recordedCount === 0 || mic.recording}
                 onClick={() => void exportDub()}
               >
-                Finish &amp; make video ({recordedCount}/{segs.length})
+                {t("pid.finishMakeVideo", { a: recordedCount, b: segs.length })}
               </button>
               <Link href="/play" className="text-[13px] text-cream/50 underline">
-                Back to media
+                {t("pid.backToMedia")}
               </Link>
             </div>
           </div>
@@ -579,9 +588,9 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
 
         {phase === "done" && (
           <div className="g-panel text-center">
-            <h2 className="g-title">Your dub is ready</h2>
+            <h2 className="g-title">{t("game.dubReady")}</h2>
             <p className="mb-4 text-[13px] text-cream/60">
-              {recordedCount} of {segs.length} lines replaced with your voice.
+              {t("pid.dubReadyBody", { a: recordedCount, b: segs.length })}
             </p>
             {finalUrl && (
               <video
@@ -593,16 +602,16 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
             )}
             <div className="flex flex-col items-center gap-3">
               <a href={downloadHref(finalUrl, `${upload?.title || "cinema-dub"}.mp4`)} className="g-btn g-btn-start">
-                ↓ Download video
+                {t("game.downloadVideo")}
               </a>
               <Link href="/dashboard" className="g-btn g-btn-ghost">
-                ← Back to dashboard
+                {t("game.backToDashboard")}
               </Link>
               <button className="g-btn g-btn-ghost" onClick={() => setPhase("studio")}>
-                Back to studio
+                {t("game.backToStudio")}
               </button>
               <Link href="/play" className="text-[13px] text-cream/50 underline">
-                Back to media
+                {t("pid.backToMedia")}
               </Link>
             </div>
           </div>
@@ -610,14 +619,14 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
 
         {phase === "error" && (
           <div className="g-panel text-center">
-            <h2 className="g-title">Export failed</h2>
-            <p className="mb-4 text-[13px] text-magenta">{exportErr || "Something went wrong."}</p>
+            <h2 className="g-title">{t("pid.exportFailedTitle")}</h2>
+            <p className="mb-4 text-[13px] text-magenta">{exportErr || t("pid.somethingWrong")}</p>
             <div className="flex flex-col items-center gap-3">
               <button className="g-btn g-btn-start" onClick={() => setPhase("studio")}>
-                Back to studio
+                {t("game.backToStudio")}
               </button>
               <Link href="/play" className="text-[13px] text-cream/50 underline">
-                Back to media
+                {t("pid.backToMedia")}
               </Link>
             </div>
           </div>

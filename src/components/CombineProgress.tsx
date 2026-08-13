@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "@/components/LanguageProvider";
 
 // Full-screen "combining" overlay shown at the end of a game while the final
 // clip is stitched together (the mux/render request). That call is a single
@@ -13,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 // to drive from the caller.
 
 export function CombineProgress({ open }: { open: boolean }) {
+  const { t } = useI18n();
   const [progress, setProgress] = useState(0);
   const easeRef = useRef<number | null>(null);
 
@@ -37,17 +39,17 @@ export function CombineProgress({ open }: { open: boolean }) {
   if (!open) return null;
 
   const pct = Math.round(progress * 100);
-  const steps = ["Gather", "Mix", "Finish"];
+  const steps = [t("cmp.combine.gather"), t("cmp.combine.mix"), t("cmp.combine.finish")];
   const activeStep = pct < 38 ? 0 : pct < 78 ? 1 : 2;
   const phase =
     activeStep === 0
-      ? "Gathering everyone's takes…"
+      ? t("cmp.combine.gathering")
       : activeStep === 1
-        ? "Mixing the audio…"
-        : "Finishing the clip…";
+        ? t("cmp.combine.mixing")
+        : t("cmp.combine.finishing");
 
   return (
-    <div className="cd-cmb-backdrop" role="dialog" aria-modal="true" aria-label="Combining the scene">
+    <div className="cd-cmb-backdrop" role="dialog" aria-modal="true" aria-label={t("cmp.combine.title")}>
       <style>{`
         .cd-cmb-backdrop{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,4,40,.66);}
         .cd-cmb-card{width:100%;max-width:430px;border-radius:22px;padding:26px;color:var(--color-cream);background:var(--color-violet);box-shadow:inset 0 0 0 3px rgba(255,255,255,.14),8px 8px 0 rgba(17,0,45,.55);}
@@ -67,8 +69,8 @@ export function CombineProgress({ open }: { open: boolean }) {
         <div className="flex items-center gap-3.5">
           <div className="cd-cmb-badge">🎬</div>
           <div>
-            <div className="font-display text-[19px] font-black leading-tight">Combining the scene</div>
-            <div className="text-[13px] font-bold text-cream/60">Stitching every dub into one clip</div>
+            <div className="font-display text-[19px] font-black leading-tight">{t("cmp.combine.title")}</div>
+            <div className="text-[13px] font-bold text-cream/60">{t("cmp.combine.sub")}</div>
           </div>
         </div>
 
@@ -115,7 +117,7 @@ export function CombineProgress({ open }: { open: boolean }) {
         </div>
 
         <p className="mt-5 text-center text-[12px] font-semibold text-cream/45">
-          Hang tight — this can take a moment for longer clips.
+          {t("cmp.combine.hangTight")}
         </p>
       </div>
     </div>

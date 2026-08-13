@@ -14,6 +14,11 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   });
   if (!upload) return NextResponse.json({ error: "Video not found." }, { status: 404 });
 
+  // Record this as a solo "run" of the video — fire-and-forget so it never
+  // delays or breaks loading the video. Powers the library's "most played
+  // today" window.
+  void db.videoPlay.create({ data: { uploadId: upload.id, mode: "solo" } }).catch(() => {});
+
   return NextResponse.json({
     video: {
       id: upload.id,

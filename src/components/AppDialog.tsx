@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useI18n } from "@/components/LanguageProvider";
 
 /**
  * App-styled replacement for the native `confirm()` / `alert()` dialogs.
@@ -71,6 +72,7 @@ function AppDialog({
   state: DialogState;
   onSettle: (value: boolean) => void;
 }) {
+  const { t } = useI18n();
   // Esc cancels, Enter confirms — only while open.
   useEffect(() => {
     if (!state.open) return;
@@ -115,7 +117,7 @@ function AppDialog({
               style={{ height: 46, fontSize: 15 }}
               onClick={() => onSettle(false)}
             >
-              {state.cancelLabel ?? "Cancel"}
+              {state.cancelLabel ?? t("common.cancel")}
             </button>
           )}
           <button
@@ -124,7 +126,7 @@ function AppDialog({
             autoFocus
             onClick={() => onSettle(true)}
           >
-            {state.confirmLabel ?? (state.kind === "alert" ? "OK" : "Confirm")}
+            {state.confirmLabel ?? (state.kind === "alert" ? t("common.ok") : t("common.confirm"))}
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useI18n } from "@/components/LanguageProvider";
 
 // The app-styled video player used in the creator/editor — a `.g-player` shell
 // with custom play/pause, scrub, mute and fullscreen controls (matching
@@ -29,6 +30,7 @@ export const VideoStage = forwardRef<
   { src?: string; sector?: Sector | null; onReadyChange?: (ready: boolean) => void }
 >(
   function VideoStage({ src, sector, onReadyChange }, ref) {
+    const { t } = useI18n();
     const videoRef = useRef<HTMLVideoElement>(null);
     const playerRef = useRef<HTMLDivElement>(null);
     const stopAtRef = useRef<number | null>(null);
@@ -247,7 +249,7 @@ export const VideoStage = forwardRef<
           {buffering && !!src && (
             <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/35">
               <span
-                aria-label="Loading video"
+                aria-label={t("editor.loadingVideoAria")}
                 className="h-11 w-11 animate-spin rounded-full border-4 border-cream/25 border-t-mint"
               />
             </div>
@@ -258,7 +260,7 @@ export const VideoStage = forwardRef<
         <div className="flex items-center gap-2 bg-[#160427] px-3 py-2.5 sm:gap-3">
           <button
             onClick={togglePlay}
-            aria-label={playing ? "Pause" : "Play"}
+            aria-label={playing ? t("editor.pause") : t("editor.play")}
             className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-[#0b3d2c] shadow-[inset_0_0_0_2px_#b6ffe0,0_3px_0_0_#2a8b65] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#b6ffe0,0_1px_0_0_#2a8b65]"
             style={{ background: "linear-gradient(0deg, #37c491 0%, #5cffb6 100%)" }}
           >
@@ -294,7 +296,7 @@ export const VideoStage = forwardRef<
 
           <button
             onClick={toggleMute}
-            aria-label={muted ? "Unmute" : "Mute"}
+            aria-label={muted ? t("editor.unmute") : t("editor.mute")}
             className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#8952dc,0_1px_0_0_rgba(17,0,69,0.4)]"
             style={{ background: "rgba(37, 28, 92, 0.6)" }}
           >
@@ -303,7 +305,7 @@ export const VideoStage = forwardRef<
 
           <button
             onClick={toggleFullscreen}
-            aria-label="Fullscreen"
+            aria-label={t("editor.fullscreen")}
             className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#8952dc,0_1px_0_0_rgba(17,0,69,0.4)]"
             style={{ background: "rgba(37, 28, 92, 0.6)" }}
           >

@@ -124,10 +124,25 @@ model VideoUpload {
   autoError     String    @default("")
   segments   VideoSegment[]
   ratings    VideoRating[]
+  plays      VideoPlay[]
   createdAt  DateTime       @default(now())
 
   @@index([userId])
   @@index([visibility])
+}
+
+// One recorded playthrough ("run") of a library video: written when a solo run
+// loads the video or a party locks it in to dub. Counted per day to rank the
+// library's "most played today" window — a run = a launch, so a refresh/replay
+// counts again, which is what "how often it's played today" should measure.
+model VideoPlay {
+  id        String      @id @default(cuid())
+  upload    VideoUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  uploadId  String
+  mode      String      @default("solo") // 'solo' | 'party'
+  createdAt DateTime    @default(now())
+
+  @@index([uploadId, createdAt])
 }
 
 // A 0–5 star rating a player gave a video after dubbing it (solo run or party).

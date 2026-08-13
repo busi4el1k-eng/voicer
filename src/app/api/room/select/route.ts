@@ -71,6 +71,10 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
+  // Record this as a party "run" of the video (one per launch), for the
+  // library's "most played today" window. Fire-and-forget.
+  void db.videoPlay.create({ data: { uploadId, mode: "party" } }).catch(() => {});
+
   emitRoom(code); // everyone jumps into the studio on the chosen video
   return NextResponse.json({ room: await roomView(code) });
 }

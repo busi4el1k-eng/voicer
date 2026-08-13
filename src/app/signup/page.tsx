@@ -1,5 +1,6 @@
 import { SignUp } from "@clerk/nextjs";
 import { ClerkGate } from "@/components/ClerkResilientProvider";
+import { T } from "@/components/LanguageProvider";
 import { clerkAppearance } from "@/lib/clerk-appearance";
 
 export default function SignupPage() {
@@ -10,7 +11,7 @@ export default function SignupPage() {
           Cinema <em>Dub</em>
         </h1>
         <p className="mt-2 font-display text-[14px] font-bold uppercase tracking-[0.06em] text-cream/55">
-          Grab a mic — create your account
+          <T k="auth.signupSubtitle" />
         </p>
       </header>
       <div className="w-full max-w-[400px]">

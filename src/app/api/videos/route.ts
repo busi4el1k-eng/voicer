@@ -42,6 +42,26 @@ export async function GET() {
     ratingRows.map((r) => [r.uploadId, { avg: r._avg.stars ?? 0, count: r._count }]),
   );
 
+  // Play counts, for the library's "most played today" window. We grab both the
+  // all-time total and the count since the start of the current (UTC) day, in
+  // two grouped queries. A "run" (VideoPlay row) is written each time a solo run
+  // loads the video or a party locks it in.
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  const uploadIds = uploads.map((u) => u.id);
+  const [playRows, todayPlayRows] = uploads.length
+    ? await Promise.all([
+        db.videoPlay.groupBy({ by: ["uploadId"], where: { uploadId: { in: uploadIds } }, _count: true }),
+        db.videoPlay.groupBy({
+          by: ["uploadId"],
+          where: { uploadId: { in: uploadIds }, createdAt: { gte: startOfToday } },
+          _count: true,
+        }),
+      ])
+    : [[], []];
+  const playsByUpload = new Map(playRows.map((r) => [r.uploadId, r._count]));
+  const todayPlaysByUpload = new Map(todayPlayRows.map((r) => [r.uploadId, r._count]));
+
   // Public videos need a share code so anyone can look them up / play them.
   // Backfill any missing or legacy-length codes on read (same as the jobs list).
   const videos = [];
@@ -72,6 +92,10 @@ export async function GET() {
       // Average 0–5 rank and how many players have rated it (0 = unrated yet).
       rating: rating ? Math.round(rating.avg * 10) / 10 : 0,
       ratingCount: rating?.count ?? 0,
+      // How many times the video has been run (played/dubbed), all-time and
+      // today, for the library's "most played today" window.
+      playCount: playsByUpload.get(u.id) ?? 0,
+      todayPlayCount: todayPlaysByUpload.get(u.id) ?? 0,
       createdAt: u.createdAt,
     });
   }

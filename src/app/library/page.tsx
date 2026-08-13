@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AccountBar } from "@/components/AccountBar";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useI18n } from "@/components/LanguageProvider";
 import { VideoThumb } from "@/components/VideoThumb";
 import { formatShareId } from "@/lib/share-id";
@@ -25,6 +24,8 @@ type Video = {
   creatorColor: string;
   rating: number; // average 0–5 rank (0 = unrated)
   ratingCount: number;
+  playCount: number; // times the video has been run (played/dubbed), all-time
+  todayPlayCount: number; // times it's been run today
   createdAt: string;
 };
 
@@ -36,11 +37,12 @@ const fmtDuration = (ms: number) => {
 
 // ── Sorting: pick one field to order by, plus one direction (ascending or
 // descending). Fields are mutually exclusive; the direction toggle flips them. ─
-type SortField = "date" | "rating" | "sectors" | "length";
+type SortField = "date" | "rating" | "popular" | "sectors" | "length";
 type SortDir = "asc" | "desc";
 // Labels are i18n keys, translated where the chips render.
 const FIELDS: { key: SortField; labelKey: string }[] = [
   { key: "date", labelKey: "lib.field.date" },
+  { key: "popular", labelKey: "lib.field.popular" },
   { key: "rating", labelKey: "lib.field.rated" },
   { key: "sectors", labelKey: "lib.field.sectors" },
   { key: "length", labelKey: "lib.field.length" },
@@ -53,6 +55,11 @@ const fieldValue = (v: Video, field: SortField): number => {
       return new Date(v.createdAt).getTime() || 0;
     case "rating":
       return v.rating;
+    // Popularity = how many people rated it. The most-often-rated videos rank
+    // highest; ties break on the average score so a well-liked video edges out
+    // an equally-rated but lower-scored one.
+    case "popular":
+      return v.ratingCount * 6 + v.rating;
     case "sectors":
       return v.lines;
     case "length":
@@ -67,6 +74,27 @@ const sortVideos = (list: Video[], field: SortField, dir: SortDir): Video[] => {
 
 // How many videos to show per page in the library.
 const PER_PAGE = 25;
+
+// How many videos the "Trending today" window shows.
+const TRENDING_COUNT = 5;
+
+// Most popular today: the videos that were run (played/dubbed) the most times
+// today. On a quiet day with no runs yet, we fall back to the all-time
+// most-played videos so the window is still useful rather than empty —
+// `fallback` tells the UI which set it's showing so it can label it and show
+// the matching count.
+type Trending = { videos: Video[]; fallback: boolean };
+const topTrending = (list: Video[]): Trending => {
+  const today = list
+    .filter((v) => v.todayPlayCount > 0)
+    .sort((a, b) => b.todayPlayCount - a.todayPlayCount || b.playCount - a.playCount);
+  if (today.length > 0) return { videos: today.slice(0, TRENDING_COUNT), fallback: false };
+
+  const allTime = list
+    .filter((v) => v.playCount > 0)
+    .sort((a, b) => b.playCount - a.playCount || b.rating - a.rating);
+  return { videos: allTime.slice(0, TRENDING_COUNT), fallback: true };
+};
 
 // The shared Video library: public videos any user can browse and dub. Mirrors
 // the creator's "Your videos" list layout, but read-only + open to everyone.
@@ -85,6 +113,8 @@ export default function LibraryPage() {
 
   // Ordered list, recomputed only when the videos or sort inputs change.
   const shown = useMemo(() => sortVideos(videos, field, dir), [videos, field, dir]);
+  // Today's top-5 trending (falls back to all-time top-rated on a quiet day).
+  const trending = useMemo(() => topTrending(videos), [videos]);
 
   const pageCount = Math.max(1, Math.ceil(shown.length / PER_PAGE));
   const current = Math.min(page, pageCount); // clamp if the list shrank
@@ -121,7 +151,6 @@ export default function LibraryPage() {
   return (
     <main className="g-screen">
       <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
-        <LanguageSwitcher />
         <AccountBar />
       </div>
 
@@ -131,7 +160,7 @@ export default function LibraryPage() {
         </h1>
       </div>
 
-      <div className="w-full max-w-3xl">
+      <div className="w-full">
         <h2 className="g-title">
           {t("lib.publicVideos")}{" "}
           {loaded ? (
@@ -144,6 +173,59 @@ export default function LibraryPage() {
           )}
         </h2>
 
+        {/* Content: on desktop, a left sidebar (trending) beside the video
+            list; on phones they stack (trending above the full list), since two
+            columns can't sit side-by-side on a narrow screen. */}
+        <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-start lg:justify-center">
+          {/* Trending today: a compact window of the 5 videos pulling in the
+              most ratings today. On desktop it's the left column (sticky so it
+              stays in view while the list scrolls); hidden on a quiet day. */}
+          {loaded && trending.videos.length > 0 && (
+            <aside className="w-full lg:sticky lg:top-4 lg:w-[290px] lg:flex-none">
+              <div className="rounded-[14px] bg-gradient-to-br from-[rgba(255,61,139,0.14)] to-[rgba(255,210,63,0.10)] p-3 shadow-[inset_0_0_0_2px_rgba(255,61,139,0.35)]">
+                <div className="mb-2 flex items-center gap-1.5">
+                  <span aria-hidden className="text-[15px]">🔥</span>
+                  <h3 className="font-display text-[14px] font-black uppercase tracking-[0.06em] text-cream">
+                    {t(trending.fallback ? "lib.trending.mostPlayed" : "lib.trending.title")}
+                  </h3>
+                </div>
+                <ol className="flex flex-col gap-1">
+                  {trending.videos.map((v, i) => {
+                    // Runs today when we have today's data; otherwise (fallback)
+                    // the all-time run total.
+                    const count = trending.fallback ? v.playCount : v.todayPlayCount;
+                    return (
+                      <li key={v.id}>
+                        <button
+                          onClick={() => setChosen(v)}
+                          title={t("lib.dubThis")}
+                          className="flex w-full items-center gap-2.5 rounded-[9px] px-2 py-1.5 text-left transition hover:bg-cream/[0.06]"
+                        >
+                          <span className="w-4 flex-none text-center font-display text-[14px] font-black text-sun">
+                            {i + 1}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-cream">
+                            {v.title || t("lib.untitled")}
+                          </span>
+                          <span
+                            className="flex flex-none items-center gap-1 text-[12px] text-cream/70"
+                            title={t("lib.trending.runs", { n: count })}
+                          >
+                            <span className="text-sun">▶</span>
+                            <span className="font-display font-bold text-cream/85">{count}</span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            </aside>
+          )}
+
+          {/* Main column: sort bar + the full video list + pagination. On
+              desktop it sits to the right of the trending sidebar. */}
+          <div className="w-full min-w-0 flex-1 lg:max-w-[720px]">
         {/* Sort bar: pick one field to order by + a direction toggle. Only
             shown once there are videos to sort. */}
         {loaded && videos.length > 0 && (
@@ -310,6 +392,8 @@ export default function LibraryPage() {
             </button>
           </div>
         )}
+          </div>
+        </div>
 
         <div className="mt-6 text-center">
           <Link href="/dashboard" className="text-[13px] text-cream/50 underline">

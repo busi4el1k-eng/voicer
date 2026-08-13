@@ -4,15 +4,16 @@ import { use, useCallback, useEffect, useRef, useState, useSyncExternalStore } f
 import Link from "next/link";
 import { formatShareId } from "@/lib/share-id";
 import { MAX_PLAYERS } from "@/lib/room-code";
+import { useI18n } from "@/components/LanguageProvider";
 import { AutoDetectProgress, type AutoState } from "@/components/AutoDetectProgress";
 
-// Label for the auto-detect progress window, derived from the eased bar since
-// the backend job only reports a coarse status.
-function autoPhaseFor(p: number): string {
-  if (p < 0.3) return "Listening to the audio…";
-  if (p < 0.62) return "Transcribing the dialogue…";
-  if (p < 0.95) return "Placing the sectors…";
-  return "Finishing up…";
+// i18n key for the auto-detect progress window, derived from the eased bar since
+// the backend job only reports a coarse status. Translated at the call site.
+function autoPhaseKeyFor(p: number): string {
+  if (p < 0.3) return "editor.phase.listening";
+  if (p < 0.62) return "editor.phase.transcribing";
+  if (p < 0.95) return "editor.phase.placing";
+  return "editor.phase.finishing";
 }
 
 type Seg = {
@@ -101,6 +102,7 @@ function Badge({ children, className = "" }: { children: React.ReactNode; classN
 
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { t } = useI18n();
 
   // Touch/mobile devices get tap-drag instructions (and no keyboard hints).
   // We treat either a coarse pointer OR the narrow mobile layout (matching the
@@ -285,7 +287,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         .reduce((m, s) => Math.min(m, s.startMs), durMs);
       end = Math.min(end, nextStart);
       if (end <= start) {
-        setMsg(`No room for a Player ${activePlayer} sector there.`);
+        setMsg(t("editor.noRoom", { n: activePlayer }));
         return;
       }
       const key = uid();
@@ -303,7 +305,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       ]);
       setSelected(key);
     },
-    [segs, durMs, activePlayer],
+    [segs, durMs, activePlayer, t],
   );
 
   // Drop a sector mark at `at`: the first mark sets the start, the second
@@ -699,10 +701,10 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uploadId: id, durationMs: durMs, segments: segs }),
       });
-      if (!r.ok) throw new Error((await r.json()).error || "Save failed.");
-      setMsg("Saved.");
+      if (!r.ok) throw new Error((await r.json()).error || t("editor.saveFailed"));
+      setMsg(t("editor.saved"));
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Save failed.");
+      setMsg(e instanceof Error ? e.message : t("editor.saveFailed"));
     } finally {
       setBusy("");
     }
@@ -728,7 +730,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     setAutoCount(0);
     setAutoDetState("working");
     setAutoProg(0);
-    setAutoPhase(autoPhaseFor(0));
+    setAutoPhase(t(autoPhaseKeyFor(0)));
     setAutoOpen(true);
     const startedAt = Date.now();
     stopAutoEase();
@@ -736,7 +738,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       const el = (Date.now() - startedAt) / 1000;
       const p = Math.min(0.95, 0.04 + 0.91 * (1 - Math.exp(-el / 22)));
       setAutoProg(p);
-      setAutoPhase(autoPhaseFor(p));
+      setAutoPhase(t(autoPhaseKeyFor(p)));
     }, 120);
 
     try {
@@ -745,7 +747,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uploadId: id, speakersExpected: speakers }),
       });
-      if (!start.ok) throw new Error((await start.json()).error || "Auto-detect failed.");
+      if (!start.ok) throw new Error((await start.json()).error || t("editor.autoFailed"));
 
       // Poll for completion (up to ~10 min for long clips).
       const deadline = Date.now() + 10 * 60_000;
@@ -757,8 +759,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           error?: string;
           segments?: Upload["segments"];
         };
-        if (!r.ok) throw new Error(d.error || "Auto-detect failed.");
-        if (d.status === "error") throw new Error(d.error || "Auto-detect failed.");
+        if (!r.ok) throw new Error(d.error || t("editor.autoFailed"));
+        if (d.status === "error") throw new Error(d.error || t("editor.autoFailed"));
         if (d.status === "ready") {
           const detected = d.segments ?? [];
           setSegs(
@@ -778,16 +780,16 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           setAutoProg(1);
           setAutoCount(detected.length);
           setAutoDetState("done");
-          setMsg(detected.length ? `Detected ${detected.length} sectors.` : "No speech detected.");
+          setMsg(detected.length ? t("editor.detected", { n: detected.length }) : t("editor.noSpeech"));
           break;
         }
-        if (Date.now() > deadline) throw new Error("Auto-detect timed out.");
+        if (Date.now() > deadline) throw new Error(t("editor.autoTimeout"));
       }
     } catch (e) {
       stopAutoEase();
       setAutoDetState("error");
-      setAutoErr(e instanceof Error ? e.message : "Auto-detect failed.");
-      setMsg(e instanceof Error ? e.message : "Auto-detect failed.");
+      setAutoErr(e instanceof Error ? e.message : t("editor.autoFailed"));
+      setMsg(e instanceof Error ? e.message : t("editor.autoFailed"));
     } finally {
       setBusy("");
     }
@@ -822,7 +824,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   if (!upload) {
     return (
       <main className="g-screen">
-        <p className="mt-20 text-cream/60">Loading…</p>
+        <p className="mt-20 text-cream/60">{t("editor.loading")}</p>
       </main>
     );
   }
@@ -842,19 +844,19 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-cream/20 border-t-mint" />
           <div className="text-center">
             <p className="font-display text-[17px] font-black text-cream">
-              {durMs <= 0 ? "Loading the video…" : "Reading the audio…"}
+              {durMs <= 0 ? t("editor.loadingVideo") : t("editor.readingAudio")}
             </p>
-            <p className="mt-1 text-[13px] text-cream/50">Getting your timeline ready</p>
+            <p className="mt-1 text-[13px] text-cream/50">{t("editor.gettingReady")}</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em]">
               <span className={`h-2 w-2 rounded-full ${durMs > 0 ? "bg-mint" : "bg-cream/25"}`} />
-              <span className={durMs > 0 ? "text-mint" : "text-cream/40"}>Video</span>
+              <span className={durMs > 0 ? "text-mint" : "text-cream/40"}>{t("editor.video")}</span>
             </span>
             <span className="h-px w-6 bg-cream/20" />
             <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em]">
               <span className={`h-2 w-2 rounded-full ${waveDone ? "bg-mint" : "bg-cream/25"}`} />
-              <span className={waveDone ? "text-mint" : "text-cream/40"}>Audio</span>
+              <span className={waveDone ? "text-mint" : "text-cream/40"}>{t("editor.audio")}</span>
             </span>
           </div>
         </div>
@@ -864,12 +866,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/creator"
-            title="Back to my videos"
+            title={t("editor.backToVideos")}
             className="grid h-10 w-10 flex-none place-items-center rounded-[10px] border-2 border-violet-lift bg-violet-deep/60 text-[18px] text-cream transition hover:border-mint"
           >
             ←
           </Link>
-          <h1 className="g-logo truncate">{upload.title || "Untitled"}</h1>
+          <h1 className="g-logo truncate">{upload.title || t("lib.untitled")}</h1>
         </div>
         {upload.shareId && (
           <button
@@ -879,11 +881,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               setCopied(true);
               window.setTimeout(() => setCopied(false), 1500);
             }}
-            title="Copy share code"
+            title={t("creator.copyShare")}
             className="flex items-center gap-2 rounded-[10px] border-2 border-violet-lift bg-violet-deep/60 px-3 py-2 text-cream transition hover:border-mint"
           >
             <span className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/50">
-              Share code
+              {t("editor.shareCode")}
             </span>
             <span className="font-display text-[16px] font-black tracking-[0.12em] text-mint tnum">
               {formatShareId(upload.shareId)}
@@ -898,7 +900,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       <div className="flex w-full max-w-4xl flex-col gap-4">
         {/* Video preview */}
         <div className="g-panel">
-          <SectionHead icon="🎬" title="Preview">
+          <SectionHead icon="🎬" title={t("editor.preview")}>
             <Badge>
               {fmt(playhead)} <span className="text-cream/40">/</span> {fmt(durMs)}
             </Badge>
@@ -942,7 +944,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {buffering && (
                 <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/35">
                   <span
-                    aria-label="Loading video"
+                    aria-label={t("editor.loadingVideoAria")}
                     className="h-11 w-11 animate-spin rounded-full border-4 border-cream/25 border-t-mint"
                   />
                 </div>
@@ -953,7 +955,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             <div className="flex items-center gap-2 bg-[#160427] px-3 py-2.5 sm:gap-3">
               <button
                 onClick={togglePlay}
-                aria-label={playing ? "Pause" : "Play"}
+                aria-label={playing ? t("editor.pause") : t("editor.play")}
                 className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-[#0b3d2c] shadow-[inset_0_0_0_2px_#b6ffe0,0_3px_0_0_#2a8b65] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#b6ffe0,0_1px_0_0_#2a8b65]"
                 style={{ background: "linear-gradient(0deg, #37c491 0%, #5cffb6 100%)" }}
               >
@@ -990,7 +992,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
               <button
                 onClick={toggleMute}
-                aria-label={muted ? "Unmute" : "Mute"}
+                aria-label={muted ? t("editor.unmute") : t("editor.mute")}
                 className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#8952dc,0_1px_0_0_rgba(17,0,69,0.4)]"
                 style={{ background: "rgba(37, 28, 92, 0.6)" }}
               >
@@ -999,7 +1001,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
               <button
                 onClick={toggleFullscreen}
-                aria-label="Fullscreen"
+                aria-label={t("editor.fullscreen")}
                 className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#8952dc,0_1px_0_0_rgba(17,0,69,0.4)]"
                 style={{ background: "rgba(37, 28, 92, 0.6)" }}
               >
@@ -1015,7 +1017,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           <textarea
             value={sel.transcript}
             onChange={(e) => updateSel({ transcript: e.target.value })}
-            placeholder="Type the line spoken in this sector…"
+            placeholder={t("editor.linePlaceholder")}
             rows={2}
             className="w-full resize-none rounded-[12px] bg-violet-deep/60 px-4 py-3 text-center font-display text-[20px] leading-[1.4] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
           />
@@ -1023,15 +1025,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
         {/* Timeline */}
         <div className="g-panel">
-          <SectionHead icon="🎞️" title="Timeline">
+          <SectionHead icon="🎞️" title={t("editor.timeline")}>
             <div className="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2">
               {/* Zoom: one button cycling fixed steps (1× → 1.5× → 2× → 4×). */}
               <button
                 type="button"
                 onClick={cycleZoom}
                 disabled={durMs <= 0}
-                title="Timeline zoom — tap to cycle"
-                aria-label={`Timeline zoom ${zoom}×, tap to change`}
+                title={t("editor.zoomTitle")}
+                aria-label={t("editor.zoomAria", { zoom })}
                 className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black tabular-nums text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[1px] disabled:opacity-35 sm:px-3"
                 style={{ background: "rgba(37, 28, 92, 0.6)" }}
               >
@@ -1039,7 +1041,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               </button>
               {/* Sector count — hidden on phones so the buttons stay on one row. */}
               <Badge className="hidden text-mint sm:inline-flex">
-                {segs.length} {segs.length === 1 ? "sector" : "sectors"}
+                {segs.length} {segs.length === 1 ? t("editor.sector") : t("editor.sectors")}
               </Badge>
               {/* Player of the SELECTED sector — click cycles which player dubs
                   it (and becomes the default for the next new sector). */}
@@ -1051,12 +1053,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   if (sel) updateSel({ player: np });
                   setActivePlayer(np);
                 }}
-                title="Which player dubs the selected sector — click to change"
+                title={t("editor.whichPlayer")}
                 className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_3px_0_rgba(31,7,51,0.35)] transition-transform active:translate-y-[1px] sm:px-3"
                 style={{ background: playerColor(sel?.player ?? activePlayer) }}
               >
                 🎙 <span className="sm:hidden">P{sel?.player ?? activePlayer}</span>
-                <span className="hidden sm:inline">Player {sel?.player ?? activePlayer}</span>
+                <span className="hidden sm:inline">{t("creator.playerN", { n: sel?.player ?? activePlayer })}</span>
               </button>
               {/* Expected number of speakers for auto-detect — click to cycle
                   1..MAX_PLAYERS. Hints the diarizer so it separates the voices. */}
@@ -1064,7 +1066,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 type="button"
                 onClick={() => setSpeakers((n) => (n % MAX_PLAYERS) + 1)}
                 disabled={durMs <= 0 || busy === "auto"}
-                title="How many people speak in this clip — auto-detect uses this to separate voices"
+                title={t("editor.speakersTitle")}
                 className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black tabular-nums text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[1px] disabled:opacity-35 sm:px-3"
                 style={{ background: "rgba(37, 28, 92, 0.6)" }}
               >
@@ -1074,25 +1076,25 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 onClick={autoDetect}
                 className="g-btn g-btn-ghost h-9 flex-none px-3 text-[13px] sm:px-4"
                 disabled={durMs <= 0 || busy === "auto"}
-                title="Let AI listen to the audio and create sectors (replaces current ones)"
+                title={t("editor.autoTitle")}
               >
-                {busy === "auto" ? "🪄 Detecting…" : (
+                {busy === "auto" ? `🪄 ${t("editor.detecting")}` : (
                   <>
-                    🪄 Auto<span className="hidden sm:inline">-detect</span>
+                    🪄 {t("editor.auto")}<span className="hidden sm:inline">{t("editor.autoSuffix")}</span>
                   </>
                 )}
               </button>
               <button
                 onClick={() => sel && deleteSeg(sel.key)}
                 disabled={!sel}
-                title="Delete the selected sector"
+                title={t("editor.deleteSectorTitle")}
                 className="g-btn h-9 flex-none px-3 text-[13px] text-cream disabled:opacity-35 sm:px-4"
                 style={{
                   background: "linear-gradient(0deg, #d61f6c 0%, #ff3d8b 100%)",
                   boxShadow: "inset 0 0 0 2px #ffb0d2, 0 4px 0 0 #a4165a",
                 }}
               >
-                ✕ Delete<span className="hidden sm:inline"> sector</span>
+                ✕ {t("editor.delete")}<span className="hidden sm:inline">{t("editor.sectorSuffix")}</span>
               </button>
             </div>
           </SectionHead>
@@ -1169,7 +1171,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                           : "inset 0 0 0 2px rgba(255,255,255,0.35), 0 3px 0 rgba(31,7,51,0.3)",
                         zIndex: isSel ? 20 : 10,
                       }}
-                      title={s.transcript || `Sector ${i + 1}`}
+                      title={s.transcript || t("editor.sectorN", { n: i + 1 })}
                     >
                       <span
                         onPointerDown={(e) => startDrag(e, s, "left")}
@@ -1213,37 +1215,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             </span>
             {pendingStart !== null ? (
               <span className="text-magenta">
-                {isTouch ? (
-                  <>Tap the timeline again to set the sector end · tap a sector to cancel.</>
-                ) : (
-                  <>
-                    Click the timeline again (or press{" "}
-                    <kbd className="font-display font-bold">Ctrl</kbd>) to set the sector end · Esc to
-                    cancel.
-                  </>
-                )}
+                {isTouch ? t("editor.helpPending.touch") : t("editor.helpPending.pc")}
               </span>
             ) : isTouch ? (
-              <span>
-                Tap the timeline to mark a sector start, then tap again for its end · drag the{" "}
-                <span className="text-sun">◆</span> playhead to scrub · tap a sector to select &amp;
-                play · drag a sector to move it, drag its <b className="text-cream/80">edges</b> to
-                resize · tap a sector then <b className="text-cream/80">Delete</b> in the toolbar to remove ·{" "}
-                <b className="text-cream/80">zoom</b> in and drag an empty part of the timeline to
-                scroll. Different players&apos; sectors may overlap (they play at the same time); one player&apos;s can&apos;t.
-              </span>
+              <span>{t("editor.help.touch")}</span>
             ) : (
-              <span>
-                Click the timeline to mark a sector start, then click again for its end · drag the{" "}
-                <span className="text-sun">◆</span> playhead to scrub ·{" "}
-                <kbd className="font-display font-bold text-cream/80">Space</kbd> play/pause ·{" "}
-                <kbd className="font-display font-bold text-cream/80">←/→</kbd> jump 5s ·{" "}
-                <kbd className="font-display font-bold text-cream/80">Ctrl</kbd> also marks a sector.
-                Drag a sector to move it, its edges to resize;{" "}
-                <kbd className="font-display font-bold text-cream/80">Delete</kbd> removes ·{" "}
-                <b className="text-cream/80">zoom</b> in and drag an empty part of the timeline to
-                scroll. Different players&apos; sectors may overlap (they play at the same time); one player&apos;s can&apos;t.
-              </span>
+              <span>{t("editor.help.pc")}</span>
             )}
           </div>
         </div>
@@ -1254,13 +1231,13 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             href="/creator"
             className="font-display text-[13px] font-bold text-cream/55 transition hover:text-cream"
           >
-            ← Back to uploads
+            ← {t("editor.backToUploads")}
           </Link>
           <div className="flex items-center gap-3">
             {msg && (
               <span
                 className={`font-display text-[13px] font-bold ${
-                  msg === "Saved." ? "text-mint" : "text-magenta"
+                  msg === t("editor.saved") ? "text-mint" : "text-magenta"
                 }`}
               >
                 {msg}
@@ -1271,7 +1248,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               disabled={!!busy}
               className="g-btn g-btn-primary h-12 px-7 text-[16px] disabled:opacity-60"
             >
-              {busy === "save" ? "Saving…" : "💾 Save sectors"}
+              {busy === "save" ? t("common.saving") : `💾 ${t("editor.saveSectors")}`}
             </button>
           </div>
         </div>

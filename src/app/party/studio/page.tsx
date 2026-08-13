@@ -12,6 +12,7 @@ import { CombineProgress } from "@/components/CombineProgress";
 import { ClapperCountdown } from "@/components/ClapperCountdown";
 import { RateVideo } from "@/components/RateVideo";
 import { downloadHref } from "@/lib/download";
+import { useI18n } from "@/components/LanguageProvider";
 import { useRoom } from "@/lib/useRoom";
 
 type Seg = {
@@ -36,7 +37,8 @@ const fmt = (ms: number) => {
 export default function PartyStudioPage() {
   const router = useRouter();
   const mic = useMic();
-  const { room, playerId, inRoom, isHost, hydrated, restart } = useRoom({
+  const { t } = useI18n();
+  const { room, playerId, inRoom, isHost, hydrated } = useRoom({
     displayName: "",
     avatarColor: "",
   });
@@ -53,7 +55,11 @@ export default function PartyStudioPage() {
   const [err, setErr] = useState("");
   const [renderBusy, setRenderBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  // Ratings are mandatory before leaving: pressing "back to dashboard" reveals
+  // them, and the exit only unlocks once each required rating is saved.
   const [showRating, setShowRating] = useState(false);
+  const [videoSaved, setVideoSaved] = useState(false);
+  const [playersSaved, setPlayersSaved] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
 
   const stageRef = useRef<VideoStageHandle>(null);
@@ -107,6 +113,40 @@ export default function PartyStudioPage() {
       cancelled = true;
     };
   }, [room?.videoUploadId, mySeat]);
+
+  // Same-party rematch: because the host leaving no longer tears the room down,
+  // a player can sit on the result screen while the host starts the next game on
+  // a new video — this page stays mounted. When the room's video actually
+  // changes, wipe the previous round's local state so the fresh game doesn't
+  // inherit old takes, waveforms or the rating gate.
+  const prevVideoIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const vid = room?.videoUploadId ?? null;
+    if (vid === prevVideoIdRef.current) return;
+    const isRematch = prevVideoIdRef.current !== null && vid !== null;
+    prevVideoIdRef.current = vid;
+    if (!isRematch) return;
+    if (capRef.current != null) {
+      clearTimeout(capRef.current);
+      capRef.current = null;
+    }
+    if (countdownRef.current != null) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setCountdown(null);
+    setCur(0);
+    takesRef.current = {};
+    setTakes({});
+    setOrigWave({});
+    setTakeWave({});
+    setVideoReady(false);
+    setErr("");
+    setRenderBusy(false);
+    setShowRating(false);
+    setVideoSaved(false);
+    setPlayersSaved(false);
+  }, [room?.videoUploadId]);
 
   // Decode the source once and precompute each of my sectors' original envelope.
   useEffect(() => {
@@ -232,7 +272,7 @@ export default function PartyStudioPage() {
   const submitMine = useCallback(async () => {
     const recorded = Object.entries(takesRef.current);
     if (recorded.length === 0 || !room || !playerId) {
-      setErr("Record your sectors first.");
+      setErr(t("pstud.submitFirst"));
       return;
     }
     setErr("");
@@ -243,13 +283,13 @@ export default function PartyStudioPage() {
       fd.append("playerId", playerId);
       for (const [segId, take] of recorded) fd.append(`take:${segId}`, take.blob, `${segId}.webm`);
       const r = await fetch("/api/room/submit", { method: "POST", body: fd });
-      if (!r.ok) throw new Error((await r.json()).error || "Submit failed.");
+      if (!r.ok) throw new Error((await r.json()).error || t("pstud.submitFailed"));
       // `mySubmitted` will flip to true via the room poll; nothing else to do.
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Submit failed.");
+      setErr(e instanceof Error ? e.message : t("pstud.submitFailed"));
       setPhase("summary");
     }
-  }, [room, playerId]);
+  }, [room, playerId, t]);
 
   // Host renders the final combined clip once everyone is finished.
   const renderFinal = useCallback(async () => {
@@ -262,23 +302,25 @@ export default function PartyStudioPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ code: room.code, playerId }),
       });
-      if (!r.ok) throw new Error((await r.json()).error || "Render failed.");
+      if (!r.ok) throw new Error((await r.json()).error || t("pstud.renderFailed"));
       // room flips to "finished" + finalUrl via the poll → result shows for all.
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Render failed.");
+      setErr(e instanceof Error ? e.message : t("pstud.renderFailed"));
     } finally {
       setRenderBusy(false);
     }
-  }, [room, playerId]);
+  }, [room, playerId, t]);
 
-  // Host returns to the lobby but KEEPS the party — members stay in the room and
-  // will be pulled into the next game. Members just navigate; they never leave
-  // the room on their own (only the host controls it).
-  const backToLobby = useCallback(async () => {
+  // Leaving is per-player: whoever taps this just goes to their own dashboard.
+  // The host no longer resets the room on the way out, so the party stays
+  // "finished" — every other player keeps their result screen and leaves on
+  // their own. They're pulled into the next game only when the host actually
+  // starts one (the room flips to "playing"/"dubbing"), never dragged to the
+  // dashboard just because the host left.
+  const backToLobby = useCallback(() => {
     setLeaving(true);
-    if (isHost) await restart("lobby");
     router.push("/dashboard");
-  }, [isHost, restart, router]);
+  }, [router]);
 
   // --- render ---------------------------------------------------------------
 
@@ -309,10 +351,10 @@ export default function PartyStudioPage() {
           </span>
           <span className="flex-1 truncate font-display text-[14px] font-bold text-cream">
             P{p.seat} · {p.displayName}
-            {p.id === playerId && <span className="text-cream/50"> (you)</span>}
+            {p.id === playerId && <span className="text-cream/50"> {t("common.you")}</span>}
             {p.isHost && (
               <span className="ml-2 rounded-[6px] bg-sun px-2 py-0.5 font-display text-[10px] font-black uppercase text-ink">
-                Host
+                {t("common.host")}
               </span>
             )}
           </span>
@@ -321,19 +363,19 @@ export default function PartyStudioPage() {
               p.status === "finished" ? "text-mint" : "text-sun"
             }`}
           >
-            {p.status === "finished" ? "✓ Finished" : "● In progress"}
+            {p.status === "finished" ? t("pstud.finished") : t("pstud.inProgress")}
           </span>
         </div>
       ))}
     </div>
   );
 
-  const title = video?.title || "Party dub";
+  const title = video?.title || t("pstud.partyDub");
 
   if (!room || phase === "loading") {
     return (
       <main className="g-screen">
-        <p className="mt-20 text-cream/60">Loading…</p>
+        <p className="mt-20 text-cream/60">{t("game.loading")}</p>
       </main>
     );
   }
@@ -347,71 +389,94 @@ export default function PartyStudioPage() {
       <div className={`w-full ${isRunView ? "max-w-6xl" : "max-w-2xl"}`}>
         {/* Everyone sees the finished video once the host renders it. */}
         {showResult ? (
+          (() => {
+            const others = room.players.filter((p) => p.id !== playerId);
+            const needVideo = !!room.videoUploadId;
+            const needPlayers = others.length > 0;
+            const canRate = !!playerId && (needVideo || needPlayers);
+            const ratingsDone =
+              (!needVideo || videoSaved) && (!needPlayers || playersSaved);
+            return (
           <div className="g-panel text-center">
-            <h2 className="g-title">The party dub is ready</h2>
-            <p className="mb-4 text-[13px] text-cream/60">
-              Everyone&apos;s voices, combined into one clip.
-            </p>
+            <h2 className="g-title">{t("pstud.dubReadyTitle")}</h2>
+            <p className="mb-4 text-[13px] text-cream/60">{t("pstud.dubReadyBody")}</p>
             <div className="mb-4">
               <VideoStage src={room.finalUrl} />
             </div>
             <div className="flex flex-col items-center gap-3">
               <a href={downloadHref(room.finalUrl, `${title}.mp4`)} className="g-btn g-btn-start">
-                ↓ Download video
+                {t("game.downloadVideo")}
               </a>
-              <button
-                onClick={() => void backToLobby()}
-                disabled={leaving}
-                className="g-btn g-btn-ghost w-full"
-              >
-                {leaving ? "…" : "← Back to dashboard"}
-              </button>
-              {playerId && (
+              {/* Before ratings are shown, this button reveals them instead of
+                  leaving; once they're revealed it exits only when they're done. */}
+              {!showRating && canRate ? (
                 <button
-                  onClick={() => setShowRating((v) => !v)}
-                  className="g-btn g-btn-primary w-full"
+                  onClick={() => setShowRating(true)}
+                  className="g-btn g-btn-ghost w-full"
                 >
-                  {showRating ? "Hide ratings" : "★ Rate video & cast"}
+                  {t("game.backToDashboard")}
                 </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => void backToLobby()}
+                    disabled={leaving || !ratingsDone}
+                    className="g-btn g-btn-ghost w-full"
+                  >
+                    {leaving ? "…" : t("game.backToDashboard")}
+                  </button>
+                  {!ratingsDone && (
+                    <p className="text-[12px] text-sun">{t("pstud.rateToContinue")}</p>
+                  )}
+                </>
               )}
             </div>
 
             {showRating && playerId && (
               <>
                 {room.videoUploadId && (
-                  <RateVideo uploadId={room.videoUploadId} raterKey={playerId} />
+                  <RateVideo
+                    uploadId={room.videoUploadId}
+                    raterKey={playerId}
+                    onSaved={setVideoSaved}
+                  />
                 )}
-                <RatePlayers code={room.code} playerId={playerId} players={room.players} />
+                <RatePlayers
+                  code={room.code}
+                  playerId={playerId}
+                  players={room.players}
+                  onSaved={setPlayersSaved}
+                />
               </>
             )}
           </div>
+            );
+          })()
         ) : phase === "error" ? (
           <div className="g-panel text-center">
-            <h2 className="g-title">Couldn&apos;t load</h2>
+            <h2 className="g-title">{t("game.cantLoad")}</h2>
             <p className="mb-4 text-[13px] text-cream/60">
-              The party video isn&apos;t available anymore
-              {isHost
-                ? " — it may have been deleted. Leave and set up the party again."
-                : ". Leaving the party — the host will need to pick another video."}
+              {t("pstud.videoGone")}
+              {isHost ? t("pstud.cantLoadHost") : t("pstud.cantLoadMember")}
             </p>
             <button
               onClick={() => void backToLobby()}
               disabled={leaving}
               className="g-btn g-btn-ghost mx-auto"
             >
-              {leaving ? "Leaving…" : "Leave party"}
+              {leaving ? t("pstud.leaving") : t("pstud.leaveParty")}
             </button>
           </div>
         ) : mySubmitted || phase === "submitting" ? (
           // I've finished my sectors — wait for everyone, then the host renders.
           <div className="g-panel">
-            <h2 className="g-title">Waiting room</h2>
+            <h2 className="g-title">{t("wait.title")}</h2>
             <p className="mb-4 text-center text-[13px] text-cream/60">
               {allFinished
                 ? isHost
-                  ? "Everyone's finished — render the final clip."
-                  : "Everyone's finished — waiting for the host to render."
-                : "You're done. Waiting for the rest of the party to finish their sectors."}
+                  ? t("pstud.allFinishedHost")
+                  : t("pstud.allFinishedMember")
+                : t("pstud.youreDone")}
             </p>
             {roster}
             <div className="mt-5 flex flex-col items-center gap-2 border-t border-cream/10 pt-4">
@@ -422,32 +487,30 @@ export default function PartyStudioPage() {
                   onClick={() => void renderFinal()}
                 >
                   {renderBusy
-                    ? "Rendering…"
+                    ? t("pstud.rendering")
                     : allFinished
-                      ? "Finish & render →"
-                      : "Waiting for all players…"}
+                      ? t("pstud.finishRender")
+                      : t("pstud.waitingAll")}
                 </button>
               ) : (
-                <p className="text-[13px] text-cream/50">Only the host can render the final clip.</p>
+                <p className="text-[13px] text-cream/50">{t("pstud.onlyHostRender")}</p>
               )}
               {err && <p className="text-[13px] text-magenta">{err}</p>}
             </div>
           </div>
         ) : phase === "empty" ? (
           <div className="g-panel">
-            <h2 className="g-title">No sectors for you</h2>
+            <h2 className="g-title">{t("pstud.noSectorsForYou")}</h2>
             <p className="mb-4 text-center text-[13px] text-cream/60">
-              This video has no sectors assigned to player {mySeat}. You can still wait for the
-              others to finish.
+              {t("pstud.noSectorsBody", { n: mySeat })}
             </p>
             {roster}
           </div>
         ) : phase === "summary" ? (
           <div className="g-panel">
-            <h2 className="g-title">Your sectors</h2>
+            <h2 className="g-title">{t("pstud.yourSectors")}</h2>
             <p className="mb-4 text-center text-[13px] text-cream/60">
-              {recordedCount} of {segs.length} recorded. Submit when you&apos;re happy — the host
-              renders once everyone&apos;s done.
+              {t("pstud.summaryBody", { a: recordedCount, b: segs.length })}
             </p>
             <div className="flex flex-col gap-2">
               {segs.map((s, i) => (
@@ -459,14 +522,14 @@ export default function PartyStudioPage() {
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <span className="flex-1 truncate text-[14px] text-cream">
-                    {s.transcript || `Sector ${i + 1}`}
+                    {s.transcript || t("editor.sectorN", { n: i + 1 })}
                   </span>
                   <span
                     className={`font-display text-[12px] font-bold uppercase ${
                       takes[s.id] ? "text-mint" : "text-cream/30"
                     }`}
                   >
-                    {takes[s.id] ? "● Recorded" : "— Skipped"}
+                    {takes[s.id] ? t("game.recorded") : t("game.skipped")}
                   </span>
                 </div>
               ))}
@@ -477,7 +540,7 @@ export default function PartyStudioPage() {
                 disabled={recordedCount === 0}
                 onClick={() => void submitMine()}
               >
-                I&apos;m finished ({recordedCount}/{segs.length})
+                {t("pstud.imFinished", { a: recordedCount, b: segs.length })}
               </button>
               {err && <p className="text-[13px] text-magenta">{err}</p>}
               <button
@@ -487,7 +550,7 @@ export default function PartyStudioPage() {
                 }}
                 className="text-[13px] text-cream/50 underline"
               >
-                ◀ Back to sectors
+                {t("game.backToSectors")}
               </button>
             </div>
           </div>
@@ -497,7 +560,7 @@ export default function PartyStudioPage() {
             <>
               <div className="mb-3 flex items-center justify-between">
                 <span className="font-display text-[14px] font-bold uppercase tracking-[0.1em] text-mint">
-                  P{mySeat} · Sector {cur + 1} / {segs.length}
+                  P{mySeat} · {t("game.sectorOf", { a: cur + 1, b: segs.length })}
                 </span>
                 <div className="flex flex-1 gap-1 pl-4">
                   {segs.map((s, i) => (
@@ -505,7 +568,7 @@ export default function PartyStudioPage() {
                       key={s.id}
                       onClick={() => goTo(i)}
                       disabled={busy}
-                      title={`Sector ${i + 1}`}
+                      title={t("editor.sectorN", { n: i + 1 })}
                       className="h-2 flex-1 rounded-full transition-colors"
                       style={{
                         background:
@@ -536,14 +599,14 @@ export default function PartyStudioPage() {
                       {counting && countdown != null && <ClapperCountdown count={countdown} />}
                     </div>
                     <p className="mt-2 text-center font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
-                      {fmt(seg.startMs)} – {fmt(seg.endMs)} · space = play / pause
+                      {fmt(seg.startMs)} – {fmt(seg.endMs)} · {t("game.spaceHint")}
                     </p>
                   </div>
 
                   <div className="g-panel mb-4">
                     <div className="mb-2 flex justify-between text-[11px] font-bold uppercase tracking-[0.08em]">
-                      <span className="text-sky-400">Original</span>
-                      <span className="text-red-400">Your voice</span>
+                      <span className="text-sky-400">{t("game.original")}</span>
+                      <span className="text-red-400">{t("game.yourVoice")}</span>
                     </div>
                     <RecorderWave
                       original={origWave[seg.id]}
@@ -567,28 +630,28 @@ export default function PartyStudioPage() {
                         }`}
                       >
                         {!sectorReady && !mic.recording && !counting
-                          ? "🎬 Loading scene…"
+                          ? t("game.loadingScene")
                           : mic.recording
-                            ? "■ Stop"
+                            ? t("game.stop")
                             : counting
-                              ? `Starting in ${countdown}…`
+                              ? t("game.startingIn", { n: countdown ?? "" })
                               : takes[seg.id]
-                                ? "● Re-record"
-                                : "● Record"}
+                                ? t("game.reRecord")
+                                : t("game.record")}
                       </button>
                       <button
                         onClick={playMyTake}
                         disabled={!takes[seg.id] || busy}
                         className="g-btn g-btn-ghost h-11 text-[14px]"
                       >
-                        ▶ My take
+                        {t("game.myTake")}
                       </button>
                       <button
                         onClick={next}
                         disabled={busy}
                         className="g-btn g-btn-primary col-span-2 h-11 text-[14px] sm:col-span-1"
                       >
-                        {cur >= segs.length - 1 ? "Finish sectors →" : "Next sector →"}
+                        {cur >= segs.length - 1 ? t("game.finishSectors") : t("game.nextSector")}
                       </button>
                     </div>
                     {mic.error && <p className="mt-3 text-[13px] text-magenta">{mic.error}</p>}
@@ -600,14 +663,14 @@ export default function PartyStudioPage() {
                       disabled={cur === 0 || busy}
                       className="text-[13px] text-cream/50 underline disabled:opacity-40"
                     >
-                      ◀ Previous sector
+                      {t("game.previousSector")}
                     </button>
                     <button
                       onClick={() => setPhase("summary")}
                       disabled={busy}
                       className="text-[13px] text-cream/50 underline disabled:opacity-40"
                     >
-                      Review &amp; finish
+                      {t("game.reviewFinish")}
                     </button>
                   </div>
                 </div>

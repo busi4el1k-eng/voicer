@@ -170,7 +170,11 @@ body {
 
 /* Game-mode / instruction card */
 .g-card {
-  display: block;
+  /* Flex so the inner panel can stretch to the full cell height — in the grid,
+     rows stretch every card to the tallest sibling, and this makes the visible
+     panel fill that height too (otherwise short cards, like the "coming soon"
+     placeholder, keep their small content height and look undersized). */
+  display: flex;
   width: 100%;
   border: none;
   border-radius: 12px;
@@ -181,6 +185,7 @@ body {
 }
 .g-card .g-card-inner {
   position: relative;
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 12px;

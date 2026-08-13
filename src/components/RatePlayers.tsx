@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { StarRating } from "@/components/StarRating";
+import { useI18n } from "@/components/LanguageProvider";
 import type { PlayerView } from "@/lib/useRoom";
 
 // Post-game rating: score every OTHER player in the room 0–5 stars. Restores any
@@ -12,11 +13,14 @@ export function RatePlayers({
   code,
   playerId,
   players,
+  onSaved,
 }: {
   code: string;
   playerId: string;
   players: PlayerView[];
+  onSaved?: (done: boolean) => void;
 }) {
+  const { t } = useI18n();
   const others = players.filter((p) => p.id !== playerId);
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [saved, setSaved] = useState(false);
@@ -45,6 +49,12 @@ export function RatePlayers({
     };
   }, [code, playerId]);
 
+  // Let a parent gate on whether these scores are persisted. When there's no one
+  // to rate, report done so the caller isn't blocked on an empty list.
+  useEffect(() => {
+    onSaved?.(others.length === 0 || saved);
+  }, [saved, others.length, onSaved]);
+
   if (others.length === 0) return null;
 
   const anyRated = others.some((p) => ratings[p.id] != null);
@@ -58,10 +68,10 @@ export function RatePlayers({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ code, playerId, ratings }),
       });
-      if (!r.ok) throw new Error((await r.json()).error || "Couldn't save ratings.");
+      if (!r.ok) throw new Error((await r.json()).error || t("cmp.ratePlayers.cantSave"));
       setSaved(true);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't save ratings.");
+      setErr(e instanceof Error ? e.message : t("cmp.ratePlayers.cantSave"));
     } finally {
       setBusy(false);
     }
@@ -70,10 +80,10 @@ export function RatePlayers({
   return (
     <div className="mt-6 border-t border-cream/10 pt-5 text-left">
       <h3 className="mb-1 text-center font-display text-[16px] font-black text-cream">
-        Rate the cast
+        {t("cmp.ratePlayers.title")}
       </h3>
       <p className="mb-4 text-center text-[12px] text-cream/55">
-        {saved ? "Thanks! You can still tweak your scores." : "Give each performance 0–5 stars."}
+        {saved ? t("cmp.ratePlayers.thanks") : t("cmp.ratePlayers.give")}
       </p>
 
       <div className="flex flex-col gap-2">
@@ -107,7 +117,7 @@ export function RatePlayers({
         disabled={busy || !anyRated}
         className="g-btn g-btn-primary mt-4 w-full"
       >
-        {busy ? "Saving…" : saved ? "Update ratings" : "Submit ratings"}
+        {busy ? t("common.saving") : saved ? t("cmp.ratePlayers.update") : t("cmp.ratePlayers.submit")}
       </button>
       {err && <p className="mt-2 text-center text-[13px] text-magenta">{err}</p>}
     </div>

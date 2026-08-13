@@ -6,6 +6,8 @@
 // runs and snaps to 100% when the sectors land. Styled in the Gartic register:
 // chunky, cream-on-violet, hard offset shadow, zero blur.
 
+import { useI18n } from "@/components/LanguageProvider";
+
 export type AutoState = "working" | "done" | "error";
 
 export function AutoDetectProgress({
@@ -25,6 +27,7 @@ export function AutoDetectProgress({
   error?: string;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   if (!open) return null;
   const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
   const done = state === "done";
@@ -38,7 +41,7 @@ export function AutoDetectProgress({
       : "linear-gradient(90deg,#ff3d8b,#ffd23f)";
 
   // The three real phases of the job, lit up as the bar advances.
-  const steps = ["Listen", "Transcribe", "Place sectors"];
+  const steps = [t("cmp.auto.step.listen"), t("cmp.auto.step.transcribe"), t("cmp.auto.step.place")];
   const activeStep = errored ? -1 : done ? 3 : pct < 30 ? 0 : pct < 62 ? 1 : 2;
 
   return (
@@ -46,7 +49,7 @@ export function AutoDetectProgress({
       className="cd-adp-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label="Auto-detecting sectors"
+      aria-label={t("cmp.auto.aria")}
       onClick={closable ? onClose : undefined}
     >
       <style>{`
@@ -70,16 +73,19 @@ export function AutoDetectProgress({
           <div className="cd-adp-badge">{errored ? "😕" : done ? "✅" : "🪄"}</div>
           <div>
             <div className="font-display text-[19px] font-black leading-tight">
-              {errored ? "Auto-detect failed" : done ? "Sectors ready!" : "Auto-detecting sectors"}
+              {errored ? t("cmp.auto.failedTitle") : done ? t("cmp.auto.readyTitle") : t("cmp.auto.workingTitle")}
             </div>
             <div className="text-[13px] font-bold text-cream/60">
               {errored
-                ? "Nothing was changed on your timeline."
+                ? t("cmp.auto.failedSub")
                 : done
                   ? count
-                    ? `${count} sector${count === 1 ? "" : "s"} placed for you`
-                    : "No speech was detected in this clip"
-                  : "AI is listening to your clip"}
+                    ? t("cmp.auto.placed", {
+                        n: count,
+                        sectors: count === 1 ? t("editor.sector") : t("editor.sectors"),
+                      })
+                    : t("cmp.auto.noSpeechSub")
+                  : t("cmp.auto.listeningSub")}
             </div>
           </div>
         </div>
@@ -147,10 +153,7 @@ export function AutoDetectProgress({
             <span aria-hidden className="text-[16px] leading-none">
               ⚠️
             </span>
-            <span>
-              Auto-detect isn&apos;t always precise. Review each sector and adjust the timing,
-              text, and speaker by hand before saving.
-            </span>
+            <span>{t("cmp.auto.warning")}</span>
           </div>
         )}
 
@@ -161,7 +164,7 @@ export function AutoDetectProgress({
             onClick={onClose}
             className="g-btn g-btn-primary mt-6 h-12 w-full text-[16px]"
           >
-            {done ? (count ? "✨ Show my sectors" : "Got it") : "Close"}
+            {done ? (count ? t("cmp.auto.showSectors") : t("cmp.auto.gotIt")) : t("cmp.auto.close")}
           </button>
         )}
       </div>

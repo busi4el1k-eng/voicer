@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AccountBar } from "@/components/AccountBar";
+import { useI18n } from "@/components/LanguageProvider";
 import { useAppDialog } from "@/components/AppDialog";
 import { VideoThumb } from "@/components/VideoThumb";
 import { LiquidLogo } from "@/components/LiquidLogo";
@@ -114,6 +115,7 @@ export default function CreatorPage() {
   const [ov, setOv] = useState<Overlay>({ active: false, phase: "upload", progress: 0, message: "" });
   const fileRef = useRef<HTMLInputElement>(null);
   const { dialog, confirm, alert } = useAppDialog();
+  const { t } = useI18n();
 
   // Inline rename state for the management table.
   const [editingId, setEditingId] = useState("");
@@ -156,7 +158,7 @@ export default function CreatorPage() {
         setOv((o) => ({
           ...o,
           phase: "error",
-          message: "Couldn't prepare the music. Retry, or continue without it.",
+          message: t("creator.bedError"),
         }));
         return;
       }
@@ -164,25 +166,25 @@ export default function CreatorPage() {
         ...o,
         phase: "ready",
         progress: 1,
-        message: res === "ready" ? "Music ready!" : "Uploaded!",
+        message: res === "ready" ? t("creator.musicReady") : t("creator.uploaded"),
       }));
       await load();
       // Don't auto-dismiss: the video isn't playable yet — the creator must
       // open the editor to mark the sectors. Keep the overlay up with a
       // prominent "Open editor" CTA so that next step is unmissable.
     },
-    [load],
+    [load, t],
   );
 
   const upload = async () => {
     const file = fileRef.current?.files?.[0];
-    if (!file) return setErr("Choose a video file first.");
+    if (!file) return setErr(t("creator.chooseFirst"));
     setErr("");
-    setOv({ active: true, phase: "upload", progress: 0, message: "Uploading video…" });
+    setOv({ active: true, phase: "upload", progress: 0, message: t("creator.uploading") });
     try {
       // Upload occupies the first third of the bar; separation the rest.
       const up = await uploadXhr(file, title, (frac) =>
-        setOv((o) => ({ ...o, progress: frac * 0.3, message: "Uploading video…" })),
+        setOv((o) => ({ ...o, progress: frac * 0.3, message: t("creator.uploading") })),
       );
       setTitle("");
       if (fileRef.current) fileRef.current.value = "";
@@ -191,14 +193,14 @@ export default function CreatorPage() {
         phase: "separating",
         progress: Math.max(o.progress, 0.36),
         uploadId: up.id,
-        message: "Separating music…",
+        message: t("creator.separating"),
       }));
       await runSeparation(up.id);
     } catch (e) {
       setOv((o) => ({
         ...o,
         phase: "error",
-        message: e instanceof Error ? e.message : "Upload failed.",
+        message: e instanceof Error ? e.message : t("creator.uploadFailed"),
       }));
     }
   };
@@ -210,7 +212,7 @@ export default function CreatorPage() {
       setOv((o) => ({ ...o, active: false }));
       return;
     }
-    setOv((o) => ({ ...o, phase: "separating", progress: Math.max(o.progress, 0.4), message: "Separating music…" }));
+    setOv((o) => ({ ...o, phase: "separating", progress: Math.max(o.progress, 0.4), message: t("creator.separating") }));
     try {
       await fetch("/api/creator/bed", {
         method: "POST",
@@ -225,9 +227,9 @@ export default function CreatorPage() {
 
   const remove = async (j: Upload) => {
     const ok = await confirm({
-      title: "Delete video?",
-      message: `“${j.title || "Untitled"}” and all its clips will be removed. This can't be undone.`,
-      confirmLabel: "Delete",
+      title: t("creator.deleteTitle"),
+      message: t("creator.deleteMsg", { title: j.title || t("lib.untitled") }),
+      confirmLabel: t("creator.delete"),
       tone: "danger",
       icon: "🗑️",
     });
@@ -236,12 +238,12 @@ export default function CreatorPage() {
     setBusy(`del:${j.id}`);
     try {
       const r = await fetch(`/api/creator/upload/${j.id}`, { method: "DELETE" });
-      if (!r.ok) throw new Error((await r.json()).error || "Delete failed.");
+      if (!r.ok) throw new Error((await r.json()).error || t("creator.deleteFailed"));
       await load();
     } catch (e) {
       await alert({
-        title: "Couldn't delete",
-        message: e instanceof Error ? e.message : "Delete failed.",
+        title: t("creator.cantDelete"),
+        message: e instanceof Error ? e.message : t("creator.deleteFailed"),
         tone: "danger",
       });
     } finally {
@@ -263,13 +265,13 @@ export default function CreatorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visibility: next }),
       });
-      if (!r.ok) throw new Error((await r.json()).error || "Update failed.");
+      if (!r.ok) throw new Error((await r.json()).error || t("creator.updateFailed"));
       await load();
     } catch (e) {
       await load(); // roll back the optimistic flip to the server truth
       await alert({
-        title: "Couldn't update visibility",
-        message: e instanceof Error ? e.message : "Update failed.",
+        title: t("creator.cantVisibility"),
+        message: e instanceof Error ? e.message : t("creator.updateFailed"),
         tone: "danger",
       });
     } finally {
@@ -291,13 +293,13 @@ export default function CreatorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: editTitle }),
       });
-      if (!r.ok) throw new Error((await r.json()).error || "Rename failed.");
+      if (!r.ok) throw new Error((await r.json()).error || t("creator.renameFailed"));
       setEditingId("");
       await load();
     } catch (e) {
       await alert({
-        title: "Couldn't rename",
-        message: e instanceof Error ? e.message : "Rename failed.",
+        title: t("creator.cantRename"),
+        message: e instanceof Error ? e.message : t("creator.renameFailed"),
         tone: "danger",
       });
     } finally {
@@ -320,17 +322,18 @@ export default function CreatorPage() {
       <div className="g-center">
         {/* LEFT — add a video + info */}
         <div className="g-left">
-          <h2 className="g-title">Add a video</h2>
+          <h2 className="g-title">{t("creator.addVideo")}</h2>
           <div className="g-panel flex flex-1 flex-col gap-4">
             {/* Title */}
             <label className="flex flex-col gap-1.5">
               <span className="font-display text-[12px] font-bold uppercase tracking-[0.06em] text-mint">
-                Title <span className="font-semibold text-cream/40">— optional</span>
+                {t("creator.titleLabel")}{" "}
+                <span className="font-semibold text-cream/40">— {t("creator.optional")}</span>
               </span>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Name your video…"
+                placeholder={t("creator.titlePh")}
                 className="h-[46px] rounded-[10px] border-2 border-violet-lift bg-violet-deep/50 px-4 font-display text-[15px] font-bold text-cream placeholder:font-semibold placeholder:text-cream/35 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-white"
               />
             </label>
@@ -338,7 +341,7 @@ export default function CreatorPage() {
             {/* File */}
             <label className="flex flex-col gap-1.5">
               <span className="font-display text-[12px] font-bold uppercase tracking-[0.06em] text-mint">
-                Video file
+                {t("creator.videoFile")}
               </span>
               <input
                 ref={fileRef}
@@ -349,12 +352,11 @@ export default function CreatorPage() {
             </label>
 
             <button className="g-btn g-btn-start w-full" onClick={upload} disabled={ov.active}>
-              {ov.active ? "Working…" : "Upload"}
+              {ov.active ? t("common.working") : t("creator.upload")}
             </button>
 
             <p className="rounded-[10px] border-2 border-white/10 bg-white/[0.05] px-3.5 py-3 font-display text-[12.5px] font-semibold leading-[1.5] text-cream/65">
-              Upload a video, then open the editor to mark the lines (sectors) on the timeline. The
-              backend cuts the video at those spots and stores each part.
+              {t("creator.info")}
             </p>
 
             {err && (
@@ -366,23 +368,21 @@ export default function CreatorPage() {
         {/* RIGHT — manage existing videos */}
         <div className="g-right">
           <h2 className="g-title">
-            Your videos{" "}
+            {t("creator.yourVideos")}{" "}
             {loaded ? (
               `(${jobs.length})`
             ) : (
               <span
-                aria-label="Loading videos"
+                aria-label={t("creator.loadingAria")}
                 className="ml-1 inline-block h-[15px] w-[15px] animate-spin rounded-full border-2 border-cream/25 border-t-mint align-[-2px]"
               />
             )}
           </h2>
           <div className="g-panel flex-1">
             {!loaded ? (
-              <p className="text-center text-[13px] text-cream/50">Loading your videos…</p>
+              <p className="text-center text-[13px] text-cream/50">{t("creator.loading")}</p>
             ) : jobs.length === 0 ? (
-              <p className="text-center text-[13px] text-cream/50">
-                Nothing uploaded yet. Add a video on the left.
-              </p>
+              <p className="text-center text-[13px] text-cream/50">{t("creator.empty")}</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {jobs.map((j) => {
@@ -417,7 +417,7 @@ export default function CreatorPage() {
                             />
                           ) : (
                             <div className="truncate font-display text-[17px] font-bold text-cream">
-                              {j.title || "Untitled"}
+                              {j.title || t("lib.untitled")}
                             </div>
                           )}
                           {j.error && <div className="text-[13px] text-magenta">{j.error}</div>}
@@ -425,14 +425,14 @@ export default function CreatorPage() {
                             <span className="flex items-center gap-1.5">
                               <span className="font-display font-bold text-cream/85">{players.length}</span>
                               <span className="text-cream/45">
-                                player{players.length === 1 ? "" : "s"}
+                                {players.length === 1 ? t("creator.player") : t("creator.players")}
                               </span>
                               {players.length > 0 && (
                                 <span className="flex gap-1">
                                   {players.map((p) => (
                                     <span
                                       key={p}
-                                      title={`Player ${p}`}
+                                      title={t("creator.playerN", { n: p })}
                                       className="h-2.5 w-2.5 rounded-full shadow-[inset_0_0_0_1.5px_rgba(31,7,51,0.4)]"
                                       style={{ background: PLAYER_COLORS[(p - 1) % PLAYER_COLORS.length] }}
                                     />
@@ -444,7 +444,7 @@ export default function CreatorPage() {
                               <button
                                 type="button"
                                 onClick={() => copyShareId(j.shareId!, j.id)}
-                                title="Copy share code"
+                                title={t("creator.copyShare")}
                                 className="flex items-center gap-1.5 font-display font-bold tracking-[0.1em] text-mint transition hover:text-cream"
                               >
                                 {formatShareId(j.shareId)}
@@ -459,11 +459,7 @@ export default function CreatorPage() {
                               type="button"
                               onClick={() => void toggleVisibility(j)}
                               disabled={rowBusy}
-                              title={
-                                isPublic
-                                  ? "Public — visible in the Video library. Click to make private."
-                                  : "Private — only you can see it. Click to publish to the library."
-                              }
+                              title={isPublic ? t("creator.publicTitle") : t("creator.privateTitle")}
                               className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-display text-[11px] font-bold uppercase tracking-[0.06em] transition disabled:opacity-60 ${
                                 isPublic
                                   ? "bg-mint/20 text-mint hover:bg-mint/30"
@@ -474,8 +470,8 @@ export default function CreatorPage() {
                               {busy === `vis:${j.id}`
                                 ? "…"
                                 : isPublic
-                                  ? "Public"
-                                  : "Private"}
+                                  ? t("creator.public")
+                                  : t("creator.private")}
                             </button>
                           </div>
                         </div>
@@ -496,13 +492,13 @@ export default function CreatorPage() {
                                 disabled={rowBusy}
                                 className="g-btn g-btn-primary h-10 flex-1 px-3 text-[13px] sm:flex-none"
                               >
-                                {busy === `rename:${j.id}` ? "Saving…" : "Save"}
+                                {busy === `rename:${j.id}` ? t("common.saving") : t("common.save")}
                               </button>
                               <button
                                 onClick={() => setEditingId("")}
                                 className="g-btn g-btn-ghost h-10 flex-1 px-3 text-[13px] sm:flex-none"
                               >
-                                Cancel
+                                {t("common.cancel")}
                               </button>
                             </>
                           ) : (
@@ -511,12 +507,12 @@ export default function CreatorPage() {
                                 href={`/creator/${j.id}`}
                                 className="g-btn g-btn-start flex h-10 flex-1 items-center justify-center px-3 text-[13px] sm:flex-none"
                               >
-                                Open editor
+                                {t("creator.openEditor")}
                               </Link>
                               <div className="relative flex-none">
                                 <button
-                                  aria-label="Settings"
-                                  title="Settings"
+                                  aria-label={t("creator.settings")}
+                                  title={t("creator.settings")}
                                   onClick={() => setMenuId(menuId === j.id ? "" : j.id)}
                                   disabled={rowBusy}
                                   className="g-btn g-btn-ghost flex h-10 w-10 items-center justify-center p-0 text-[16px] leading-none"
@@ -534,7 +530,7 @@ export default function CreatorPage() {
                                         }}
                                         className="flex items-center gap-2 px-3 py-2.5 text-left font-display text-[14px] font-semibold text-cream hover:bg-violet-lift"
                                       >
-                                        <span aria-hidden>✏️</span> Rename
+                                        <span aria-hidden>✏️</span> {t("creator.rename")}
                                       </button>
                                       <button
                                         onClick={() => {
@@ -543,7 +539,7 @@ export default function CreatorPage() {
                                         }}
                                         className="flex items-center gap-2 border-t border-cream/10 px-3 py-2.5 text-left font-display text-[14px] font-semibold text-magenta hover:bg-magenta/15"
                                       >
-                                        <span aria-hidden>🗑️</span> Delete
+                                        <span aria-hidden>🗑️</span> {t("creator.delete")}
                                       </button>
                                     </div>
                                   </>
@@ -585,16 +581,13 @@ export default function CreatorPage() {
               {ov.message}
             </div>
             {ov.phase === "separating" && (
-              <div className="g-modal-sub">
-                Keeping the original music under your dub — this can take a few minutes.
-              </div>
+              <div className="g-modal-sub">{t("creator.separatingSub")}</div>
             )}
             {ov.phase === "ready" && (
               <>
                 <div className="g-modal-sub">
-                  <strong className="text-mint">Next step:</strong> open the editor to mark the
-                  lines (sectors) on the timeline. Your video isn&apos;t playable in games until you
-                  do this.
+                  <strong className="text-mint">{t("creator.nextStep")}</strong>{" "}
+                  {t("creator.readySub")}
                 </div>
                 <div className="flex flex-col items-center gap-2 pt-1">
                   {ov.uploadId && (
@@ -603,7 +596,7 @@ export default function CreatorPage() {
                       className="g-btn g-btn-start flex w-full items-center justify-center gap-2"
                       style={{ height: 52, padding: "0 24px", fontSize: 17 }}
                     >
-                      <span aria-hidden>🎬</span> Open editor
+                      <span aria-hidden>🎬</span> {t("creator.openEditor")}
                     </Link>
                   )}
                   <button
@@ -611,7 +604,7 @@ export default function CreatorPage() {
                     style={{ height: 40, padding: "0 18px", fontSize: 14 }}
                     onClick={() => setOv((o) => ({ ...o, active: false }))}
                   >
-                    Later
+                    {t("creator.later")}
                   </button>
                 </div>
               </>
@@ -623,7 +616,7 @@ export default function CreatorPage() {
                   style={{ height: 44, padding: "0 20px", fontSize: 15 }}
                   onClick={() => void retryBed()}
                 >
-                  Retry
+                  {t("creator.retry")}
                 </button>
                 <button
                   className="g-btn g-btn-ghost"
@@ -633,7 +626,7 @@ export default function CreatorPage() {
                     void load();
                   }}
                 >
-                  Continue
+                  {t("creator.continue")}
                 </button>
               </div>
             )}

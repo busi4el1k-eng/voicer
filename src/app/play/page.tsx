@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AccountBar } from "@/components/AccountBar";
 import { VideoStage } from "@/components/VideoStage";
+import { useI18n } from "@/components/LanguageProvider";
 import { formatShareId, formatShareInput } from "@/lib/share-id";
 
 type Video = {
@@ -25,6 +26,7 @@ const fmtDuration = (ms: number) => {
 
 export default function PlayHome() {
   const router = useRouter();
+  const { t } = useI18n();
   const [code, setCode] = useState("");
   const [video, setVideo] = useState<Video | null>(null);
   const [err, setErr] = useState("");
@@ -32,17 +34,17 @@ export default function PlayHome() {
 
   const search = async () => {
     const trimmed = code.trim();
-    if (!trimmed) return setErr("Enter a share code.");
+    if (!trimmed) return setErr(t("solo.enterShareCode"));
     setBusy(true);
     setErr("");
     setVideo(null);
     try {
       const r = await fetch(`/api/solo/lookup?code=${encodeURIComponent(trimmed)}`);
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Lookup failed.");
+      if (!r.ok) throw new Error(d.error || t("solo.lookupFailed"));
       setVideo(d.video as Video);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Lookup failed.");
+      setErr(e instanceof Error ? e.message : t("solo.lookupFailed"));
     } finally {
       setBusy(false);
     }
@@ -60,7 +62,7 @@ export default function PlayHome() {
       </div>
 
       <div className="w-full max-w-xl">
-        <h2 className="g-title">Enter a share code</h2>
+        <h2 className="g-title">{t("solo.enterCode")}</h2>
 
         {/* Code search */}
         <div className="g-panel">
@@ -71,20 +73,17 @@ export default function PlayHome() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void search();
               }}
-              placeholder="e.g. ABCD-EFGH"
+              placeholder={t("solo.codePh")}
               maxLength={9}
               autoFocus
               className="flex-1 rounded-[10px] bg-violet-deep/60 px-4 py-3 font-display text-[16px] font-bold uppercase tracking-[0.12em] text-cream placeholder:font-normal placeholder:tracking-normal placeholder:text-cream/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
             />
             <button onClick={search} disabled={busy} className="g-btn g-btn-primary px-5">
-              {busy ? "…" : "Search"}
+              {busy ? "…" : t("solo.search")}
             </button>
           </div>
           {err && <p className="mt-3 text-[13px] text-magenta">{err}</p>}
-          <p className="mt-3 text-[12px] leading-[1.5] text-cream/50">
-            Ask the creator for the video&apos;s share code (shown in the video creator), then enter
-            it here to dub it.
-          </p>
+          <p className="mt-3 text-[12px] leading-[1.5] text-cream/50">{t("solo.hint")}</p>
         </div>
 
         {/* Found video — game info + mock play */}
@@ -94,13 +93,13 @@ export default function PlayHome() {
               <VideoStage src={video.sourceUrl} />
             </div>
             <h3 className="font-display text-[22px] font-black text-cream">
-              {video.title || "Untitled"}
+              {video.title || t("lib.untitled")}
             </h3>
 
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div className="rounded-[10px] bg-white/5 p-3 text-center">
                 <div className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-                  Code
+                  {t("solo.code")}
                 </div>
                 <div className="mt-1 font-display text-[15px] font-black tracking-[0.1em] text-mint">
                   {video.shareId ? formatShareId(video.shareId) : "—"}
@@ -108,7 +107,7 @@ export default function PlayHome() {
               </div>
               <div className="rounded-[10px] bg-white/5 p-3 text-center">
                 <div className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-                  Lines
+                  {t("solo.lines")}
                 </div>
                 <div className="mt-1 font-display text-[15px] font-black text-cream">
                   {video.lines}
@@ -116,7 +115,7 @@ export default function PlayHome() {
               </div>
               <div className="rounded-[10px] bg-white/5 p-3 text-center">
                 <div className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-cream/45">
-                  Length
+                  {t("solo.length")}
                 </div>
                 <div className="mt-1 font-display text-[15px] font-black text-cream">
                   {video.durationMs ? fmtDuration(video.durationMs) : "—"}
@@ -130,7 +129,7 @@ export default function PlayHome() {
                 disabled={video.lines === 0}
                 className="g-btn g-btn-start w-full disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {video.lines === 0 ? "No lines to dub yet" : "Play"}
+                {video.lines === 0 ? t("solo.noLinesYet") : t("solo.play")}
               </button>
             </div>
           </div>
@@ -138,7 +137,7 @@ export default function PlayHome() {
 
         <div className="mt-6 text-center">
           <Link href="/dashboard" className="text-[13px] text-cream/50 underline">
-            Back to lobby
+            {t("lib.backToLobby")}
           </Link>
         </div>
       </div>

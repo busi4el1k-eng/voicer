@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useI18n } from "@/components/LanguageProvider";
 
 // The pre-record countdown, as a film clapperboard instead of plain 3-2-1
 // numbers. On each beat the clapper arm snaps shut (a "clap") and a short beep
@@ -36,7 +37,8 @@ function beep(freq: number, ms: number) {
 }
 
 export function ClapperCountdown({ count }: { count: number }) {
-  const label = count >= 3 ? "Lights" : count === 2 ? "Camera" : "Action!";
+  const { t } = useI18n();
+  const label = count >= 3 ? t("cmp.clap.lights") : count === 2 ? t("cmp.clap.camera") : t("cmp.clap.action");
   const isAction = count <= 1;
 
   // One short beep per beat — three identical "peep"s across the count.
@@ -56,7 +58,7 @@ export function ClapperCountdown({ count }: { count: number }) {
       `}</style>
 
       <div key={`s${count}`} className="cd-stage">
-        <svg viewBox="0 0 100 100" width="100%" role="img" aria-label={`${label} — recording in ${count}`}>
+        <svg viewBox="0 0 100 100" width="100%" role="img" aria-label={t("cmp.clap.aria", { label, n: count })}>
           {/* slate board */}
           <rect x="14" y="44" width="72" height="42" rx="7" fill="#fff6ec" stroke="#201255" strokeWidth="4" />
           <path d="M41 55 L41 75 L60 65 Z" fill="#ff3d8b" stroke="#201255" strokeWidth="3" strokeLinejoin="round" />
