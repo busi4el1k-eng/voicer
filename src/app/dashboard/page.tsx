@@ -28,22 +28,17 @@ export default async function DashboardPage() {
   const avatarColor = user?.avatarColor || "#6F48FF";
   const initial = name.charAt(0).toUpperCase();
 
-  // Real stats from the DB for the signed-in user. Guests have none yet → zeros.
-  // Labels are i18n keys, translated client-side in StudioPanel.
-  let stats: Stat[] = [
-    { label: "stat.runs", value: 0 },
-    { label: "stat.scenes", value: 0 },
-    { label: "stat.rating", value: "—" },
-    { label: "stat.best", value: 0 },
-  ];
+  // Real stats from the DB for the signed-in user. Guests have none yet → "—".
+  // Labels are i18n keys, translated client-side in StudioPanel. We only surface
+  // the Rating stat now (runs / scenes played / best scene were dropped).
+  let stats: Stat[] = [{ label: "stat.rating", value: "—" }];
   if (user) {
     try {
-      const [runCount, agg, best, rating] = await Promise.all([
-        db.run.count({ where: { userId: user.id } }),
-        db.take.aggregate({ where: { userId: user.id }, _count: true }),
-        db.take.aggregate({ where: { userId: user.id }, _max: { judgeScore: true } }),
-        db.playerRating.aggregate({ where: { ratedUserId: user.id }, _avg: { stars: true }, _count: true }),
-      ]);
+      const rating = await db.playerRating.aggregate({
+        where: { ratedUserId: user.id },
+        _avg: { stars: true },
+        _count: true,
+      });
       // Average star rating other players gave this user across finished parties,
       // shown as e.g. "4.3 ★ (7)". "—" until they've been rated at least once.
       const avgStars = rating._avg.stars;
@@ -51,12 +46,7 @@ export default async function DashboardPage() {
         rating._count > 0 && avgStars != null
           ? `${(Math.round(avgStars * 10) / 10).toFixed(1)} ★ (${rating._count})`
           : "—";
-      stats = [
-        { label: "stat.runs", value: runCount },
-        { label: "stat.scenes", value: agg._count },
-        { label: "stat.rating", value: ratingLabel },
-        { label: "stat.best", value: best._max.judgeScore ?? 0 },
-      ];
+      stats = [{ label: "stat.rating", value: ratingLabel }];
     } catch {
       dbError = true;
     }

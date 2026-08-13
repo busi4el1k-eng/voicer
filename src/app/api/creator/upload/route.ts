@@ -3,10 +3,11 @@ import { Readable } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
-import { SPACES_PREFIX, putObjectStream, spacesConfigured } from "@/lib/spaces";
+import { SPACES_PREFIX, deleteObjects, putObjectStream, spacesConfigured } from "@/lib/spaces";
 import { rateLimit } from "@/lib/rate-limit";
 import { generateShareId } from "@/lib/share-id.server";
 import { generateBedForUpload } from "@/lib/bed.server";
+import { assertReadable, isPermanentInputError } from "@/lib/ffmpeg";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -73,6 +74,26 @@ export async function POST(req: NextRequest) {
     // Storage failed — drop the orphan row so it doesn't show as a broken video.
     await db.videoUpload.delete({ where: { id: upload.id } }).catch(() => {});
     return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 502 });
+  }
+
+  // Validate the stored file before it enters the pipeline: a truncated or
+  // corrupt upload (e.g. a recording cut off before its moov atom was written)
+  // would otherwise fail every render and loop the bed worker forever. We probe
+  // the Spaces URL directly (header-only, cheap even for a big file). Only a
+  // definitive "bad data" verdict rejects — if the probe itself can't run
+  // (network/env), we let the upload through and let the bed worker classify it.
+  try {
+    await assertReadable(url);
+  } catch (e) {
+    if (isPermanentInputError(e)) {
+      await deleteObjects([key]).catch(() => {});
+      await db.videoUpload.delete({ where: { id: upload.id } }).catch(() => {});
+      return NextResponse.json(
+        { error: "That video looks incomplete or corrupted. Please re-export it and upload again." },
+        { status: 400 },
+      );
+    }
+    console.error("[upload] validity probe skipped for", upload.id, e);
   }
 
   const saved = await db.videoUpload.update({

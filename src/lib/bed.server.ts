@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import db from "@/lib/db";
 import { getObjectBuffer, putObject, SPACES_PREFIX, spacesConfigured } from "@/lib/spaces";
-import { withSourceFile, extractAudio } from "@/lib/ffmpeg";
+import { withSourceFile, extractAudio, isPermanentInputError } from "@/lib/ffmpeg";
 import { demucsConfigured, separateBed } from "@/lib/demucs";
 
 // Generate (once) the Demucs music bed for a source video: extract its audio,
@@ -62,9 +62,13 @@ export async function generateBedForUpload(uploadId: string): Promise<void> {
       data: { bedKey: key, bedStatus: "ready" },
     });
   } catch (e) {
-    console.error("[bed] generation failed for", uploadId, e);
+    // A corrupt/truncated source will never separate — mark it terminally
+    // "invalid" so the sweep skips it forever instead of retrying every
+    // RETRY_ERROR_MS. Genuinely transient failures stay "error" and get retried.
+    const permanent = isPermanentInputError(e);
+    console.error(`[bed] generation ${permanent ? "permanently failed (invalid source)" : "failed"} for`, uploadId, e);
     await db.videoUpload
-      .update({ where: { id: uploadId }, data: { bedStatus: "error" } })
+      .update({ where: { id: uploadId }, data: { bedStatus: permanent ? "invalid" : "error" } })
       .catch(() => {});
   }
 }
@@ -138,7 +142,7 @@ export async function ensureBedForUpload(uploadId: string): Promise<string | nul
       select: { bedStatus: true, bedKey: true },
     });
     if (u?.bedStatus === "ready" && u.bedKey) return u.bedKey;
-    if (u?.bedStatus === "error") return null;
+    if (u?.bedStatus === "error" || u?.bedStatus === "invalid") return null;
     if (u?.bedStatus !== "processing") break; // "none" again → nothing is working on it
     await new Promise((r) => setTimeout(r, 3000)); // wait on a concurrent worker
   }

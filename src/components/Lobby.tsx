@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRoom, type RoomView } from "@/lib/useRoom";
 import { useI18n } from "@/components/LanguageProvider";
-import { PerformanceHistory } from "@/components/PerformanceHistory";
 import { MAX_PLAYERS, MIN_PLAYERS, normalizeRoomCode } from "@/lib/room-code";
 
 type Mode = {
@@ -26,11 +25,11 @@ const MODES: Mode[] = [
     href: "/creator",
   },
   {
-    id: "solo",
-    icon: "🎬",
-    titleKey: "mode.solo.title",
-    textKey: "mode.solo.text",
-    href: "/play",
+    id: "library",
+    icon: "🎞️",
+    titleKey: "mode.library.title",
+    textKey: "mode.library.text",
+    href: "/library",
   },
   {
     id: "party",
@@ -40,11 +39,11 @@ const MODES: Mode[] = [
     href: "/party",
   },
   {
-    id: "library",
-    icon: "🎞️",
-    titleKey: "mode.library.title",
-    textKey: "mode.library.text",
-    href: "/library",
+    id: "solo",
+    icon: "🎬",
+    titleKey: "mode.solo.title",
+    textKey: "mode.solo.text",
+    href: "/play",
   },
   {
     id: "ghost",
@@ -291,8 +290,6 @@ export function Lobby({
               </div>
             </button>
           ))}
-
-          <PerformanceHistory />
         </div>
       </div>
 

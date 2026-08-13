@@ -26,6 +26,39 @@ function run(args: string[]): Promise<void> {
   });
 }
 
+// Substrings ffmpeg prints when the INPUT itself is unusable — truncated,
+// corrupt, or not really a decodable video — as opposed to a transient or
+// environmental failure (network, missing binary, disk). These are PERMANENT:
+// re-running ffmpeg on the same bytes will always fail the same way, so callers
+// should give up instead of retrying forever. Matched case-insensitively.
+const PERMANENT_INPUT_ERRORS = [
+  "moov atom not found",
+  "invalid data found when processing input",
+  "could not find codec parameters",
+  "does not contain any stream",
+  "error while decoding stream",
+  "invalid nal unit size",
+  "error reading header",
+];
+
+// True when an ffmpeg failure is due to the input file being corrupt/unreadable
+// (not a transient/env problem). Lets callers mark such a source terminally bad
+// instead of retrying it on every sweep.
+export function isPermanentInputError(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return PERMANENT_INPUT_ERRORS.some((s) => msg.includes(s));
+}
+
+// Cheaply verify ffmpeg can open and decode a source (a local path OR an http(s)
+// URL). Reads only the container header plus a moment of audio, so it's fast even
+// for a large remote file and streams almost nothing. Throws the usual ffmpeg
+// error on a corrupt/truncated input (e.g. "moov atom not found"), which
+// isPermanentInputError() then recognises. Use this to reject bad uploads at the
+// door before they enter the pipeline.
+export async function assertReadable(input: string): Promise<void> {
+  await run(["-v", "error", "-xerror", "-i", input, "-t", "0.1", "-f", "null", "-"]);
+}
+
 // A scratch dir + the source file written to disk, for a batch of operations.
 export async function withSourceFile<T>(
   source: Buffer,

@@ -54,11 +54,11 @@ export function VideoThumb({ src }: { src: string }) {
         onTimeUpdate={onTime}
         className="h-11 w-[72px] cursor-pointer rounded-[8px] border-2 border-violet-lift bg-black object-cover transition-transform duration-200"
         style={{
-          transform: hover ? "scale(1.7)" : "scale(1)",
+          transform: hover ? "scale(2.9)" : "scale(1)",
           transformOrigin: "center",
           position: "relative",
           zIndex: hover ? 30 : 1,
-          boxShadow: hover ? "0 8px 24px rgba(0,0,0,0.5)" : "none",
+          boxShadow: hover ? "0 12px 34px rgba(0,0,0,0.55)" : "none",
         }}
       />
     </div>

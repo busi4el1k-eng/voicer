@@ -95,9 +95,11 @@ export async function makeSectors(sentences: AsrSentence[], expectedSpeakers?: n
   try {
     const client = new Anthropic();
     const message = await client.messages.create({
-      model: "claude-opus-4-8",
+      model: "claude-haiku-4-5",
       max_tokens: 8000,
-      thinking: { type: "adaptive" },
+      // Haiku 4.5 doesn't support adaptive thinking (Opus 4.6+ only); it uses
+      // extended thinking with an explicit budget (< max_tokens).
+      thinking: { type: "enabled", budget_tokens: 4000 },
       system,
       messages: [
         {
