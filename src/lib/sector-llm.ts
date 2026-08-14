@@ -96,10 +96,14 @@ export async function makeSectors(sentences: AsrSentence[], expectedSpeakers?: n
     const client = new Anthropic();
     const message = await client.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 8000,
+      // The output is a compact list of index ranges + speaker numbers, so it
+      // never needs a big ceiling. Thinking tokens bill at the 5x output rate,
+      // so both of these are kept lean to hold the per-call cost down.
+      max_tokens: 4000,
       // Haiku 4.5 doesn't support adaptive thinking (Opus 4.6+ only); it uses
-      // extended thinking with an explicit budget (< max_tokens).
-      thinking: { type: "enabled", budget_tokens: 4000 },
+      // extended thinking with an explicit budget (< max_tokens). 1024 is the
+      // minimum and is plenty for speaker attribution on a single scene.
+      thinking: { type: "enabled", budget_tokens: 1024 },
       system,
       messages: [
         {
@@ -133,6 +137,15 @@ export async function makeSectors(sentences: AsrSentence[], expectedSpeakers?: n
         },
       },
     });
+
+    // Log real token usage so cost is visible per call. At Haiku 4.5 pricing
+    // ($1/1M input, $5/1M output; thinking counts as output) this makes it easy
+    // to spot a call — or a re-run — that costs more than expected.
+    const u = message.usage;
+    console.log(
+      `[sector-llm] tokens in=${u.input_tokens} out=${u.output_tokens} ` +
+        `~$${((u.input_tokens * 1 + u.output_tokens * 5) / 1_000_000).toFixed(4)}`,
+    );
 
     const textBlock = message.content.find((b) => b.type === "text");
     if (!textBlock || textBlock.type !== "text") return oneEach(sentences);
