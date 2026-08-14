@@ -5,6 +5,7 @@ import Link from "next/link";
 import { downloadHref } from "@/lib/download";
 import { useMic, type RecordResult } from "@/lib/audio/useMic";
 import { CombineProgress } from "@/components/CombineProgress";
+import { ShareButton } from "@/components/ShareButton";
 import { useI18n } from "@/components/LanguageProvider";
 
 type Seg = { id: string; startMs: number; endMs: number; label: string; transcript: string };
@@ -601,9 +602,17 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
               />
             )}
             <div className="flex flex-col items-center gap-3">
-              <a href={downloadHref(finalUrl, `${upload?.title || "cinema-dub"}.mp4`)} className="g-btn g-btn-start">
-                {t("game.downloadVideo")}
-              </a>
+              <div className="flex w-full flex-wrap items-center gap-3">
+                <a
+                  href={downloadHref(finalUrl, `${upload?.title || "cinema-dub"}.mp4`)}
+                  className="g-btn g-btn-start min-w-[150px] flex-1"
+                >
+                  {t("game.downloadVideo")}
+                </a>
+                {finalUrl && (
+                  <ShareButton videoUrl={finalUrl} title={upload?.title} mode="solo" />
+                )}
+              </div>
               <Link href="/dashboard" className="g-btn g-btn-ghost">
                 {t("game.backToDashboard")}
               </Link>

@@ -18,6 +18,8 @@ services:
         NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /dashboard
         NEXT_PUBLIC_SPACES_PUBLIC_BASE: ${NEXT_PUBLIC_SPACES_PUBLIC_BASE}
         NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL}
+        # Baked into the client bundle at build time; empty ⇒ analytics disabled.
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY}
     restart: unless-stopped
     # Each realtime (SSE) player holds one long-lived connection = one file
     # descriptor. The default 1024 soft limit caps concurrent players at ~1k;
@@ -42,6 +44,7 @@ services:
       - DO_SPACES_PREFIX=${DO_SPACES_PREFIX}
       - NEXT_PUBLIC_SPACES_PUBLIC_BASE=${NEXT_PUBLIC_SPACES_PUBLIC_BASE}
       - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
+      - NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
       - DEMUCS_URL=${DEMUCS_URL}
       - DEMUCS_API_KEY=${DEMUCS_API_KEY}
       # AI auto-detect (optional): AssemblyAI transcribes, Anthropic corrects the

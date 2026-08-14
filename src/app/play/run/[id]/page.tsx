@@ -9,6 +9,7 @@ import { decodeAudio, type Pcm } from "@/lib/audio/waveform";
 import { RecorderWave } from "@/components/RecorderWave";
 import { VideoStage, type VideoStageHandle } from "@/components/VideoStage";
 import { RateVideo } from "@/components/RateVideo";
+import { ShareButton } from "@/components/ShareButton";
 import { ScenarioWindow, scenarioFromSegments } from "@/components/ScenarioWindow";
 import { CombineProgress } from "@/components/CombineProgress";
 import { ClapperCountdown } from "@/components/ClapperCountdown";
@@ -56,7 +57,6 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   const [countdown, setCountdown] = useState<number | null>(null);
   // Rating is mandatory before leaving: pressing "back to dashboard" reveals it,
   // and the exit only unlocks once the video score is saved.
-  const [showRating, setShowRating] = useState(false);
   const [videoSaved, setVideoSaved] = useState(false);
 
   const stageRef = useRef<VideoStageHandle>(null);
@@ -477,37 +477,36 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
               </div>
             )}
             <div className="flex flex-col items-center gap-3">
-              <a href={downloadHref(resultUrl, `${video?.title || "cinema-dub"}.mp4`)} className="g-btn g-btn-start">
-                {t("game.downloadVideo")}
-              </a>
-              {/* Before the rating is shown, this button reveals it instead of
-                  leaving; once it's revealed it exits only when the score is saved. */}
-              {!showRating && video && clientId ? (
-                <button
-                  onClick={() => setShowRating(true)}
-                  className="g-btn g-btn-ghost w-full"
+              <div className="flex w-full flex-wrap items-center gap-3">
+                <a
+                  href={downloadHref(resultUrl, `${video?.title || "cinema-dub"}.mp4`)}
+                  className="g-btn g-btn-start min-w-[150px] flex-1"
                 >
-                  {t("game.backToDashboard")}
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => router.push("/dashboard")}
-                    disabled={!!(video && clientId) && !videoSaved}
-                    className="g-btn g-btn-ghost w-full"
-                  >
-                    {t("game.backToDashboard")}
-                  </button>
-                  {video && clientId && !videoSaved && (
-                    <p className="text-[12px] text-sun">{t("srun.rateToContinue")}</p>
-                  )}
-                </>
+                  {t("game.downloadVideo")}
+                </a>
+                {resultUrl && (
+                  <ShareButton videoUrl={resultUrl} title={video?.title} mode="solo" />
+                )}
+              </div>
+              {/* Rating is always shown, above the exit. Leaving still waits for
+                  the score to be saved. */}
+              {video && clientId && (
+                <div className="w-full">
+                  <RateVideo uploadId={video.id} raterKey={clientId} onSaved={setVideoSaved} />
+                </div>
+              )}
+
+              <button
+                onClick={() => router.push("/dashboard")}
+                disabled={!!(video && clientId) && !videoSaved}
+                className="g-btn g-btn-ghost w-full"
+              >
+                {t("game.backToDashboard")}
+              </button>
+              {video && clientId && !videoSaved && (
+                <p className="text-[12px] text-sun">{t("srun.rateToContinue")}</p>
               )}
             </div>
-
-            {showRating && video && clientId && (
-              <RateVideo uploadId={video.id} raterKey={clientId} onSaved={setVideoSaved} />
-            )}
           </div>
         )}
       </div>

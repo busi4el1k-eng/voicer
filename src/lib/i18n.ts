@@ -339,6 +339,18 @@ const en: Dict = {
   "game.noSectors": "No sectors",
   "game.quit": "Quit",
 
+  // Share a finished dub + the public /watch page
+  "share.button": "🔗 Copy link",
+  "share.creating": "Creating link…",
+  "share.linkReady": "Anyone with this link can watch",
+  "share.failed": "Couldn't create a share link. Try again.",
+  "watch.subtitle": "Made with Cinema Dub",
+  "watch.untitled": "A shared dub",
+  "watch.makeYours": "🎬 Make your own dub",
+  "watch.notFoundTitle": "Dub not found",
+  "watch.notFoundBody": "This link is invalid or the dub is no longer available.",
+  "watch.goToDashboard": "Go to dashboard →",
+
   // Solo run (play/run/[id])
   "srun.recordFirst": "Record at least one sector first.",
   "srun.exportFailed": "Export failed.",
@@ -775,6 +787,18 @@ const es: Dict = {
   "game.back": "Atrás",
   "game.noSectors": "Sin sectores",
   "game.quit": "Salir",
+
+  // Share a finished dub + the public /watch page
+  "share.button": "🔗 Copiar enlace",
+  "share.creating": "Creando enlace…",
+  "share.linkReady": "Cualquiera con este enlace puede verlo",
+  "share.failed": "No se pudo crear el enlace. Inténtalo de nuevo.",
+  "watch.subtitle": "Hecho con Cinema Dub",
+  "watch.untitled": "Un doblaje compartido",
+  "watch.makeYours": "🎬 Haz tu propio doblaje",
+  "watch.notFoundTitle": "Doblaje no encontrado",
+  "watch.notFoundBody": "Este enlace no es válido o el doblaje ya no está disponible.",
+  "watch.goToDashboard": "Ir al panel →",
 
   // Solo run (play/run/[id])
   "srun.recordFirst": "Graba al menos un sector primero.",
@@ -1213,6 +1237,18 @@ const fr: Dict = {
   "game.noSectors": "Aucun secteur",
   "game.quit": "Quitter",
 
+  // Share a finished dub + the public /watch page
+  "share.button": "🔗 Copier le lien",
+  "share.creating": "Création du lien…",
+  "share.linkReady": "Toute personne ayant ce lien peut le regarder",
+  "share.failed": "Impossible de créer le lien. Réessayez.",
+  "watch.subtitle": "Réalisé avec Cinema Dub",
+  "watch.untitled": "Un doublage partagé",
+  "watch.makeYours": "🎬 Faites votre propre doublage",
+  "watch.notFoundTitle": "Doublage introuvable",
+  "watch.notFoundBody": "Ce lien est invalide ou le doublage n'est plus disponible.",
+  "watch.goToDashboard": "Aller au tableau de bord →",
+
   // Solo run (play/run/[id])
   "srun.recordFirst": "Enregistrez au moins un secteur d'abord.",
   "srun.exportFailed": "Export échoué.",
@@ -1650,6 +1686,18 @@ const ru: Dict = {
   "game.noSectors": "Нет секторов",
   "game.quit": "Выйти",
 
+  // Share a finished dub + the public /watch page
+  "share.button": "🔗 Копировать ссылку",
+  "share.creating": "Создаём ссылку…",
+  "share.linkReady": "Любой, у кого есть эта ссылка, может посмотреть",
+  "share.failed": "Не удалось создать ссылку. Попробуйте ещё раз.",
+  "watch.subtitle": "Сделано в Cinema Dub",
+  "watch.untitled": "Общий дубляж",
+  "watch.makeYours": "🎬 Сделай свой дубляж",
+  "watch.notFoundTitle": "Дубляж не найден",
+  "watch.notFoundBody": "Эта ссылка недействительна или дубляж больше недоступен.",
+  "watch.goToDashboard": "Перейти в панель →",
+
   // Solo run (play/run/[id])
   "srun.recordFirst": "Сначала запишите хотя бы один сектор.",
   "srun.exportFailed": "Экспорт не удался.",
@@ -2086,6 +2134,18 @@ const ro: Dict = {
   "game.back": "Înapoi",
   "game.noSectors": "Fără sectoare",
   "game.quit": "Ieși",
+
+  // Share a finished dub + the public /watch page
+  "share.button": "🔗 Copiază linkul",
+  "share.creating": "Se creează linkul…",
+  "share.linkReady": "Oricine are acest link îl poate viziona",
+  "share.failed": "Nu s-a putut crea linkul. Încearcă din nou.",
+  "watch.subtitle": "Făcut cu Cinema Dub",
+  "watch.untitled": "Un dublaj distribuit",
+  "watch.makeYours": "🎬 Fă-ți propriul dublaj",
+  "watch.notFoundTitle": "Dublaj negăsit",
+  "watch.notFoundBody": "Acest link este invalid sau dublajul nu mai este disponibil.",
+  "watch.goToDashboard": "Mergi la panou →",
 
   // Solo run (play/run/[id])
   "srun.recordFirst": "Înregistrează mai întâi cel puțin un sector.",

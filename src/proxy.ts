@@ -14,6 +14,9 @@ const isPublicRoute = createRouteMatcher([
   "/library(.*)",
   "/play(.*)", // solo dubbing (guest)
   "/party(.*)", // online party lobby + studio (guest)
+  "/watch(.*)", // public shared-dub watch page (anyone with the link)
+  "/ingest(.*)", // PostHog analytics reverse proxy (see next.config.ts)
+  "/api/user", // GET returns the current identity (guest-safe) for analytics
   "/api/clerk/webhook",
   "/api/library(.*)",
   "/api/videos(.*)",
@@ -21,6 +24,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/room(.*)", // all party room actions (join/select/submit/render/…)
   "/api/solo(.*)", // solo lookup + video fetch
   "/api/creator/dub(.*)", // export the finished solo dub (no membership gate)
+  "/api/share(.*)", // create a public share link for a finished dub (guest)
   "/api/download(.*)", // force-download a finished video
 ]);
 

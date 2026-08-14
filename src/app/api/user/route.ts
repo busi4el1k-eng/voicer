@@ -4,6 +4,17 @@ import { getOrCreateUser } from "@/lib/get-user";
 
 export const runtime = "nodejs";
 
+// The signed-in player's internal id (used to identify them in analytics) — or
+// null for a guest. Public + guest-safe: never redirects, just reports identity.
+export async function GET() {
+  try {
+    const user = await getOrCreateUser();
+    return NextResponse.json({ id: user?.id ?? null });
+  } catch {
+    return NextResponse.json({ id: null });
+  }
+}
+
 // Update the signed-in player's profile. For now just the display name (shown on
 // the dashboard and as "Play as <name>").
 export async function PATCH(req: NextRequest) {

@@ -11,6 +11,7 @@ import { ScenarioWindow, scenarioFromSegments } from "@/components/ScenarioWindo
 import { CombineProgress } from "@/components/CombineProgress";
 import { ClapperCountdown } from "@/components/ClapperCountdown";
 import { RateVideo } from "@/components/RateVideo";
+import { ShareButton } from "@/components/ShareButton";
 import { downloadHref } from "@/lib/download";
 import { useI18n } from "@/components/LanguageProvider";
 import { useRoom } from "@/lib/useRoom";
@@ -57,7 +58,6 @@ export default function PartyStudioPage() {
   const [leaving, setLeaving] = useState(false);
   // Ratings are mandatory before leaving: pressing "back to dashboard" reveals
   // them, and the exit only unlocks once each required rating is saved.
-  const [showRating, setShowRating] = useState(false);
   const [videoSaved, setVideoSaved] = useState(false);
   const [playersSaved, setPlayersSaved] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -143,7 +143,6 @@ export default function PartyStudioPage() {
     setVideoReady(false);
     setErr("");
     setRenderBusy(false);
-    setShowRating(false);
     setVideoSaved(false);
     setPlayersSaved(false);
   }, [room?.videoUploadId]);
@@ -404,51 +403,48 @@ export default function PartyStudioPage() {
               <VideoStage src={room.finalUrl} />
             </div>
             <div className="flex flex-col items-center gap-3">
-              <a href={downloadHref(room.finalUrl, `${title}.mp4`)} className="g-btn g-btn-start">
-                {t("game.downloadVideo")}
-              </a>
-              {/* Before ratings are shown, this button reveals them instead of
-                  leaving; once they're revealed it exits only when they're done. */}
-              {!showRating && canRate ? (
-                <button
-                  onClick={() => setShowRating(true)}
-                  className="g-btn g-btn-ghost w-full"
+              <div className="flex w-full flex-wrap items-center gap-3">
+                <a
+                  href={downloadHref(room.finalUrl, `${title}.mp4`)}
+                  className="g-btn g-btn-start min-w-[150px] flex-1"
                 >
-                  {t("game.backToDashboard")}
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => void backToLobby()}
-                    disabled={leaving || !ratingsDone}
-                    className="g-btn g-btn-ghost w-full"
-                  >
-                    {leaving ? "…" : t("game.backToDashboard")}
-                  </button>
-                  {!ratingsDone && (
-                    <p className="text-[12px] text-sun">{t("pstud.rateToContinue")}</p>
+                  {t("game.downloadVideo")}
+                </a>
+                <ShareButton videoUrl={room.finalUrl} title={title} mode="party" />
+              </div>
+              {/* Ratings are always shown, above the exit. Leaving still waits
+                  for them to be done. */}
+              {canRate && playerId && (
+                <div className="w-full">
+                  {needVideo && (
+                    <RateVideo
+                      uploadId={room.videoUploadId!}
+                      raterKey={playerId}
+                      onSaved={setVideoSaved}
+                    />
                   )}
-                </>
+                  {needPlayers && (
+                    <RatePlayers
+                      code={room.code}
+                      playerId={playerId}
+                      players={room.players}
+                      onSaved={setPlayersSaved}
+                    />
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={() => void backToLobby()}
+                disabled={leaving || !ratingsDone}
+                className="g-btn g-btn-ghost w-full"
+              >
+                {leaving ? "…" : t("game.backToDashboard")}
+              </button>
+              {!ratingsDone && (
+                <p className="text-[12px] text-sun">{t("pstud.rateToContinue")}</p>
               )}
             </div>
-
-            {showRating && playerId && (
-              <>
-                {room.videoUploadId && (
-                  <RateVideo
-                    uploadId={room.videoUploadId}
-                    raterKey={playerId}
-                    onSaved={setVideoSaved}
-                  />
-                )}
-                <RatePlayers
-                  code={room.code}
-                  playerId={playerId}
-                  players={room.players}
-                  onSaved={setPlayersSaved}
-                />
-              </>
-            )}
           </div>
             );
           })()

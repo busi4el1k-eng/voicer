@@ -184,6 +184,18 @@ model VideoSegment {
   @@index([uploadId])
 }
 
+// A finished dub someone chose to share. The rendered result MP4 already lives
+// in Spaces (persistent, public-read); this row just gives it a short, shareable
+// public URL (/watch/<id>) that anyone can open to watch the dub — no account,
+// no relation to who made it. Created on demand when a player taps "Share".
+model SharedDub {
+  id        String   @id @default(cuid())
+  videoUrl  String // public Spaces URL of the rendered dub
+  title     String   @default("")
+  mode      String   @default("solo") // 'solo' | 'party' — just for display
+  createdAt DateTime @default(now())
+}
+
 // A live online room. 4-char code is the primary key. Holds up to 4 players
 // (host + 3), tracked by the RoomPlayer join rows.
 model Room {

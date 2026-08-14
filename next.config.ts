@@ -14,6 +14,25 @@ const nextConfig: NextConfig = {
     // client_max_body_size (1024m) so full video uploads make it through.
     proxyClientMaxBodySize: "1024mb",
   },
+
+  // PostHog analytics reverse proxy: the browser talks to our own /ingest path
+  // (see src/instrumentation-client.ts) and we forward it to PostHog EU cloud,
+  // so ad-blockers that block *.posthog.com can't drop our events. The /static
+  // rule must come before the catch-all. Trailing-slash redirects are skipped
+  // because PostHog's endpoints are sensitive to them.
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
+      {
+        source: "/ingest/static/:path*",
+        destination: "https://eu-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/ingest/:path*",
+        destination: "https://eu.i.posthog.com/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
