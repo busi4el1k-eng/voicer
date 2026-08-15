@@ -98,6 +98,22 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Announcement bell "ring": a quick swinging wiggle, applied for ~0.9s each
+   time the bell chimes while there's an unread announcement. */
+@keyframes bell-ring {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(9deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(3deg); }
+  100% { transform: rotate(0); }
+}
+.bell-ring svg {
+  animation: bell-ring 0.9s ease-in-out;
+  transform-origin: top center;
+}
+
 /* ============================================================
    Left ad rail (desktop only) — Gartic-Phone style persistent skyscraper.
    The rail is position:fixed on the far left; the whole page is padded right

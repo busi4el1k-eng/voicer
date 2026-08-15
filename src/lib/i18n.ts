@@ -340,6 +340,8 @@ const en: Dict = {
   "game.quit": "Quit",
 
   // Share a finished dub + the public /watch page
+  "announce.aria": "Announcements",
+  "announce.title": "Announcement",
   "share.button": "🔗 Copy link",
   "share.creating": "Creating link…",
   "share.linkReady": "Anyone with this link can watch",
@@ -789,6 +791,8 @@ const es: Dict = {
   "game.quit": "Salir",
 
   // Share a finished dub + the public /watch page
+  "announce.aria": "Anuncios",
+  "announce.title": "Anuncio",
   "share.button": "🔗 Copiar enlace",
   "share.creating": "Creando enlace…",
   "share.linkReady": "Cualquiera con este enlace puede verlo",
@@ -1238,6 +1242,8 @@ const fr: Dict = {
   "game.quit": "Quitter",
 
   // Share a finished dub + the public /watch page
+  "announce.aria": "Annonces",
+  "announce.title": "Annonce",
   "share.button": "🔗 Copier le lien",
   "share.creating": "Création du lien…",
   "share.linkReady": "Toute personne ayant ce lien peut le regarder",
@@ -1687,6 +1693,8 @@ const ru: Dict = {
   "game.quit": "Выйти",
 
   // Share a finished dub + the public /watch page
+  "announce.aria": "Объявления",
+  "announce.title": "Объявление",
   "share.button": "🔗 Копировать ссылку",
   "share.creating": "Создаём ссылку…",
   "share.linkReady": "Любой, у кого есть эта ссылка, может посмотреть",
@@ -2136,6 +2144,8 @@ const ro: Dict = {
   "game.quit": "Ieși",
 
   // Share a finished dub + the public /watch page
+  "announce.aria": "Anunțuri",
+  "announce.title": "Anunț",
   "share.button": "🔗 Copiază linkul",
   "share.creating": "Se creează linkul…",
   "share.linkReady": "Oricine are acest link îl poate viziona",

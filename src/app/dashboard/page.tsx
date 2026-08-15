@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
 import { isClerkConfigured } from "@/lib/clerk";
 import { AccountBar } from "@/components/AccountBar";
+import { AnnouncementBell } from "@/components/AnnouncementBell";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { T } from "@/components/LanguageProvider";
 import { Lobby } from "@/components/Lobby";
@@ -55,6 +56,7 @@ export default async function DashboardPage() {
   return (
     <main className="g-screen">
       <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        <AnnouncementBell />
         <LanguageSwitcher />
         <AccountBar />
       </div>
