@@ -115,11 +115,13 @@ body {
 }
 
 /* ============================================================
-   Left ad rail (desktop only) — Gartic-Phone style persistent skyscraper.
-   The rail is position:fixed on the far left; the whole page is padded right
-   by --ad-rail so nothing sits under it. Below the breakpoint the var is 0,
-   the rail is display:none, and the layout is full-width — phones get no ad
-   and no wasted gutter.
+   Right ad rail (desktop only) — Gartic-Phone style persistent skyscraper.
+   The rail is position:fixed on the far RIGHT; the page reserves --ad-rail on
+   BOTH sides so the content column stays centred in the true middle of the
+   viewport (the ad lives in the reserved right gutter instead of shoving the
+   whole page off-centre). With no ad rendered the symmetric gutters still keep
+   content centred. Below the breakpoint the var is 0, the rail is display:none,
+   and the layout is full-width — phones get no ad and no wasted gutter.
    ============================================================ */
 :root {
   --ad-rail: 0px;
@@ -136,11 +138,14 @@ body {
     --ad-rail: 200px;
   }
   body {
+    /* Symmetric gutters keep the centred content column in the middle of the
+       viewport regardless of whether an ad actually fills the right rail. */
     padding-left: var(--ad-rail);
+    padding-right: var(--ad-rail);
   }
   .ad-rail {
     position: fixed;
-    left: 0;
+    right: 0;
     top: 0;
     bottom: 0;
     width: var(--ad-rail);
@@ -163,10 +168,23 @@ body {
   }
 }
 
-/* Wider screens → wider rail, so AdSense can serve a 300-wide half-page too. */
-@media (min-width: 1600px) {
+/* --g-zoom uniformly scales the centred content column up on big screens so it
+   fills more of the viewport instead of floating small in a sea of empty margin
+   (the content is otherwise capped at 1080px). Applied via `zoom` on .g-screen
+   (and mirrored on the fixed top-left back button so both corners match). Kept
+   modest and stepped by width so the scaled column still fits inside the ad-rail
+   gutters without overflowing. */
+:root {
+  --g-zoom: 1;
+}
+@media (min-width: 1500px) {
   :root {
-    --ad-rail: 340px;
+    --g-zoom: 1.15;
+  }
+}
+@media (min-width: 1850px) {
+  :root {
+    --g-zoom: 1.3;
   }
 }
 
@@ -183,6 +201,25 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* Desktop: centre the content column vertically too, so short pages sit in the
+   middle of the viewport instead of hugging the top. The column fills the
+   viewport height and centres its *flow* children (logo + panels) with flexbox,
+   rather than centring the whole box — that way the top-right controls, which
+   are absolutely positioned at the column's top edge, stay pinned to the top of
+   the screen instead of riding down with the centred content. `min-height` (not
+   a fixed height) means a tall page grows past the viewport and scrolls
+   normally, with nothing clipped. Phones are left untouched. */
+@media (min-width: 1200px) {
+  .g-screen {
+    /* Uniformly scale the whole column up on big screens (see --g-zoom). Because
+       `zoom` also scales the vh unit, divide the min-height back down so the
+       column is still exactly one viewport tall (no phantom scrollbar). */
+    zoom: var(--g-zoom);
+    min-height: calc(100vh / var(--g-zoom));
+    justify-content: center;
+  }
 }
 
 .g-logo {
