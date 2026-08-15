@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Fredoka, Nunito } from "next/font/google";
 import { cookies } from "next/headers";
 import { ClerkResilientProvider } from "@/components/ClerkResilientProvider";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { BackButton } from "@/components/BackButton";
+import { AdRail } from "@/components/AdRail";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { PostHogIdentify } from "@/components/PostHogIdentify";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
 import { isClerkConfigured } from "@/lib/clerk";
+import { ADSENSE_CLIENT, ADSENSE_ENABLED } from "@/lib/adsense";
 import "./globals.css";
 import "./mobile.css";
 
@@ -47,8 +50,20 @@ export default async function RootLayout({
           <PostHogIdentify />
           <AnimatedBackground />
           <BackButton />
+          <AdRail />
           {children}
         </LanguageProvider>
+        {/* AdSense loader — mounted once at the app root so the persistent left
+            rail (and any future units) can request ads on every page. */}
+        {ADSENSE_ENABLED && (
+          <Script
+            id="adsbygoogle-loader"
+            async
+            strategy="afterInteractive"
+            crossOrigin="anonymous"
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+          />
+        )}
       </body>
     </html>
   );

@@ -18,7 +18,13 @@ export function BackButton() {
   };
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-40">
+    <div
+      className="pointer-events-none fixed inset-x-0 top-0 z-40"
+      // Shift right by the ad-rail width on desktop (0 on mobile) so this
+      // full-viewport bar's centred 1080 column stays aligned with the page
+      // content, which is padded by the same amount. See --ad-rail in globals.css.
+      style={{ paddingLeft: "var(--ad-rail, 0px)" }}
+    >
       <div className="relative mx-auto max-w-[1080px]">
         <button
           type="button"
