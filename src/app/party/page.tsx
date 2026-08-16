@@ -42,9 +42,11 @@ export default function PartyHome() {
   // instantly, before the room fetch resolves.
   const isMember = inRoom && !isHost;
   const partyCount = room ? room.players.length : null;
-  // Party play is fully restricted unless the party size exactly matches the
-  // video's recommended player count.
+  // Whether the party size matches the video's recommended (creator-cast) count.
+  // Any size is now allowed to play — the studio shares sectors out to fit — so
+  // this only drives the soft colour hint and the heads-up note, not a hard gate.
   const partyMatches = !!video && partyCount !== null && partyCount === video.players;
+  const inParty = partyCount !== null && partyCount >= 1;
 
   // Once the host launches (room flips to "dubbing"), the host and every waiting
   // member follow into the studio together. Also covers "finished" so a late
@@ -262,40 +264,38 @@ export default function PartyHome() {
             </div>
 
             <div className="mt-4 flex flex-col gap-2">
-              {/* Fully restricted unless the party size exactly matches the
-                  recommendation. Launching drops the whole party into the studio. */}
+              {/* Any party size can play — the studio shares sectors out to fit.
+                  Only blocked if the video has no sectors, or you're not in a
+                  party yet. Launching drops the whole party into the studio. */}
               <button
                 onClick={() => void startForEveryone()}
-                disabled={video.lines === 0 || !partyMatches || launching}
+                disabled={video.lines === 0 || !inParty || launching}
                 className="g-btn g-btn-start w-full disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {launching
                   ? t("ppick.starting")
                   : video.lines === 0
                     ? t("solo.noLinesYet")
-                    : partyMatches
-                      ? t("ppick.startEveryone")
-                      : t("ppick.sizeMustMatch")}
+                    : !inParty
+                      ? t("ppick.needParty")
+                      : t("ppick.startEveryone")}
               </button>
 
-              {video.lines > 0 && !partyMatches && (
+              {video.lines > 0 && !inParty && (
                 <p className="text-center text-[13px] leading-[1.5] text-sun">
-                  {partyCount === null
-                    ? t("ppick.notInParty", {
-                        n: video.players,
-                        players: video.players === 1 ? t("creator.player") : t("creator.players"),
-                      })
-                    : partyCount < video.players
-                      ? t("ppick.inviteMore", {
-                          a: partyCount,
-                          b: video.players,
-                          c: video.players - partyCount,
-                        })
-                      : t("ppick.removeSome", {
-                          a: partyCount,
-                          b: video.players,
-                          c: partyCount - video.players,
-                        })}
+                  {t("ppick.notInParty", {
+                    n: video.players,
+                    players: video.players === 1 ? t("creator.player") : t("creator.players"),
+                  })}
+                </p>
+              )}
+              {/* Non-blocking heads-up when the size differs from the cast count:
+                  fewer players double up characters, more players share them. */}
+              {video.lines > 0 && inParty && !partyMatches && partyCount !== null && (
+                <p className="text-center text-[13px] leading-[1.5] text-sun">
+                  {partyCount < video.players
+                    ? t("ppick.fewerOk", { a: partyCount, b: video.players })
+                    : t("ppick.moreOk", { a: partyCount, b: video.players })}
                 </p>
               )}
             </div>

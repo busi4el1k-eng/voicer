@@ -293,27 +293,32 @@ export function Lobby({
         </div>
       </div>
 
-      <div className="g-actions flex-col gap-2">
-        {selected === "party" &&
-          // Party mode requires a party of at least MIN_PLAYERS. Ready → enter
-          // directly; otherwise a button opens the create/gather modal.
-          (partyReady ? (
-            <button className="g-btn g-btn-start" onClick={startParty} disabled={roomBusy}>
-              {t("party.startParty")}
-            </button>
-          ) : (
-            <button
-              className="g-btn g-btn-primary"
-              onClick={() => {
-                setRoomError(null);
-                setPartyOpen(true);
-              }}
-            >
-              {room ? t("party.setup") : t("party.create")}
-            </button>
-          ))}
-        {note && <p className="text-[12px] text-cream/60">{t("lobby.comingSoon")}</p>}
-      </div>
+      {/* Only render the actions row when it has something to show. An always-on
+          empty row still carries its margin-top, which pushes the modes panel up
+          so it no longer bottom-aligns with the room/profile window. */}
+      {(selected === "party" || note) && (
+        <div className="g-actions flex-col gap-2">
+          {selected === "party" &&
+            // Party mode requires a party of at least MIN_PLAYERS. Ready → enter
+            // directly; otherwise a button opens the create/gather modal.
+            (partyReady ? (
+              <button className="g-btn g-btn-start" onClick={startParty} disabled={roomBusy}>
+                {t("party.startParty")}
+              </button>
+            ) : (
+              <button
+                className="g-btn g-btn-primary"
+                onClick={() => {
+                  setRoomError(null);
+                  setPartyOpen(true);
+                }}
+              >
+                {room ? t("party.setup") : t("party.create")}
+              </button>
+            ))}
+          {note && <p className="text-[12px] text-cream/60">{t("lobby.comingSoon")}</p>}
+        </div>
+      )}
 
       {gate && <GuestGate onClose={() => setGate(false)} />}
 

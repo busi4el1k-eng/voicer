@@ -25,11 +25,14 @@ export async function POST(req: NextRequest) {
   if (!player || player.roomCode !== code) {
     return NextResponse.json({ error: "You're not in this room." }, { status: 404 });
   }
-  if (!player.isHost) {
-    return NextResponse.json({ error: "Only the host controls the room." }, { status: 403 });
-  }
 
   const status = target === "playing" ? "playing" : "lobby";
+  // Ending the game back to the lobby ("quit") is open to ANY player — anyone
+  // can bail the whole party out of a game and everyone regroups in the lobby.
+  // Jumping straight to picking a new video stays host-only.
+  if (status === "playing" && !player.isHost) {
+    return NextResponse.json({ error: "Only the host controls the room." }, { status: 403 });
+  }
   await db.$transaction([
     db.roomTake.deleteMany({ where: { roomCode: code } }),
     // Clear frozen seats too — the next game re-assigns them in select, so a

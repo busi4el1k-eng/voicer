@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
 import { deleteObjects, spacesConfigured } from "@/lib/spaces";
+import { LOCALES } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 
@@ -23,11 +24,12 @@ async function ownedUpload(id: string) {
 // table can send whichever one changed.
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const { title, visibility } = (await req.json().catch(() => ({}))) as {
+  const { title, visibility, language } = (await req.json().catch(() => ({}))) as {
     title?: string;
     visibility?: string;
+    language?: string;
   };
-  if (title === undefined && visibility === undefined) {
+  if (title === undefined && visibility === undefined && language === undefined) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
   if (title !== undefined && typeof title !== "string") {
@@ -35,6 +37,14 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   }
   if (visibility !== undefined && visibility !== "public" && visibility !== "private") {
     return NextResponse.json({ error: "visibility must be 'public' or 'private'." }, { status: 400 });
+  }
+  // Empty string clears the tag back to "unset" (falls back to the title guess).
+  if (
+    language !== undefined &&
+    language !== "" &&
+    !(LOCALES as readonly string[]).includes(language)
+  ) {
+    return NextResponse.json({ error: "language must be a supported locale or empty." }, { status: 400 });
   }
   const { upload } = await ownedUpload(id);
   if (!upload) return NextResponse.json({ error: "Upload not found." }, { status: 404 });
@@ -44,6 +54,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     data: {
       ...(title !== undefined ? { title: title.slice(0, 120) } : {}),
       ...(visibility !== undefined ? { visibility } : {}),
+      ...(language !== undefined ? { language: language === "" ? null : language } : {}),
     },
     include: { segments: { orderBy: { index: "asc" } } },
   });

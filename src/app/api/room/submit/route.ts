@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import { normalizeRoomCode } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
 import { emitRoom } from "@/lib/room-events";
+import { assignSectors } from "@/lib/party-assign";
 import { SPACES_PREFIX, putObject, spacesConfigured } from "@/lib/spaces";
 
 export const runtime = "nodejs";
@@ -48,13 +49,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No video selected." }, { status: 409 });
   }
 
-  // Which sectors this player is allowed to dub (their seat's sectors).
+  // Which sectors this player is allowed to dub. The assignment adapts to the
+  // party size (see lib/party-assign): with the seats frozen at launch
+  // ([1..seatCount]) every client and the server compute the SAME sector→seat
+  // map, so a player can only upload takes for the sectors they were given.
   const segments = await db.videoSegment.findMany({
     where: { uploadId: room.videoUploadId },
     select: { id: true, player: true, startMs: true, endMs: true },
   });
+  const seatUniverse = Array.from(
+    { length: room.seatCount > 0 ? room.seatCount : room.players.length },
+    (_, i) => i + 1,
+  );
+  const assignment = assignSectors(segments, seatUniverse);
   const mine = new Set(
-    segments.filter((s) => (s.player ?? 1) === seat && s.endMs > s.startMs).map((s) => s.id),
+    segments.filter((s) => assignment.get(s.id) === seat).map((s) => s.id),
   );
 
   for (const [field, value] of form.entries()) {

@@ -16,6 +16,7 @@ export type RoomView = {
   status: string;
   videoUploadId: string | null;
   finalUrl: string;
+  seatCount: number; // players frozen into seats at launch (0 before launch)
   players: PlayerView[];
 };
 

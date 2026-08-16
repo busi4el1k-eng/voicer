@@ -9,9 +9,21 @@ import { DEFAULT_LOCALE, isLocale, translate } from "@/lib/i18n";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-async function getShare(id: string) {
+// A watchable dub, normalised from either an explicitly-shared dub (SharedDub)
+// or a podium clip (Clip, which carries no title of its own → use the source
+// video's title). Lets one /watch/<id> page serve both.
+type Watchable = { title: string; videoUrl: string };
+
+async function getShare(id: string): Promise<Watchable | null> {
   try {
-    return await db.sharedDub.findUnique({ where: { id } });
+    const share = await db.sharedDub.findUnique({ where: { id } });
+    if (share) return { title: share.title, videoUrl: share.videoUrl };
+    const clip = await db.clip.findUnique({
+      where: { id },
+      include: { upload: { select: { title: true } } },
+    });
+    if (clip) return { title: clip.upload.title, videoUrl: clip.videoUrl };
+    return null;
   } catch {
     return null; // db unreachable — treat as missing rather than 500
   }

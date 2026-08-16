@@ -4,6 +4,7 @@ import { writeFile } from "node:fs/promises";
 import db from "@/lib/db";
 import { SPACES_PREFIX, getObjectBuffer, putObject, spacesConfigured } from "@/lib/spaces";
 import { muxDub, withSourceFile, type DubTake } from "@/lib/ffmpeg";
+import { analyzeTakes, recordPublicClip, type AggFeatures } from "@/lib/perf-clip";
 import { ensureBedForUpload } from "@/lib/bed.server";
 import { RenderBusyError, withRenderSlot } from "@/lib/render-queue";
 import { ClientError, toClientMessage } from "@/lib/errors";
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
       const src = await getObjectBuffer(upload.sourceKey);
       const ext = upload.sourceKey.split(".").pop() || "mp4";
 
-      const outBuf = await withSourceFile(src, ext, async ({ dir, input }) => {
+      const { outBuf, features } = await withSourceFile(src, ext, async ({ dir, input }) => {
         // Match each uploaded take to its sector (by id), in chronological order.
         const takes: DubTake[] = [];
         let i = 0;
@@ -68,12 +69,24 @@ export async function POST(req: NextRequest) {
           await writeFile(bedPath, await getObjectBuffer(bedKey));
         }
 
+        // Score the performance from the raw voice takes (podium), public only.
+        let features: AggFeatures | null = null;
+        if (upload.visibility === "public") features = await analyzeTakes(takes);
+
         const out = join(dir, "dub.mp4");
-        return muxDub(input, takes, out, { bedPath });
+        return { outBuf: await muxDub(input, takes, out, { bedPath }), features };
       });
 
       const key = `${SPACES_PREFIX}sources/${upload.id}/dubs/${Date.now()}.mp4`;
       const { url } = await putObject(key, outBuf, "video/mp4");
+      // Enter the public dub into the "Clips of Today" podium (no-op if private).
+      void recordPublicClip({
+        uploadId: upload.id,
+        visibility: upload.visibility,
+        videoUrl: url,
+        mode: "solo",
+        features,
+      }).catch(() => {});
       return url;
     });
 

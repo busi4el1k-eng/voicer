@@ -108,6 +108,70 @@ export async function extractAudio(input: string, out: string): Promise<Buffer> 
   return readFile(out);
 }
 
+// Run ffmpeg and resolve with its full stderr (where filters print their
+// summaries), regardless of exit code — analysis filters still emit useful
+// numbers even when ffmpeg exits non-zero on an odd input.
+function runCapture(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!FFMPEG) {
+      reject(new Error("ffmpeg binary not found. Set FFMPEG_PATH or install ffmpeg-static."));
+      return;
+    }
+    const proc = spawn(FFMPEG, args, { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    proc.stderr.on("data", (d) => (stderr += d.toString()));
+    proc.on("error", reject);
+    proc.on("close", () => resolve(stderr));
+  });
+}
+
+// Raw, un-normalised performance features of one voice recording. All pure DSP
+// (no AI): loudness/dynamics/punch/coverage of the SPOKEN voice — analyse the
+// recorded take, never the final mix, so the music bed doesn't skew it.
+export type AudioFeatures = {
+  loudness: number; // integrated loudness, LUFS (higher/less-negative = louder)
+  lra: number; // loudness range, LU (how much the volume swings → expressiveness)
+  crest: number; // crest factor (peak / RMS → punchy vs flat delivery)
+  silenceSec: number; // total detected silence, seconds (→ coverage penalty)
+};
+
+const RE_LOUDNESS = /I:\s*(-?\d+(?:\.\d+)?)\s*LUFS/;
+const RE_LRA = /LRA:\s*(-?\d+(?:\.\d+)?)\s*LU/;
+const RE_CREST = /Crest factor:\s*(\d+(?:\.\d+)?)/g;
+const RE_SILENCE = /silence_duration:\s*(\d+(?:\.\d+)?)/g;
+
+// Measure one voice recording with a single ffmpeg pass: EBU R128 loudness +
+// loudness range, astats (crest factor), and silencedetect (coverage). Parses
+// the numbers out of ffmpeg's stderr summaries. Best-effort — on any parse/decode
+// trouble the caller gets neutral defaults rather than an exception.
+export async function analyzeVoice(path: string): Promise<AudioFeatures> {
+  const stderr = await runCapture([
+    "-hide_banner",
+    "-nostats",
+    "-i", path,
+    "-map", "0:a?",
+    "-af", "ebur128=framelog=quiet,astats=metadata=0,silencedetect=noise=-30dB:d=0.2",
+    "-f", "null", "-",
+  ]);
+
+  const loudness = Number(stderr.match(RE_LOUDNESS)?.[1] ?? NaN);
+  const lra = Number(stderr.match(RE_LRA)?.[1] ?? NaN);
+
+  // astats prints a "Crest factor" per channel plus an Overall — average what we
+  // find so a stereo take isn't double-counted oddly.
+  const crests = [...stderr.matchAll(RE_CREST)].map((m) => Number(m[1])).filter((n) => n > 0);
+  const crest = crests.length ? crests.reduce((a, b) => a + b, 0) / crests.length : NaN;
+
+  const silenceSec = [...stderr.matchAll(RE_SILENCE)].reduce((a, m) => a + Number(m[1]), 0);
+
+  return {
+    loudness: Number.isFinite(loudness) ? loudness : -70,
+    lra: Number.isFinite(lra) ? lra : 0,
+    crest: Number.isFinite(crest) ? crest : 1,
+    silenceSec: Number.isFinite(silenceSec) ? silenceSec : 0,
+  };
+}
+
 // A recorded dub take placed on the timeline of the source video.
 export type DubTake = { path: string; startMs: number; endMs: number };
 

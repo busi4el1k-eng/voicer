@@ -15,6 +15,8 @@ import { ShareButton } from "@/components/ShareButton";
 import { downloadHref } from "@/lib/download";
 import { useI18n } from "@/components/LanguageProvider";
 import { useRoom } from "@/lib/useRoom";
+import { useAppDialog } from "@/components/AppDialog";
+import { assignSectors, roleCount, seatsPerRole } from "@/lib/party-assign";
 
 type Seg = {
   id: string;
@@ -39,7 +41,8 @@ export default function PartyStudioPage() {
   const router = useRouter();
   const mic = useMic();
   const { t } = useI18n();
-  const { room, playerId, inRoom, isHost, hydrated } = useRoom({
+  const { dialog, confirm } = useAppDialog();
+  const { room, playerId, inRoom, isHost, hydrated, restart } = useRoom({
     displayName: "",
     avatarColor: "",
   });
@@ -61,6 +64,12 @@ export default function PartyStudioPage() {
   const [videoSaved, setVideoSaved] = useState(false);
   const [playersSaved, setPlayersSaved] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  // One-time "uneven party" heads-up: explains how sectors were shared out when
+  // the party size doesn't match the video's character count. null = no notice.
+  const [notice, setNotice] = useState<
+    | null
+    | { kind: "fewer" | "more"; players: number; roles: number; myRoles: number; share: number }
+  >(null);
 
   const stageRef = useRef<VideoStageHandle>(null);
   const pcmRef = useRef<Pcm | null>(null);
@@ -90,10 +99,18 @@ export default function PartyStudioPage() {
     }
   }, [hydrated, inRoom, room, router, leaving]);
 
-  // Load the room's video, then keep only the sectors assigned to my seat.
+  // Seat universe frozen at launch: [1..seatCount]. Falls back to the live
+  // roster size only if the room predates seatCount (0). Used to assign sectors
+  // the SAME way here as the server does in submit.
+  const seatCount = room ? (room.seatCount > 0 ? room.seatCount : room.players.length) : 0;
+
+  // Load the room's video, then keep only the sectors this seat was assigned.
+  // The assignment adapts to the party size (see lib/party-assign): with fewer
+  // players than characters a seat covers several roles; with more, a character
+  // is split across seats.
   useEffect(() => {
     const uploadId = room?.videoUploadId;
-    if (!uploadId || mySeat === 0) return;
+    if (!uploadId || mySeat === 0 || seatCount === 0) return;
     let cancelled = false;
     (async () => {
       try {
@@ -102,9 +119,27 @@ export default function PartyStudioPage() {
         const d = (await r.json()) as { video: Video };
         if (cancelled) return;
         setVideo(d.video);
-        const mine = d.video.segments.filter((s) => s.endMs > s.startMs && (s.player ?? 1) === mySeat);
+
+        const seats = Array.from({ length: seatCount }, (_, i) => i + 1);
+        const assignment = assignSectors(d.video.segments, seats);
+        const mine = d.video.segments.filter((s) => assignment.get(s.id) === mySeat);
         setSegs(mine);
         setPhase(mine.length === 0 ? "empty" : "run");
+
+        // Work out whether the party is uneven, and how it affects ME, so we can
+        // show a one-time heads-up. Only when I actually have sectors.
+        const roles = roleCount(d.video.segments);
+        const myRoleCount = new Set(mine.map((s) => s.player ?? 1)).size;
+        if (mine.length > 0 && seatCount !== roles) {
+          if (seatCount < roles) {
+            setNotice({ kind: "fewer", players: seatCount, roles, myRoles: myRoleCount, share: 0 });
+          } else {
+            // Largest number of players sharing any character I voice.
+            const spr = seatsPerRole(d.video.segments, seats);
+            const share = Math.max(1, ...[...new Set(mine.map((s) => s.player ?? 1))].map((r) => spr.get(r) ?? 1));
+            setNotice({ kind: "more", players: seatCount, roles, myRoles: myRoleCount, share });
+          }
+        }
       } catch {
         if (!cancelled) setPhase("error");
       }
@@ -112,7 +147,7 @@ export default function PartyStudioPage() {
     return () => {
       cancelled = true;
     };
-  }, [room?.videoUploadId, mySeat]);
+  }, [room?.videoUploadId, mySeat, seatCount]);
 
   // Same-party rematch: because the host leaving no longer tears the room down,
   // a player can sit on the result screen while the host starts the next game on
@@ -145,6 +180,7 @@ export default function PartyStudioPage() {
     setRenderBusy(false);
     setVideoSaved(false);
     setPlayersSaved(false);
+    setNotice(null);
   }, [room?.videoUploadId]);
 
   // Decode the source once and precompute each of my sectors' original envelope.
@@ -321,9 +357,53 @@ export default function PartyStudioPage() {
     router.push("/dashboard");
   }, [router]);
 
+  // Hard quit — the always-visible top button. Any player (host OR guest) can
+  // end the game for the WHOLE party: it resets the room back to the lobby, so
+  // every other player's studio follows to the dashboard via the live stream.
+  // Crucially it does NOT tear the room down or drop anyone's membership — the
+  // party stays together in the lobby, ready to start another dub. We confirm
+  // first because one tap ends the round for everybody.
+  const quit = useCallback(async () => {
+    const ok = await confirm({
+      title: t("pstud.quitTitle"),
+      message: t("pstud.quitMsg"),
+      confirmLabel: t("pstud.quitConfirm"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    setLeaving(true); // stop the guard from redirecting while we end the game
+    try {
+      await restart("lobby"); // end the game for everyone, keep the room open
+    } catch {
+      /* even if the reset call fails we still return to the dashboard */
+    }
+    router.replace("/dashboard");
+  }, [confirm, restart, router, t]);
+
   // --- render ---------------------------------------------------------------
 
   const recordedCount = Object.keys(takes).length;
+
+  // Always-visible escape hatch: a yellow square pinned to the top-right that
+  // lets anyone — host or guest — bail out of the game to the dashboard at any
+  // point, in any phase. Rendered on every screen (including the loading state)
+  // so a player is never trapped mid-dub.
+  const quitButton = (
+    <button
+      onClick={() => void quit()}
+      disabled={leaving}
+      title={t("pstud.quit")}
+      aria-label={t("pstud.quit")}
+      className="fixed right-4 top-4 z-40 flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-[10px] bg-sun font-display text-ink shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-2 ring-black/10 transition hover:brightness-105 active:scale-95 disabled:opacity-60"
+    >
+      <span aria-hidden className="text-[16px] font-black leading-none">
+        ✕
+      </span>
+      <span className="text-[9px] font-black uppercase leading-none tracking-[0.06em]">
+        {t("pstud.quit")}
+      </span>
+    </button>
+  );
 
   // The active dubbing view (the final `else` branch below) uses a wider,
   // split-screen layout — video on the left, scenario script on the right — so
@@ -374,14 +454,17 @@ export default function PartyStudioPage() {
   if (!room || phase === "loading") {
     return (
       <main className="g-screen">
+        {quitButton}
         <p className="mt-20 text-cream/60">{t("game.loading")}</p>
+        {dialog}
       </main>
     );
   }
 
   return (
     <main className="g-screen">
-      <div className="flex h-[72px] items-center">
+      {quitButton}
+      <div className="flex h-[72px] items-center pr-16">
         <h1 className="g-logo">{title}</h1>
       </div>
 
@@ -657,8 +740,9 @@ export default function PartyStudioPage() {
                     <button
                       onClick={() => goTo(cur - 1)}
                       disabled={cur === 0 || busy}
-                      className="text-[13px] text-cream/50 underline disabled:opacity-40"
+                      className="g-btn g-btn-ghost flex h-10 items-center gap-1.5 px-4 text-[13px] disabled:opacity-40"
                     >
+                      <span aria-hidden className="text-[15px] leading-none">←</span>
                       {t("game.previousSector")}
                     </button>
                     <button
@@ -689,6 +773,37 @@ export default function PartyStudioPage() {
         )}
       </div>
       <CombineProgress open={renderBusy} />
+
+      {/* Uneven-party heads-up — shown once when the party size doesn't match the
+          video's character count, explaining how sectors were shared out. */}
+      {notice && (
+        <div className="g-modal-overlay" onClick={() => setNotice(null)}>
+          <div className="g-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-1 grid h-12 w-12 place-items-center rounded-full bg-sun/20 text-[24px]">
+              🎭
+            </div>
+            <h3 className="g-modal-title">{t("passign.title")}</h3>
+            <p className="g-modal-sub">
+              {notice.kind === "fewer"
+                ? t("passign.fewerBody", { players: notice.players, roles: notice.roles })
+                : t("passign.moreBody", { players: notice.players, roles: notice.roles })}
+            </p>
+            <p className="mb-4 text-center text-[14px] font-bold text-sun">
+              {notice.kind === "fewer"
+                ? notice.myRoles > 1
+                  ? t("passign.youVoiceMulti", { n: notice.myRoles })
+                  : t("passign.youVoiceOne")
+                : notice.share > 1
+                  ? t("passign.youShare", { n: notice.share })
+                  : t("passign.youVoiceOne")}
+            </p>
+            <button type="button" className="g-btn g-btn-start w-full" onClick={() => setNotice(null)}>
+              {t("passign.ok")}
+            </button>
+          </div>
+        </div>
+      )}
+      {dialog}
     </main>
   );
 }

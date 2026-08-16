@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { generateShareId } from "@/lib/share-id.server";
 import { SHARE_ID_LENGTH } from "@/lib/share-id";
+import { resolveLang } from "@/lib/lang-detect";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,6 +82,9 @@ export async function GET() {
     videos.push({
       id: u.id,
       title: u.title,
+      // Content language for the library's language filter: the creator's
+      // explicit tag, or a best-effort guess from the title when unset.
+      language: resolveLang(u.language, u.title),
       shareId,
       status: u.status,
       sourceUrl: u.sourceUrl,

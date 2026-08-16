@@ -100,6 +100,11 @@ model VideoUpload {
   shareId    String?        @unique
   userId     String?
   title      String         @default("")
+  // Content language of the dub, one of the app locales (en|es|fr|ru|ro) or null
+  // when unset. Used to filter/group the shared library so visitors see videos
+  // in their own language first instead of a wall of one dominant language.
+  // Null rows are best-effort guessed from the title on read (see lang-detect).
+  language   String?
   sourceKey  String // Spaces object key of the original upload
   sourceUrl  String // public URL of the original
   durationMs Int            @default(0)
@@ -126,10 +131,37 @@ model VideoUpload {
   segments   VideoSegment[]
   ratings    VideoRating[]
   plays      VideoPlay[]
+  clips      Clip[]
   createdAt  DateTime       @default(now())
 
   @@index([userId])
   @@index([visibility])
+  @@index([language])
+}
+
+// A finished dub of a PUBLIC library video, kept so it can compete on the
+// dashboard's "Clips of Today" podium. Written once per completed render (solo
+// export or party finish) when the source video is public. The "best" ranking is
+// a pure-DSP performance score computed from the recorded voice takes (no AI):
+// we store the raw audio features here and normalise them across the day's clips
+// at read time (see lib/perf-clip.ts), so "loudest / most dynamic" is judged
+// relative to the field rather than against magic thresholds.
+model Clip {
+  id       String      @id @default(cuid())
+  upload   VideoUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  uploadId String
+  videoUrl String // public Spaces URL of the rendered dub (the /watch clip)
+  mode     String      @default("solo") // 'solo' | 'party'
+  // Raw performance features from the voice takes (music/bed excluded):
+  loudness Float    @default(-70) // integrated loudness, LUFS (higher = louder)
+  lra      Float    @default(0) // loudness range, LU (dynamics / expressiveness)
+  crest    Float    @default(1) // crest factor (peak-to-RMS punch)
+  silence  Float    @default(0) // silence ratio 0..1 (1 = all silent → no coverage)
+  voicedMs Int      @default(0) // total dubbed (voiced) duration across sectors
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([uploadId])
 }
 
 // One recorded playthrough ("run") of a library video: written when a solo run
@@ -210,6 +242,11 @@ model Room {
   // The video the host locked in for a party dub, and the rendered result URL.
   videoUploadId String?
   finalUrl      String   @default("")
+  // How many players were in the party when the host launched the current game.
+  // Frozen at select so the sector→seat assignment (see lib/party-assign) is the
+  // SAME on every client and on the server even if someone leaves mid-game — the
+  // seat universe stays [1..seatCount], so nobody's sectors get reshuffled.
+  seatCount Int          @default(0)
   round     Int          @default(0)
   players   RoomPlayer[]
   takes     RoomTake[]

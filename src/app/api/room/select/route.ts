@@ -39,8 +39,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "That video has no sectors to dub." }, { status: 409 });
   }
 
-  // Party size must exactly match the number of distinct seats the creator used.
-  const seats = new Set(playableSegs.map((s) => s.player ?? 1)).size;
   // Freeze the roster order NOW so each player's seat (→ sector assignment) is
   // fixed for the whole game. The id tiebreaker keeps the order deterministic
   // even when two players joined in the same instant. This is the same order
@@ -50,16 +48,17 @@ export async function POST(req: NextRequest) {
     orderBy: [{ isHost: "desc" }, { createdAt: "asc" }, { id: "asc" }],
     select: { id: true },
   });
-  if (roster.length !== seats) {
-    return NextResponse.json(
-      { error: `This video needs exactly ${seats} players; your party has ${roster.length}.` },
-      { status: 409 },
-    );
+  // Party size no longer has to equal the video's character count: the sector →
+  // seat assignment (lib/party-assign) adapts to any party size — fewer players
+  // each voice several characters, more players share characters. We only need
+  // at least one player (always true — the host is here).
+  if (roster.length < 1) {
+    return NextResponse.json({ error: "You need at least one player." }, { status: 409 });
   }
 
-  // Reset per-player status, assign frozen seats, clear any prior takes/result,
-  // then launch. Seat is stored per row so a mid-game leave can never shift who
-  // dubs which sector.
+  // Reset per-player status, assign frozen seats, freeze the seat count, clear
+  // any prior takes/result, then launch. Seat + seatCount are stored so a
+  // mid-game leave can never shift who dubs which sector.
   await db.$transaction([
     db.roomTake.deleteMany({ where: { roomCode: code } }),
     ...roster.map((p, i) =>
@@ -67,7 +66,7 @@ export async function POST(req: NextRequest) {
     ),
     db.room.update({
       where: { code },
-      data: { videoUploadId: uploadId, finalUrl: "", status: "dubbing" },
+      data: { videoUploadId: uploadId, finalUrl: "", status: "dubbing", seatCount: roster.length },
     }),
   ]);
 

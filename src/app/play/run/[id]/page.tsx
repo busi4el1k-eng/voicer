@@ -14,6 +14,7 @@ import { ScenarioWindow, scenarioFromSegments } from "@/components/ScenarioWindo
 import { CombineProgress } from "@/components/CombineProgress";
 import { ClapperCountdown } from "@/components/ClapperCountdown";
 import { useI18n } from "@/components/LanguageProvider";
+import { useAppDialog } from "@/components/AppDialog";
 import { getClientId } from "@/lib/client-id";
 
 type Seg = {
@@ -36,6 +37,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   const { id } = use(params);
   const mic = useMic();
   const { t } = useI18n();
+  const { dialog, confirm } = useAppDialog();
   const router = useRouter();
 
   const [video, setVideo] = useState<Video | null>(null);
@@ -227,6 +229,40 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
     }
   }, [id, t]);
 
+  // Always-visible quit — the same yellow square as party mode. Solo has no room
+  // to tear down, so it just leaves to the dashboard; we confirm first when
+  // there are unsaved recordings so an accidental tap doesn't lose them.
+  const quit = useCallback(async () => {
+    const hasWork = Object.keys(takesRef.current).length > 0 && phase !== "result";
+    if (hasWork) {
+      const ok = await confirm({
+        title: t("srun.quitTitle"),
+        message: t("srun.quitMsg"),
+        confirmLabel: t("srun.quitConfirm"),
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    router.push("/dashboard");
+  }, [confirm, phase, router, t]);
+
+  // The yellow Quit square, pinned top-right on every screen (matches party mode).
+  const quitButton = (
+    <button
+      onClick={() => void quit()}
+      title={t("pstud.quit")}
+      aria-label={t("pstud.quit")}
+      className="fixed right-4 top-4 z-40 flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-[10px] bg-sun font-display text-ink shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-2 ring-black/10 transition hover:brightness-105 active:scale-95"
+    >
+      <span aria-hidden className="text-[16px] font-black leading-none">
+        ✕
+      </span>
+      <span className="text-[9px] font-black uppercase leading-none tracking-[0.06em]">
+        {t("pstud.quit")}
+      </span>
+    </button>
+  );
+
   // --- render ---------------------------------------------------------------
 
   if (phase === "loading") {
@@ -269,7 +305,8 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
 
   return (
     <main className="g-screen">
-      <div className="flex h-[72px] items-center">
+      {quitButton}
+      <div className="flex h-[72px] items-center pr-16">
         <h1 className="g-logo">{video.title || t("solo.title")}</h1>
       </div>
 
@@ -378,17 +415,15 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                   {mic.error && <p className="mt-3 text-[13px] text-magenta">{mic.error}</p>}
                 </div>
 
-                <div className="mt-auto flex items-center justify-between">
+                <div className="mt-auto flex items-center">
                   <button
                     onClick={() => goTo(cur - 1)}
                     disabled={cur === 0 || busy}
-                    className="text-[13px] text-cream/50 underline disabled:opacity-40"
+                    className="g-btn g-btn-ghost flex h-10 items-center gap-1.5 px-4 text-[13px] disabled:opacity-40"
                   >
+                    <span aria-hidden className="text-[15px] leading-none">←</span>
                     {t("game.previousSector")}
                   </button>
-                  <Link href="/play" className="text-[13px] text-cream/50 underline">
-                    {t("game.quit")}
-                  </Link>
                 </div>
               </div>
 
@@ -510,6 +545,7 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
           </div>
         )}
       </div>
+      {dialog}
     </main>
   );
 }

@@ -34,6 +34,15 @@ export function VideoThumb({ src }: { src: string }) {
     showStill();
   };
 
+  // Touch devices have no hover: a tap toggles the enlarged preview on/off.
+  // preventDefault stops the browser also firing a synthetic mouseenter that
+  // would immediately re-toggle it.
+  const onTouch = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (hover) onLeave();
+    else onEnter();
+  };
+
   // Keep the preview short by looping the opening seconds.
   const onTime = () => {
     const v = ref.current;
@@ -51,6 +60,7 @@ export function VideoThumb({ src }: { src: string }) {
         onLoadedMetadata={showStill}
         onMouseEnter={onEnter}
         onMouseLeave={onLeave}
+        onTouchStart={onTouch}
         onTimeUpdate={onTime}
         className="h-11 w-[72px] cursor-pointer rounded-[8px] border-2 border-violet-lift bg-black object-cover transition-transform duration-200"
         style={{

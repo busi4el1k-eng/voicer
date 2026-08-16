@@ -6,6 +6,7 @@ import { normalizeRoomCode } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
 import { SPACES_PREFIX, getObjectBuffer, putObject, spacesConfigured } from "@/lib/spaces";
 import { muxDub, withSourceFile, type DubTake } from "@/lib/ffmpeg";
+import { analyzeTakes, recordPublicClip, type AggFeatures } from "@/lib/perf-clip";
 import { ensureBedForUpload } from "@/lib/bed.server";
 import { RenderBusyError, withRenderSlot } from "@/lib/render-queue";
 import { emitRoom } from "@/lib/room-events";
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
       const src = await getObjectBuffer(upload.sourceKey);
       const ext = upload.sourceKey.split(".").pop() || "mp4";
 
-      const outBuf = await withSourceFile(src, ext, async ({ dir, input }) => {
+      const { outBuf, features } = await withSourceFile(src, ext, async ({ dir, input }) => {
         const takes: DubTake[] = [];
         let i = 0;
         for (const seg of upload.segments) {
@@ -88,13 +89,26 @@ export async function POST(req: NextRequest) {
           await writeFile(bedPath, await getObjectBuffer(bedKey));
         }
 
+        // Score the performance from the raw voice takes (podium), but only for
+        // public videos — no point spending CPU on dubs that can't be shown.
+        let features: AggFeatures | null = null;
+        if (upload.visibility === "public") features = await analyzeTakes(takes);
+
         const out = join(dir, "party-dub.mp4");
-        return muxDub(input, takes, out, { bedPath });
+        return { outBuf: await muxDub(input, takes, out, { bedPath }), features };
       });
 
       const key = `${SPACES_PREFIX}rooms/${code}/final/${Date.now()}.mp4`;
       const { url } = await putObject(key, outBuf, "video/mp4");
       await db.room.update({ where: { code }, data: { finalUrl: url, status: "finished" } });
+      // Enter the public dub into the "Clips of Today" podium (no-op if private).
+      void recordPublicClip({
+        uploadId: upload.id,
+        visibility: upload.visibility,
+        videoUrl: url,
+        mode: "party",
+        features,
+      }).catch(() => {});
       emitRoom(code); // everyone's screen flips to the finished result
       return url;
     });

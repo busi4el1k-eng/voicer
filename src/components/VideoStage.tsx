@@ -27,9 +27,17 @@ const fmt = (ms: number) => {
 
 export const VideoStage = forwardRef<
   VideoStageHandle,
-  { src?: string; sector?: Sector | null; onReadyChange?: (ready: boolean) => void }
+  {
+    src?: string;
+    sector?: Sector | null;
+    onReadyChange?: (ready: boolean) => void;
+    // Start playing (with sound) as soon as the clip can play. Safe to use only
+    // when the player is opened by a user gesture (e.g. the podium click/hold),
+    // which is what lets sound autoplay.
+    autoPlay?: boolean;
+  }
 >(
-  function VideoStage({ src, sector, onReadyChange }, ref) {
+  function VideoStage({ src, sector, onReadyChange, autoPlay }, ref) {
     const { t } = useI18n();
     const videoRef = useRef<HTMLVideoElement>(null);
     const playerRef = useRef<HTMLDivElement>(null);
@@ -93,6 +101,22 @@ export const VideoStage = forwardRef<
       setBufferedMs(0);
       onReadyChange?.(false);
     }, [src, onReadyChange]);
+
+    // Optional autostart: once the clip can play, start it with sound. Only used
+    // when opened from a user gesture (the browser blocks unprompted audio).
+    useEffect(() => {
+      if (!autoPlay || !src) return;
+      const v = videoRef.current;
+      if (!v) return;
+      const go = () => {
+        v.muted = false;
+        setMuted(false);
+        void v.play().catch(() => {});
+      };
+      if (v.readyState >= 2) go();
+      else v.addEventListener("canplay", go, { once: true });
+      return () => v.removeEventListener("canplay", go);
+    }, [autoPlay, src]);
 
     const onTimeUpdate = () => {
       const v = videoRef.current;

@@ -8,6 +8,8 @@ import { useAppDialog } from "@/components/AppDialog";
 import { VideoThumb } from "@/components/VideoThumb";
 import { LiquidLogo } from "@/components/LiquidLogo";
 import { formatShareId } from "@/lib/share-id";
+import { LOCALES, LOCALE_META } from "@/lib/i18n";
+import { Flag } from "@/components/Flag";
 
 // One fixed colour per player seat (1-4), matching the editor.
 const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8", "#A78BFA", "#FB923C", "#F87171"];
@@ -29,6 +31,7 @@ type Upload = {
   title: string;
   status: string;
   visibility: string; // 'private' | 'public'
+  language: string | null; // content language (app locale) or null when unset
   shareId: string | null;
   sourceUrl: string;
   error: string;
@@ -123,6 +126,8 @@ export default function CreatorPage() {
 
   // Which row's settings (rename/delete) menu is open.
   const [menuId, setMenuId] = useState("");
+  // Which row's language picker popover is open (id, or "" for none).
+  const [langMenuId, setLangMenuId] = useState("");
   // Id of the row whose share code was just copied (for the ✓ feedback).
   const [copiedId, setCopiedId] = useState("");
 
@@ -279,6 +284,34 @@ export default function CreatorPage() {
     }
   };
 
+  // Set (or clear) a video's content language. Public videos are grouped by
+  // this in the shared library so visitors see their own language first; empty
+  // clears the tag and lets the library fall back to guessing from the title.
+  const setLanguage = async (j: Upload, next: string) => {
+    setErr("");
+    setBusy(`lang:${j.id}`);
+    // Optimistic — reconciled by the reload below.
+    setJobs((prev) => prev.map((u) => (u.id === j.id ? { ...u, language: next || null } : u)));
+    try {
+      const r = await fetch(`/api/creator/upload/${j.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: next }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || t("creator.updateFailed"));
+      await load();
+    } catch (e) {
+      await load(); // roll back to server truth
+      await alert({
+        title: t("creator.cantVisibility"),
+        message: e instanceof Error ? e.message : t("creator.updateFailed"),
+        tone: "danger",
+      });
+    } finally {
+      setBusy("");
+    }
+  };
+
   const startRename = (j: Upload) => {
     setEditingId(j.id);
     setEditTitle(j.title);
@@ -392,6 +425,12 @@ export default function CreatorPage() {
                     busy === `rename:${j.id}` ||
                     busy === `vis:${j.id}`;
                   const isPublic = j.visibility === "public";
+                  // The video's content language if it's one we know, else "" (Auto).
+                  const curLang =
+                    j.language && (LOCALES as readonly string[]).includes(j.language)
+                      ? (j.language as (typeof LOCALES)[number])
+                      : "";
+                  const langBusy = busy === `lang:${j.id}`;
                   // Distinct players assigned across this video's sectors.
                   const players = Array.from(new Set(j.segments.map((s) => s.player ?? 1))).sort(
                     (a, b) => a - b,
@@ -473,6 +512,96 @@ export default function CreatorPage() {
                                   ? t("creator.public")
                                   : t("creator.private")}
                             </button>
+                            {/* Content language — groups the video in the shared
+                                library's language filter. A custom popover (not a
+                                native <select>) so it matches the site's pills:
+                                shows the flag + native name, "Auto" leaves it
+                                unset (the library guesses from the title). */}
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setLangMenuId(langMenuId === j.id ? "" : j.id)}
+                                disabled={rowBusy}
+                                aria-haspopup="listbox"
+                                aria-expanded={langMenuId === j.id}
+                                title={t("lib.langBy")}
+                                className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-display text-[11px] font-bold uppercase tracking-[0.06em] transition disabled:opacity-60 ${
+                                  curLang
+                                    ? "bg-sun/20 text-sun shadow-[inset_0_0_0_1.5px_rgba(255,210,63,0.5)] hover:bg-sun/30"
+                                    : "bg-white/8 text-cream/60 hover:bg-white/15"
+                                }`}
+                              >
+                                {langBusy ? (
+                                  "…"
+                                ) : curLang ? (
+                                  <>
+                                    <Flag locale={curLang} size={11} />
+                                    {LOCALE_META[curLang].label}
+                                  </>
+                                ) : (
+                                  <>
+                                    <span aria-hidden>🗣️</span>
+                                    {t("creator.langAuto")}
+                                  </>
+                                )}
+                                <span aria-hidden className="text-[8px] opacity-70">
+                                  ▼
+                                </span>
+                              </button>
+                              {langMenuId === j.id && (
+                                <>
+                                  <div className="fixed inset-0 z-20" onClick={() => setLangMenuId("")} />
+                                  <ul
+                                    role="listbox"
+                                    className="absolute left-0 top-[calc(100%+6px)] z-30 flex w-40 flex-col overflow-hidden rounded-[10px] border-2 border-violet-lift bg-violet-deep shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                                  >
+                                    {/* Auto (clear the tag) */}
+                                    <li>
+                                      <button
+                                        type="button"
+                                        role="option"
+                                        aria-selected={curLang === ""}
+                                        onClick={() => {
+                                          setLangMenuId("");
+                                          if (curLang !== "") void setLanguage(j, "");
+                                        }}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left font-display text-[13px] font-semibold transition ${
+                                          curLang === ""
+                                            ? "bg-mint/15 text-mint"
+                                            : "text-cream hover:bg-violet-lift"
+                                        }`}
+                                      >
+                                        <span aria-hidden className="text-[13px]">🗣️</span>
+                                        {t("creator.langAuto")}
+                                        {curLang === "" && <span className="ml-auto text-mint">✓</span>}
+                                      </button>
+                                    </li>
+                                    {LOCALES.map((l) => (
+                                      <li key={l}>
+                                        <button
+                                          type="button"
+                                          role="option"
+                                          aria-selected={curLang === l}
+                                          onClick={() => {
+                                            setLangMenuId("");
+                                            if (curLang !== l) void setLanguage(j, l);
+                                          }}
+                                          className={`flex w-full items-center gap-2 border-t border-cream/10 px-3 py-2 text-left font-display text-[13px] font-semibold transition ${
+                                            curLang === l
+                                              ? "bg-mint/15 text-mint"
+                                              : "text-cream hover:bg-violet-lift"
+                                          }`}
+                                        >
+                                          <Flag locale={l} size={13} />
+                                          {LOCALE_META[l].label}
+                                          {curLang === l && <span className="ml-auto text-mint">✓</span>}
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
 

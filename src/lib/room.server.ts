@@ -61,6 +61,9 @@ export type RoomView = {
   status: string;
   videoUploadId: string | null;
   finalUrl: string;
+  // Players frozen into seats when the current game launched (0 before launch).
+  // The sector→seat assignment uses [1..seatCount] so it's stable across leaves.
+  seatCount: number;
   players: PlayerView[];
 };
 
@@ -78,6 +81,7 @@ export async function roomView(code: string): Promise<RoomView | null> {
     status: room.status,
     videoUploadId: room.videoUploadId,
     finalUrl: room.finalUrl,
+    seatCount: room.seatCount,
     players: room.players.map((p, i) => ({
       id: p.id,
       displayName: p.displayName,

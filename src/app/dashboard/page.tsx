@@ -7,6 +7,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { T } from "@/components/LanguageProvider";
 import { Lobby } from "@/components/Lobby";
 import { StudioPanel, type Stat } from "@/components/StudioPanel";
+import { TodayPodium } from "@/components/TodayPodium";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,9 @@ export default async function DashboardPage() {
         {/* RIGHT — mode lobby */}
         <Lobby isGuest={isGuest} playerName={name} avatarColor={avatarColor} />
       </div>
+
+      {/* BELOW — today's top-3 dubbed clips, full width (mock data for now) */}
+      <TodayPodium />
     </main>
   );
 }

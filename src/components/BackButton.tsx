@@ -5,12 +5,15 @@ import { useI18n } from "@/components/LanguageProvider";
 
 // App-wide "go back" button. Mirrors the AccountBar/settings button (top-right)
 // on the opposite corner (top-left), centred to the same 1080px column so it
-// lines up on every page. Hidden on the home screen, where there's nowhere back.
+// lines up on every page. Hidden on the home screen, where there's nowhere back,
+// and inside a dub (the party studio and the solo run) — game mode has its own
+// yellow Quit button and a stray back arrow there would fight the game flow.
 export function BackButton() {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useI18n();
-  if (pathname === "/") return null;
+  if (pathname === "/" || pathname === "/party/studio" || pathname.startsWith("/play/run/"))
+    return null;
 
   const goBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) router.back();

@@ -13,10 +13,10 @@ export type Announcement = {
 };
 
 export const ANNOUNCEMENT: Announcement = {
-  id: "2026-08-15-maintenance-2",
-  title: "Server maintenance",
+  id: "2026-08-15-update-3",
+  title: "New update",
   message:
-    "We're sorry for the trouble — the server is currently being updated and under maintenance, so you may briefly lose connection or run into issues while playing. Just refresh if something gets stuck. Thanks for your patience!",
+    "We just rolled out a small update with new features and improvements. Sorry for any brief hiccups or lost connection during the rollout — just refresh if something looks off. Thanks for playing! 🎬",
 };
 
 // True when there's an actual message to show (drives the bell's unread state).

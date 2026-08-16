@@ -218,7 +218,10 @@ body {
        column is still exactly one viewport tall (no phantom scrollbar). */
     zoom: var(--g-zoom);
     min-height: calc(100vh / var(--g-zoom));
-    justify-content: center;
+    /* `safe` centres when the content fits but falls back to top-alignment when
+       it's taller than the viewport, so the podium below the fold stays
+       scroll-reachable instead of being clipped off the bottom. */
+    justify-content: safe center;
   }
 }
 
@@ -252,7 +255,8 @@ body {
 .g-center {
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  /* stretch = the modes window and the profile/room window share one height */
+  align-items: stretch;
   align-self: stretch;
   width: 100%;
 }
@@ -275,6 +279,109 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+/* Today's top-3 dubbed clips: a full-width window under the profile + modes. */
+.g-podium {
+  width: 100%;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Decorative firework: a launch trail rises from the bottom of the window and
+   then explodes into a cluster of coloured particles at its apex, on a loop.
+   Two children — the rising rocket and the burst — share one timeline via the
+   per-firework `--d` (delay) and `--rise` (apex height) custom properties.
+   Purely ornamental, so it never takes clicks. */
+.g-fw {
+  position: absolute;
+  bottom: 12px;
+  width: 4px;
+  height: 4px;
+  pointer-events: none;
+  --rise: 120px;
+  --d: 0s;
+}
+/* The rising rocket: a short bright streak that travels up, easing to a stop at
+   the apex, then vanishes just as the burst appears. */
+.g-fw-rocket {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(to top, rgba(255, 210, 63, 0), #ffd23f);
+  opacity: 0;
+  animation: g-fw-rise 2.4s ease-out infinite;
+  animation-delay: var(--d);
+}
+/* The burst: one dot + its box-shadows. transform:scale grows the dot AND its
+   shadows outward from the centre, so the particles fly apart while they fade. */
+.g-fw-burst {
+  position: absolute;
+  bottom: 0;
+  left: -0.5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: #ffd23f;
+  opacity: 0;
+  box-shadow:
+    0 -20px 0 #ff3d8b,
+    0 20px 0 #27e1a1,
+    -20px 0 0 #38bdf8,
+    20px 0 0 #ffd23f,
+    14px -14px 0 #a78bfa,
+    -14px -14px 0 #fb923c,
+    14px 14px 0 #5cffb6,
+    -14px 14px 0 #ff3d8b;
+  animation: g-fw-explode 2.4s ease-out infinite;
+  animation-delay: var(--d);
+}
+@keyframes g-fw-rise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  40% {
+    transform: translateY(calc(-1 * var(--rise)));
+    opacity: 1;
+  }
+  44%,
+  100% {
+    transform: translateY(calc(-1 * var(--rise)));
+    opacity: 0;
+  }
+}
+@keyframes g-fw-explode {
+  0%,
+  40% {
+    transform: translateY(calc(-1 * var(--rise))) scale(0.15);
+    opacity: 0;
+  }
+  46% {
+    opacity: 1;
+  }
+  74% {
+    transform: translateY(calc(-1 * var(--rise))) scale(1);
+    opacity: 0.9;
+  }
+  88%,
+  100% {
+    transform: translateY(calc(-1 * var(--rise))) scale(1.3);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .g-fw-rocket,
+  .g-fw-burst {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 /* Game-mode / instruction card */
@@ -893,4 +1000,23 @@ button.g-ghost-slot:disabled {
 .cd-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(39, 225, 161, 0.6);
   background-clip: padding-box;
+}
+
+/* Video library — "Trending today" sidebar. On desktop it becomes a
+   full-viewport-height sticky rail whose content is vertically centred, so it
+   tracks the middle of the screen while the list scrolls, instead of pinning to
+   the top (where it used to ride down and overlap the yellow "back to lobby"
+   button). Height is divided by --g-zoom to cancel the big-screen `zoom` on
+   .g-screen so the rail is exactly one screen tall. Phones are untouched — the
+   window just stacks above the list as before. */
+@media (min-width: 1024px) {
+  .lib-trending {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: calc(100vh / var(--g-zoom));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
 }
