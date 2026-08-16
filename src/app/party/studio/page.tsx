@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMic, type RecordResult } from "@/lib/audio/useMic";
 import { decodeAudio, type Pcm } from "@/lib/audio/waveform";
+import { sectorMatch } from "@/lib/audio/similarity";
 import { RecorderWave } from "@/components/RecorderWave";
 import { VideoStage, type VideoStageHandle } from "@/components/VideoStage";
 import { RatePlayers } from "@/components/RatePlayers";
@@ -37,6 +38,10 @@ const fmt = (ms: number) => {
   return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 };
 
+// Colour a match % — mint (great) → sun (ok) → pink (needs work). Mirrors solo.
+const matchColor = (pct: number) =>
+  pct >= 70 ? "#27E1A1" : pct >= 40 ? "#FFD23F" : "#FF6FA5";
+
 export default function PartyStudioPage() {
   const router = useRouter();
   const mic = useMic();
@@ -54,6 +59,9 @@ export default function PartyStudioPage() {
   const [takes, setTakes] = useState<Record<string, RecordResult>>({});
   const [origWave, setOrigWave] = useState<Record<string, Float32Array>>({});
   const [takeWave, setTakeWave] = useState<Record<string, Float32Array>>({});
+  // Per-sector "match with original" %, scored on-device from the two envelopes
+  // when a take is recorded — same as solo, but only for my own sectors.
+  const [scores, setScores] = useState<Record<string, number>>({});
   // The clip must be playable before recording — VideoStage reports this.
   const [videoReady, setVideoReady] = useState(false);
   const [err, setErr] = useState("");
@@ -229,10 +237,12 @@ export default function PartyStudioPage() {
     try {
       const pcm = await decodeAudio(take.blob);
       setTakeWave((p) => ({ ...p, [seg.id]: pcm.data }));
+      const orig = origWave[seg.id];
+      if (orig) setScores((p) => ({ ...p, [seg.id]: sectorMatch(orig, pcm.data) }));
     } catch {
       /* keep the recording even if we can't draw its waveform */
     }
-  }, [seg, mic]);
+  }, [seg, mic, origWave]);
 
   // You can't record longer than the sector runs: auto-stop at the sector
   // length. Anything you leave unfilled stays silent in the final mix (the
@@ -317,6 +327,11 @@ export default function PartyStudioPage() {
       fd.append("code", room.code);
       fd.append("playerId", playerId);
       for (const [segId, take] of recorded) fd.append(`take:${segId}`, take.blob, `${segId}.webm`);
+      // My average match across the sectors I recorded — the server stores it so
+      // the finished screen can show the party's average across all players.
+      const vals = recorded.map(([segId]) => scores[segId] ?? 0);
+      const myAvg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+      fd.append("matchAvg", String(myAvg));
       const r = await fetch("/api/room/submit", { method: "POST", body: fd });
       if (!r.ok) throw new Error((await r.json()).error || t("pstud.submitFailed"));
       // `mySubmitted` will flip to true via the room poll; nothing else to do.
@@ -324,7 +339,7 @@ export default function PartyStudioPage() {
       setErr(e instanceof Error ? e.message : t("pstud.submitFailed"));
       setPhase("summary");
     }
-  }, [room, playerId, t]);
+  }, [room, playerId, t, scores]);
 
   // Host renders the final combined clip once everyone is finished.
   const renderFinal = useCallback(async () => {
@@ -383,6 +398,12 @@ export default function PartyStudioPage() {
   // --- render ---------------------------------------------------------------
 
   const recordedCount = Object.keys(takes).length;
+
+  // Average match across my recorded sectors, for the summary headline.
+  const matchVals = segs.filter((s) => takes[s.id]).map((s) => scores[s.id] ?? 0);
+  const overallMatch = matchVals.length
+    ? Math.round(matchVals.reduce((a, b) => a + b, 0) / matchVals.length)
+    : 0;
 
   // Always-visible escape hatch: a yellow square pinned to the top-right that
   // lets anyone — host or guest — bail out of the game to the dashboard at any
@@ -478,6 +499,13 @@ export default function PartyStudioPage() {
             const canRate = !!playerId && (needVideo || needPlayers);
             const ratingsDone =
               (!needVideo || videoSaved) && (!needPlayers || playersSaved);
+            // Party match: average of every player's on-device match score.
+            const scoredPlayers = room.players.filter((p) => p.matchAvg != null);
+            const partyMatch = scoredPlayers.length
+              ? Math.round(
+                  scoredPlayers.reduce((a, p) => a + (p.matchAvg ?? 0), 0) / scoredPlayers.length,
+                )
+              : null;
             return (
           <div className="g-panel text-center">
             <h2 className="g-title">{t("pstud.dubReadyTitle")}</h2>
@@ -485,6 +513,46 @@ export default function PartyStudioPage() {
             <div className="mb-4">
               <VideoStage src={room.finalUrl} />
             </div>
+
+            {/* Party's match with the original — the average across all players,
+                plus each player's own score. */}
+            {partyMatch != null && (
+              <div className="mb-4 flex flex-col items-center gap-1 rounded-[12px] bg-white/5 py-4">
+                <span
+                  className="font-display text-[44px] font-black leading-none"
+                  style={{ color: matchColor(partyMatch) }}
+                >
+                  {partyMatch}%
+                </span>
+                <span className="font-display text-[12px] font-bold uppercase tracking-[0.1em] text-cream/70">
+                  {t("pstud.partyMatch")}
+                </span>
+                <div className="mt-3 flex w-full max-w-sm flex-col gap-1.5 px-4">
+                  {scoredPlayers.map((p) => (
+                    <div key={p.id} className="flex items-center gap-2">
+                      <span
+                        className="grid h-6 w-6 flex-none place-items-center rounded-full font-display text-[11px] font-black text-white"
+                        style={{ backgroundColor: p.avatarColor }}
+                      >
+                        {p.displayName.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="flex-1 truncate text-left text-[13px] text-cream/85">
+                        {p.displayName}
+                        {p.id === playerId && (
+                          <span className="text-cream/45"> {t("common.you")}</span>
+                        )}
+                      </span>
+                      <span
+                        className="font-display text-[14px] font-black"
+                        style={{ color: matchColor(p.matchAvg ?? 0) }}
+                      >
+                        {p.matchAvg ?? 0}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex flex-col items-center gap-3">
               <div className="flex w-full flex-wrap items-center gap-3">
                 <a
@@ -591,6 +659,22 @@ export default function PartyStudioPage() {
             <p className="mb-4 text-center text-[13px] text-cream/60">
               {t("pstud.summaryBody", { a: recordedCount, b: segs.length })}
             </p>
+
+            {/* Overall "match with original" across my recorded sectors. */}
+            {recordedCount > 0 && (
+              <div className="mb-4 flex flex-col items-center gap-1 rounded-[12px] bg-white/5 py-4">
+                <span className="font-display text-[44px] font-black leading-none" style={{ color: matchColor(overallMatch) }}>
+                  {overallMatch}%
+                </span>
+                <span className="font-display text-[12px] font-bold uppercase tracking-[0.1em] text-cream/70">
+                  {t("srun.matchOverall")}
+                </span>
+                <p className="mt-1 max-w-sm px-4 text-center text-[11px] leading-snug text-cream/45">
+                  {t("srun.matchHint")}
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               {segs.map((s, i) => (
                 <div
@@ -603,13 +687,23 @@ export default function PartyStudioPage() {
                   <span className="flex-1 truncate text-[14px] text-cream">
                     {s.transcript || t("editor.sectorN", { n: i + 1 })}
                   </span>
-                  <span
-                    className={`font-display text-[12px] font-bold uppercase ${
-                      takes[s.id] ? "text-mint" : "text-cream/30"
-                    }`}
-                  >
-                    {takes[s.id] ? t("game.recorded") : t("game.skipped")}
-                  </span>
+                  {takes[s.id] ? (
+                    <span className="flex items-baseline gap-1">
+                      <span
+                        className="font-display text-[16px] font-black"
+                        style={{ color: matchColor(scores[s.id] ?? 0) }}
+                      >
+                        {scores[s.id] ?? 0}%
+                      </span>
+                      <span className="font-display text-[10px] uppercase tracking-[0.08em] text-cream/40">
+                        {t("srun.matchSector")}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="font-display text-[12px] font-bold uppercase text-cream/30">
+                      {t("game.skipped")}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

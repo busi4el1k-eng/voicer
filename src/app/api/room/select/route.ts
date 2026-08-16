@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
   await db.$transaction([
     db.roomTake.deleteMany({ where: { roomCode: code } }),
     ...roster.map((p, i) =>
-      db.roomPlayer.update({ where: { id: p.id }, data: { seat: i + 1, status: "playing" } }),
+      db.roomPlayer.update({
+        where: { id: p.id },
+        data: { seat: i + 1, status: "playing", matchAvg: null },
+      }),
     ),
     db.room.update({
       where: { code },

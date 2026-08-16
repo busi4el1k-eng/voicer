@@ -37,7 +37,10 @@ export async function POST(req: NextRequest) {
     db.roomTake.deleteMany({ where: { roomCode: code } }),
     // Clear frozen seats too — the next game re-assigns them in select, so a
     // party that changed size between rounds gets fresh, correct seating.
-    db.roomPlayer.updateMany({ where: { roomCode: code }, data: { status: "playing", seat: 0 } }),
+    db.roomPlayer.updateMany({
+      where: { roomCode: code },
+      data: { status: "playing", seat: 0, matchAvg: null },
+    }),
     db.room.update({ where: { code }, data: { status, videoUploadId: null, finalUrl: "" } }),
   ]);
   emitRoom(code);

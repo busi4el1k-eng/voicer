@@ -83,7 +83,18 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  await db.roomPlayer.update({ where: { id: playerId }, data: { status: "finished" } });
+  // The player's browser scored each of its sectors against the original and
+  // sends the average (0–100). Stored so the finished result screen can show the
+  // party's average across everyone. Clamped; ignored if absent/invalid.
+  const rawMatch = Number(form.get("matchAvg"));
+  const matchAvg = Number.isFinite(rawMatch)
+    ? Math.max(0, Math.min(100, Math.round(rawMatch)))
+    : null;
+
+  await db.roomPlayer.update({
+    where: { id: playerId },
+    data: { status: "finished", matchAvg },
+  });
   emitRoom(code); // host sees this player flip to "finished" right away
   return NextResponse.json({ room: await roomView(code) });
 }

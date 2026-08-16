@@ -12,7 +12,13 @@ import { useEffect, useRef } from "react";
 const ORIG_COLOR = "rgba(56,189,248,0.7)"; // blue
 const MINE_COLOR = "rgba(255,60,60,0.5)"; // semitransparent red (voice)
 
-// Editor-style dense waveform: rescale `data` across the full width.
+// How much of the canvas height the loudest bar fills after normalisation.
+const FILL = 0.9;
+
+// Editor-style dense waveform: rescale `data` across the full width AND normalise
+// its amplitude so the loudest bar fills the height. This "regulates" a quiet
+// original or a quiet mic recording up to a consistent, readable size instead of
+// rendering as a barely-visible sliver.
 function drawWaveform(
   ctx: CanvasRenderingContext2D,
   W: number,
@@ -21,14 +27,41 @@ function drawWaveform(
   color: string,
 ) {
   const step = Math.max(1, Math.floor(data.length / W));
-  ctx.fillStyle = color;
+  // First pass: peak per column + the overall peak to normalise against.
+  const cols = new Float32Array(W);
+  let max = 0;
   for (let x = 0; x < W; x++) {
     let peak = 0;
     for (let i = 0; i < step; i++) {
       const v = data[x * step + i];
       if (v) peak = Math.max(peak, Math.abs(v));
     }
-    const h = Math.max(1, peak * H);
+    cols[x] = peak;
+    if (peak > max) max = peak;
+  }
+  const gain = max > 1e-4 ? FILL / max : 0;
+  ctx.fillStyle = color;
+  for (let x = 0; x < W; x++) {
+    const h = Math.max(1, cols[x] * gain * H);
+    ctx.fillRect(x, (H - h) / 2, 1, h);
+  }
+}
+
+// Draw the live/recorded mic-level trace (one column per level sample), also
+// normalised to its peak so a soft voice still fills the height like the original.
+function drawLevels(
+  ctx: CanvasRenderingContext2D,
+  H: number,
+  buf: Float32Array,
+  count: number,
+  color: string,
+) {
+  let max = 0;
+  for (let x = 0; x < count; x++) if (buf[x] > max) max = buf[x];
+  const gain = max > 1e-4 ? FILL / max : 0;
+  ctx.fillStyle = color;
+  for (let x = 0; x < count; x++) {
+    const h = Math.max(1, buf[x] * gain * H);
     ctx.fillRect(x, (H - h) / 2, 1, h);
   }
 }
@@ -87,11 +120,7 @@ export function RecorderWave({
         for (let x = posRef.current; x < target; x++) buf[x] = lvl; // fill any skipped columns
         posRef.current = target;
         const { H } = base();
-        ctx.fillStyle = MINE_COLOR;
-        for (let x = 0; x < posRef.current; x++) {
-          const h = Math.max(1, Math.min(1, buf[x]) * H);
-          ctx.fillRect(x, (H - h) / 2, 1, h);
-        }
+        drawLevels(ctx, H, buf, posRef.current, MINE_COLOR);
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
@@ -104,12 +133,8 @@ export function RecorderWave({
       // Freeze the live red exactly where it stopped. Rescaling the take to the
       // full width here made it visibly jump forward after the auto-stop; keep
       // it identical to the last recorded frame instead.
-      ctx.fillStyle = MINE_COLOR;
       const n = Math.min(posRef.current, buf.length, W);
-      for (let x = 0; x < n; x++) {
-        const h = Math.max(1, Math.min(1, buf[x]) * H);
-        ctx.fillRect(x, (H - h) / 2, 1, h);
-      }
+      drawLevels(ctx, H, buf, n, MINE_COLOR);
     } else if (take && take.length) {
       // No live buffer (e.g. revisiting an earlier take): draw the full take.
       drawWaveform(ctx, W, H, take, MINE_COLOR);

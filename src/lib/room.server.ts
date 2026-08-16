@@ -54,6 +54,7 @@ export type PlayerView = {
   isHost: boolean;
   seat: number; // 1-based; host = 1, joiners in join order
   status: string; // 'playing' | 'finished'
+  matchAvg: number | null; // player's avg "match with original" %, null until finished
 };
 
 export type RoomView = {
@@ -91,6 +92,7 @@ export async function roomView(code: string): Promise<RoomView | null> {
       // select). In the lobby it's still 0, so fall back to roster position.
       seat: p.seat > 0 ? p.seat : i + 1,
       status: p.status,
+      matchAvg: p.matchAvg,
     })),
   };
 }

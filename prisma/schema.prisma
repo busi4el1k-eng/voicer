@@ -271,6 +271,10 @@ model RoomPlayer {
   seat        Int      @default(0)
   // 'playing' (still dubbing their sectors) | 'finished' (submitted takes)
   status      String   @default("playing")
+  // This player's average on-device "match with original" %, computed in their
+  // browser and sent on submit. Null until they finish; cleared each new game.
+  // Averaged across players for the party's result-screen score.
+  matchAvg    Int?
   createdAt   DateTime @default(now())
 
   @@index([roomCode])

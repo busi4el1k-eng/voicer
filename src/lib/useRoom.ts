@@ -10,6 +10,7 @@ export type PlayerView = {
   isHost: boolean;
   seat: number; // 1-based; host = 1
   status: string; // 'playing' | 'finished'
+  matchAvg: number | null; // player's avg "match with original" %, null until finished
 };
 export type RoomView = {
   code: string;

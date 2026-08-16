@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { downloadHref } from "@/lib/download";
 import { useMic, type RecordResult } from "@/lib/audio/useMic";
 import { decodeAudio, type Pcm } from "@/lib/audio/waveform";
+import { sectorMatch } from "@/lib/audio/similarity";
 import { RecorderWave } from "@/components/RecorderWave";
 import { VideoStage, type VideoStageHandle } from "@/components/VideoStage";
 import { RateVideo } from "@/components/RateVideo";
@@ -33,6 +34,10 @@ const fmt = (ms: number) => {
   return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 };
 
+// Colour a match % — mint (great) → sun (ok) → pink (needs work).
+const matchColor = (pct: number) =>
+  pct >= 70 ? "#27E1A1" : pct >= 40 ? "#FFD23F" : "#FF6FA5";
+
 export default function SoloRunPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const mic = useMic();
@@ -47,6 +52,9 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   const [takes, setTakes] = useState<Record<string, RecordResult>>({});
   const [origWave, setOrigWave] = useState<Record<string, Float32Array>>({});
   const [takeWave, setTakeWave] = useState<Record<string, Float32Array>>({});
+  // Per-sector "match with original" %, scored on-device from the two envelopes
+  // the moment a take is recorded (see stopRecording). No upload, no server.
+  const [scores, setScores] = useState<Record<string, number>>({});
   // The clip must be playable before recording — VideoStage reports this.
   const [videoReady, setVideoReady] = useState(false);
   const [resultUrl, setResultUrl] = useState("");
@@ -131,10 +139,13 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
     try {
       const pcm = await decodeAudio(take.blob);
       setTakeWave((p) => ({ ...p, [seg.id]: pcm.data }));
+      // Score this take against the original sector envelope on-device.
+      const orig = origWave[seg.id];
+      if (orig) setScores((p) => ({ ...p, [seg.id]: sectorMatch(orig, pcm.data) }));
     } catch {
       /* keep the recording even if we can't draw its waveform */
     }
-  }, [seg, mic]);
+  }, [seg, mic, origWave]);
 
   // You can't record longer than the sector runs: auto-stop at the sector
   // length. Anything you leave unfilled stays silent in the final mix (the
@@ -299,6 +310,12 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
 
   const recordedCount = Object.keys(takes).length;
 
+  // Average match across the recorded sectors, for the summary headline.
+  const matchVals = segs.filter((s) => takes[s.id]).map((s) => scores[s.id] ?? 0);
+  const overallMatch = matchVals.length
+    ? Math.round(matchVals.reduce((a, b) => a + b, 0) / matchVals.length)
+    : 0;
+
   // The active dubbing view uses a wider, split-screen layout (video on the
   // left, scenario script on the right), so the page container widens to match.
   const isRunView = phase === "run" && !!seg;
@@ -450,6 +467,22 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
               {t("srun.recordedOf", { a: recordedCount, b: segs.length })}
             </p>
 
+            {/* Overall "match with original" — the average of the recorded
+                sectors' on-device scores. */}
+            {recordedCount > 0 && (
+              <div className="mb-4 flex flex-col items-center gap-1 rounded-[12px] bg-white/5 py-4">
+                <span className="font-display text-[44px] font-black leading-none" style={{ color: matchColor(overallMatch) }}>
+                  {overallMatch}%
+                </span>
+                <span className="font-display text-[12px] font-bold uppercase tracking-[0.1em] text-cream/70">
+                  {t("srun.matchOverall")}
+                </span>
+                <p className="mt-1 max-w-sm px-4 text-center text-[11px] leading-snug text-cream/45">
+                  {t("srun.matchHint")}
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               {segs.map((s, i) => (
                 <div
@@ -465,13 +498,23 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
                   <span className="font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
                     {fmt(s.startMs)}–{fmt(s.endMs)}
                   </span>
-                  <span
-                    className={`font-display text-[12px] font-bold uppercase ${
-                      takes[s.id] ? "text-mint" : "text-cream/30"
-                    }`}
-                  >
-                    {takes[s.id] ? t("game.recorded") : t("game.skipped")}
-                  </span>
+                  {takes[s.id] ? (
+                    <span className="flex items-baseline gap-1">
+                      <span
+                        className="font-display text-[16px] font-black"
+                        style={{ color: matchColor(scores[s.id] ?? 0) }}
+                      >
+                        {scores[s.id] ?? 0}%
+                      </span>
+                      <span className="font-display text-[10px] uppercase tracking-[0.08em] text-cream/40">
+                        {t("srun.matchSector")}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="font-display text-[12px] font-bold uppercase text-cream/30">
+                      {t("game.skipped")}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -509,6 +552,21 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
             {resultUrl && (
               <div className="mb-4">
                 <VideoStage src={resultUrl} />
+              </div>
+            )}
+
+            {/* Your match with the original, carried over from the run. */}
+            {recordedCount > 0 && (
+              <div className="mb-4 flex flex-col items-center gap-1 rounded-[12px] bg-white/5 py-4">
+                <span
+                  className="font-display text-[44px] font-black leading-none"
+                  style={{ color: matchColor(overallMatch) }}
+                >
+                  {overallMatch}%
+                </span>
+                <span className="font-display text-[12px] font-bold uppercase tracking-[0.1em] text-cream/70">
+                  {t("srun.matchOverall")}
+                </span>
               </div>
             )}
             <div className="flex flex-col items-center gap-3">
