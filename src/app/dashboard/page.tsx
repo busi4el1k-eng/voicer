@@ -33,14 +33,20 @@ export default async function DashboardPage() {
   // Real stats from the DB for the signed-in user. Guests have none yet → "—".
   // Labels are i18n keys, translated client-side in StudioPanel. We only surface
   // the Rating stat now (runs / scenes played / best scene were dropped).
-  let stats: Stat[] = [{ label: "stat.rating", value: "—" }];
+  let stats: Stat[] = [
+    { label: "stat.rating", value: "—" },
+    { label: "stat.duelWins", value: "—" },
+  ];
   if (user) {
     try {
-      const rating = await db.playerRating.aggregate({
-        where: { ratedUserId: user.id },
-        _avg: { stars: true },
-        _count: true,
-      });
+      const [rating, duelWins] = await Promise.all([
+        db.playerRating.aggregate({
+          where: { ratedUserId: user.id },
+          _avg: { stars: true },
+          _count: true,
+        }),
+        db.duelWin.count({ where: { userId: user.id } }),
+      ]);
       // Average star rating other players gave this user across finished parties,
       // shown as e.g. "4.3 ★ (7)". "—" until they've been rated at least once.
       const avgStars = rating._avg.stars;
@@ -48,7 +54,12 @@ export default async function DashboardPage() {
         rating._count > 0 && avgStars != null
           ? `${(Math.round(avgStars * 10) / 10).toFixed(1)} ★ (${rating._count})`
           : "—";
-      stats = [{ label: "stat.rating", value: ratingLabel }];
+      // Duel wins shown as a row of crowns (👑 ×N), or "—" before the first win.
+      const winsLabel = duelWins > 0 ? `${"👑".repeat(Math.min(duelWins, 5))} ${duelWins}` : "—";
+      stats = [
+        { label: "stat.rating", value: ratingLabel },
+        { label: "stat.duelWins", value: winsLabel },
+      ];
     } catch {
       dbError = true;
     }

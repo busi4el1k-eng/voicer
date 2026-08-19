@@ -53,6 +53,13 @@ export async function POST(req: NextRequest) {
   });
   if (!upload) return NextResponse.json({ error: "Video not found." }, { status: 404 });
 
+  // Duel renders each player's OWN dub of the whole video (separate result videos)
+  // and decides a winner by capture score — a different pipeline from the party's
+  // single combined render below.
+  if (room.mode === "duel") {
+    return renderDuel(code, room.players, upload);
+  }
+
   const roomTakes = await db.roomTake.findMany({ where: { roomCode: code } });
   const takeByseg = new Map(roomTakes.map((t) => [t.segmentId, t]));
 
@@ -102,11 +109,18 @@ export async function POST(req: NextRequest) {
       const { url } = await putObject(key, outBuf, "video/mp4");
       await db.room.update({ where: { code }, data: { finalUrl: url, status: "finished" } });
       // Enter the public dub into the "Clips of Today" podium (no-op if private).
+      // Authors = the party's player names.
+      const author = room.players
+        .map((p) => p.displayName)
+        .filter(Boolean)
+        .slice(0, 4)
+        .join(", ");
       void recordPublicClip({
         uploadId: upload.id,
         visibility: upload.visibility,
         videoUrl: url,
         mode: "party",
+        author,
         features,
       }).catch(() => {});
       emitRoom(code); // everyone's screen flips to the finished result
@@ -116,6 +130,150 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url, room: await roomView(code) });
   } catch (e) {
     // Queue full — tell the client to retry shortly rather than fail outright.
+    const status = e instanceof RenderBusyError ? 503 : 500;
+    return NextResponse.json(
+      { error: toClientMessage(e, "Render failed. Please try again.") },
+      { status },
+    );
+  }
+}
+
+// The minimal shapes renderDuel needs from the loaded room/upload.
+type DuelPlayer = {
+  id: string;
+  displayName: string;
+  matchAvg: number | null;
+  userId: string | null; // null for guests — only signed-in wins are counted
+};
+type DuelUpload = {
+  id: string;
+  sourceKey: string;
+  visibility: string;
+  segments: { id: string; startMs: number; endMs: number }[];
+};
+
+// Duel render: both players dubbed the WHOLE video, each keeping their own takes
+// (DuelTake). We render one result video PER player (their takes over the shared
+// source + music bed), store it on their RoomPlayer.finalUrl, then flip the room
+// to "finished". The winner (higher capture score) enters the "Clips of Today"
+// podium. Source + bed are loaded once and reused for both renders.
+async function renderDuel(code: string, players: DuelPlayer[], upload: DuelUpload) {
+  const duelTakes = await db.duelTake.findMany({ where: { roomCode: code } });
+  if (duelTakes.length === 0) {
+    return NextResponse.json({ error: "No recorded takes to combine." }, { status: 409 });
+  }
+
+  try {
+    const rendered = await withRenderSlot(async () => {
+      const src = await getObjectBuffer(upload.sourceKey);
+      const ext = upload.sourceKey.split(".").pop() || "mp4";
+
+      // Render every player inside a single source-file context so the input clip
+      // and the (once-generated) music bed are shared across both passes.
+      const results = await withSourceFile(src, ext, async ({ dir, input }) => {
+        let bedPath: string | null = null;
+        const bedKey = await ensureBedForUpload(upload.id);
+        if (bedKey) {
+          bedPath = join(dir, "bed.wav");
+          await writeFile(bedPath, await getObjectBuffer(bedKey));
+        }
+
+        const out: { playerId: string; outBuf: Buffer | null; features: AggFeatures | null }[] = [];
+        for (const p of players) {
+          const mineBySeg = new Map(
+            duelTakes.filter((t) => t.playerId === p.id).map((t) => [t.segmentId, t]),
+          );
+          const takes: DubTake[] = [];
+          let i = 0;
+          for (const seg of upload.segments) {
+            const rt = mineBySeg.get(seg.id);
+            if (!rt) continue; // sector this player didn't dub — keep the original audio
+            const buf = await getObjectBuffer(rt.partKey);
+            const path = join(dir, `take-${p.id}-${i}.webm`);
+            await writeFile(path, buf);
+            takes.push({ path, startMs: seg.startMs, endMs: seg.endMs });
+            i++;
+          }
+          if (takes.length === 0) {
+            out.push({ playerId: p.id, outBuf: null, features: null });
+            continue;
+          }
+          const features = upload.visibility === "public" ? await analyzeTakes(takes) : null;
+          const path = join(dir, `duel-${p.id}.mp4`);
+          out.push({ playerId: p.id, outBuf: await muxDub(input, takes, path, { bedPath }), features });
+        }
+        return out;
+      });
+
+      // Publish each player's dub and record it on their seat.
+      const urls: { playerId: string; url: string; features: AggFeatures | null }[] = [];
+      for (const r of results) {
+        if (!r.outBuf) {
+          urls.push({ playerId: r.playerId, url: "", features: null });
+          continue;
+        }
+        const key = `${SPACES_PREFIX}rooms/${code}/duel/${r.playerId}/final/${Date.now()}.mp4`;
+        const { url } = await putObject(key, r.outBuf, "video/mp4");
+        urls.push({ playerId: r.playerId, url, features: r.features });
+      }
+
+      if (urls.every((u) => !u.url)) throw new ClientError("No recorded takes to combine.");
+
+      await db.$transaction([
+        ...urls
+          .filter((u) => u.url)
+          .map((u) => db.roomPlayer.update({ where: { id: u.playerId }, data: { finalUrl: u.url } })),
+        db.room.update({ where: { code }, data: { status: "finished" } }),
+      ]);
+
+      // The winner (higher capture score) with a rendered dub goes on the podium.
+      const winner = [...players]
+        .filter((p) => urls.find((u) => u.playerId === p.id)?.url)
+        .sort((a, b) => (b.matchAvg ?? 0) - (a.matchAvg ?? 0))[0];
+      const winUrl = winner && urls.find((u) => u.playerId === winner.id);
+      if (winner && winUrl?.url) {
+        void recordPublicClip({
+          uploadId: upload.id,
+          visibility: upload.visibility,
+          videoUrl: winUrl.url,
+          mode: "party",
+          author: winner.displayName,
+          features: winUrl.features,
+        }).catch(() => {});
+      }
+
+      // Credit the duel win (a "crown" on the dashboard) to every signed-in
+      // player who has a rendered dub and shares the top capture score — a tie
+      // crowns both. Requires a real head-to-head (2+ rendered dubs) and a
+      // non-zero top score, so a walkover or an unscored game hands out nothing.
+      // upsert on (roomCode,userId) keeps a re-render from double-counting.
+      const contenders = players.filter((p) => urls.find((u) => u.playerId === p.id)?.url);
+      if (contenders.length >= 2) {
+        const top = Math.max(...contenders.map((p) => p.matchAvg ?? 0));
+        const winnerUserIds = contenders
+          .filter((p) => (p.matchAvg ?? 0) === top && p.userId)
+          .map((p) => p.userId as string);
+        if (top > 0 && winnerUserIds.length > 0) {
+          void db
+            .$transaction(
+              winnerUserIds.map((uid) =>
+                db.duelWin.upsert({
+                  where: { roomCode_userId: { roomCode: code, userId: uid } },
+                  create: { roomCode: code, userId: uid },
+                  update: {},
+                }),
+              ),
+            )
+            .catch(() => {});
+        }
+      }
+
+      emitRoom(code); // every duelist's screen flips to the head-to-head result
+      return urls;
+    });
+
+    return NextResponse.json({ rendered, room: await roomView(code) });
+  } catch (e) {
     const status = e instanceof RenderBusyError ? 503 : 500;
     return NextResponse.json(
       { error: toClientMessage(e, "Render failed. Please try again.") },

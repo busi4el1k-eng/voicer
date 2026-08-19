@@ -55,11 +55,13 @@ export type PlayerView = {
   seat: number; // 1-based; host = 1, joiners in join order
   status: string; // 'playing' | 'finished'
   matchAvg: number | null; // player's avg "match with original" %, null until finished
+  finalUrl: string; // DUEL: this player's own rendered dub ("" until rendered / in party)
 };
 
 export type RoomView = {
   code: string;
   status: string;
+  mode: string; // 'party' | 'duel'
   videoUploadId: string | null;
   finalUrl: string;
   // Players frozen into seats when the current game launched (0 before launch).
@@ -80,6 +82,7 @@ export async function roomView(code: string): Promise<RoomView | null> {
   return {
     code: room.code,
     status: room.status,
+    mode: room.mode,
     videoUploadId: room.videoUploadId,
     finalUrl: room.finalUrl,
     seatCount: room.seatCount,
@@ -93,6 +96,7 @@ export async function roomView(code: string): Promise<RoomView | null> {
       seat: p.seat > 0 ? p.seat : i + 1,
       status: p.status,
       matchAvg: p.matchAvg,
+      finalUrl: p.finalUrl,
     })),
   };
 }

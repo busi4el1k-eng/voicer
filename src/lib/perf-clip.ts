@@ -62,6 +62,7 @@ export async function recordPublicClip(opts: {
   visibility: string;
   videoUrl: string;
   mode: "solo" | "party";
+  author: string;
   features: AggFeatures | null;
 }): Promise<void> {
   if (opts.visibility !== "public" || !opts.features) return;
@@ -71,6 +72,7 @@ export async function recordPublicClip(opts: {
       uploadId: opts.uploadId,
       videoUrl: opts.videoUrl,
       mode: opts.mode,
+      author: opts.author.slice(0, 120),
       loudness: f.loudness,
       lra: f.lra,
       crest: f.crest,
@@ -82,7 +84,13 @@ export async function recordPublicClip(opts: {
   void purgeExpiredClips().catch(() => {});
 }
 
-export type PodiumClip = { id: string; videoUrl: string; mode: string; score: number };
+export type PodiumClip = {
+  id: string;
+  videoUrl: string;
+  mode: string;
+  author: string;
+  score: number;
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -131,7 +139,7 @@ export async function getTopClipsToday(limit = 3): Promise<PodiumClip[]> {
     const coverage = 1 - r.silence;
     const energy = nLoud(r.loudness);
     const score = Math.round(100 * (0.5 * expr + 0.25 * coverage + 0.25 * energy));
-    return { id: r.id, videoUrl: r.videoUrl, mode: r.mode, score };
+    return { id: r.id, videoUrl: r.videoUrl, mode: r.mode, author: r.author, score };
   });
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit);

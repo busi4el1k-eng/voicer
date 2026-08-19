@@ -5,6 +5,7 @@ import db from "@/lib/db";
 import { SPACES_PREFIX, getObjectBuffer, putObject, spacesConfigured } from "@/lib/spaces";
 import { muxDub, withSourceFile, type DubTake } from "@/lib/ffmpeg";
 import { analyzeTakes, recordPublicClip, type AggFeatures } from "@/lib/perf-clip";
+import { getOrCreateUser } from "@/lib/get-user";
 import { ensureBedForUpload } from "@/lib/bed.server";
 import { RenderBusyError, withRenderSlot } from "@/lib/render-queue";
 import { ClientError, toClientMessage } from "@/lib/errors";
@@ -80,11 +81,20 @@ export async function POST(req: NextRequest) {
       const key = `${SPACES_PREFIX}sources/${upload.id}/dubs/${Date.now()}.mp4`;
       const { url } = await putObject(key, outBuf, "video/mp4");
       // Enter the public dub into the "Clips of Today" podium (no-op if private).
+      // Author = the signed-in player's name, or "Guest" for anonymous plays.
+      let author = "Guest";
+      try {
+        const u = await getOrCreateUser();
+        if (u?.displayName) author = u.displayName;
+      } catch {
+        /* guest / auth unavailable — keep "Guest" */
+      }
       void recordPublicClip({
         uploadId: upload.id,
         visibility: upload.visibility,
         videoUrl: url,
         mode: "solo",
+        author,
         features,
       }).catch(() => {});
       return url;

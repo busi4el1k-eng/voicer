@@ -2,6 +2,7 @@ import { AccountBar } from "@/components/AccountBar";
 import { PlayPanel } from "@/components/PlayPanel";
 import { Logo } from "@/components/Logo";
 import { T } from "@/components/LanguageProvider";
+import { SiteFooter } from "@/components/SiteFooter";
 
 const STEPS = [
   { icon: "🎧", titleKey: "home.step.listen.t", textKey: "home.step.listen.d" },
@@ -49,6 +50,8 @@ export default function Landing() {
           </div>
         </div>
       </div>
+
+      <SiteFooter />
     </main>
   );
 }

@@ -33,6 +33,9 @@ export default function PartyHome() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [launching, setLaunching] = useState(false);
+  // Mode requested via ?mode=duel (e.g. from the library chooser). Overrides the
+  // room's current mode when the host launches; null = keep the room as-is.
+  const [intendedMode, setIntendedMode] = useState<"party" | "duel" | null>(null);
 
   // The invite-lobby room the user is in (created from the dashboard, persisted
   // in localStorage + polled). Read here only, to show the live party size.
@@ -41,6 +44,7 @@ export default function PartyHome() {
   // are optimistic (from the stored membership) so the waiting view shows
   // instantly, before the room fetch resolves.
   const isMember = inRoom && !isHost;
+  const isDuel = intendedMode === "duel" || (intendedMode == null && room?.mode === "duel");
   const partyCount = room ? room.players.length : null;
   // Whether the party size matches the video's recommended (creator-cast) count.
   // Any size is now allowed to play — the studio shares sectors out to fit — so
@@ -66,7 +70,14 @@ export default function PartyHome() {
       const r = await fetch("/api/room/select", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code: room.code, playerId, uploadId: video.id }),
+        body: JSON.stringify({
+          code: room.code,
+          playerId,
+          uploadId: video.id,
+          // When arriving from the library's Duel/Party chooser, set the room's
+          // mode at launch. Omitted otherwise so the dashboard-chosen mode stands.
+          ...(intendedMode ? { mode: intendedMode } : {}),
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || t("ppick.cantStart"));
@@ -98,7 +109,10 @@ export default function PartyHome() {
   // A code handed off from the Video library ("Party mode") pre-fills the search
   // and looks the video up automatically, so the host lands right on it.
   useEffect(() => {
-    const c = new URLSearchParams(window.location.search).get("code");
+    const params = new URLSearchParams(window.location.search);
+    const m = params.get("mode");
+    if (m === "duel" || m === "party") setIntendedMode(m);
+    const c = params.get("code");
     if (!c) return;
     void (async () => {
       const pretty = formatShareInput(c);
@@ -115,7 +129,8 @@ export default function PartyHome() {
       </div>
       <div className="flex h-[92px] items-center">
         <h1 className="g-logo">
-          Party<em>Dub</em>
+          {isDuel ? "Duel" : "Party"}
+          <em>Dub</em>
         </h1>
       </div>
 
@@ -278,7 +293,9 @@ export default function PartyHome() {
                     ? t("solo.noLinesYet")
                     : !inParty
                       ? t("ppick.needParty")
-                      : t("ppick.startEveryone")}
+                      : isDuel
+                        ? t("duel.startEveryone")
+                        : t("ppick.startEveryone")}
               </button>
 
               {video.lines > 0 && !inParty && (
@@ -289,9 +306,15 @@ export default function PartyHome() {
                   })}
                 </p>
               )}
-              {/* Non-blocking heads-up when the size differs from the cast count:
-                  fewer players double up characters, more players share them. */}
-              {video.lines > 0 && inParty && !partyMatches && partyCount !== null && (
+              {/* Duel: both players dub the whole video — no cast-size heads-up. */}
+              {video.lines > 0 && inParty && isDuel && (
+                <p className="text-center text-[13px] leading-[1.5] text-sun">
+                  {t("duel.pickNote")}
+                </p>
+              )}
+              {/* Party: non-blocking heads-up when the size differs from the cast
+                  count — fewer players double up characters, more players share. */}
+              {video.lines > 0 && inParty && !isDuel && !partyMatches && partyCount !== null && (
                 <p className="text-center text-[13px] leading-[1.5] text-sun">
                   {partyCount < video.players
                     ? t("ppick.fewerOk", { a: partyCount, b: video.players })

@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
+import { isAdmin } from "@/lib/admin";
 import { SPACES_PREFIX, deleteObjects, putObjectStream, spacesConfigured } from "@/lib/spaces";
 import { rateLimit } from "@/lib/rate-limit";
 import { generateShareId } from "@/lib/share-id.server";
@@ -51,12 +52,27 @@ export async function POST(req: NextRequest) {
 
   const ext = (filename.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
 
+  // Optional: attach this upload to a featured Creator (from /admin/creators).
+  // Admin-only, and the creator must exist — otherwise ignored so a normal upload
+  // can never be smuggled under a creator.
+  let creatorId: string | null = null;
+  const creatorParam = params.get("creatorId");
+  if (creatorParam) {
+    if (!(await isAdmin())) {
+      return NextResponse.json({ error: "Only an admin can add a creator video." }, { status: 403 });
+    }
+    const creator = await db.creator.findUnique({ where: { id: creatorParam }, select: { id: true } });
+    if (!creator) return NextResponse.json({ error: "Creator not found." }, { status: 404 });
+    creatorId = creator.id;
+  }
+
   // Create the row first so its id keys the storage path. Each video gets a
   // short shareable code so it can be opened later (e.g. in a solo run).
   const shareId = await generateShareId();
   const upload = await db.videoUpload.create({
     data: {
       userId: user.id,
+      creatorId,
       title: title || filename || "Untitled",
       sourceKey: "",
       sourceUrl: "",

@@ -11,10 +11,12 @@ export type PlayerView = {
   seat: number; // 1-based; host = 1
   status: string; // 'playing' | 'finished'
   matchAvg: number | null; // player's avg "match with original" %, null until finished
+  finalUrl: string; // DUEL: this player's own rendered dub ("" in party / until rendered)
 };
 export type RoomView = {
   code: string;
   status: string;
+  mode: string; // 'party' | 'duel'
   videoUploadId: string | null;
   finalUrl: string;
   seatCount: number; // players frozen into seats at launch (0 before launch)
@@ -242,8 +244,9 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
   );
 
   // Host-only: flip the room to "playing" so waiting members follow into the
-  // game. Returns true once the server confirms.
-  const start = useCallback(async (): Promise<boolean> => {
+  // game. `mode` picks the game type ("party" co-op | "duel" competitive) and is
+  // frozen onto the room here. Returns true once the server confirms.
+  const start = useCallback(async (mode: "party" | "duel" = "party"): Promise<boolean> => {
     if (!room || !playerId) return false;
     setBusy(true);
     setError(null);
@@ -251,7 +254,7 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
       const res = await fetch("/api/room/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code: room.code, playerId }),
+        body: JSON.stringify({ code: room.code, playerId, mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Couldn't start the party.");

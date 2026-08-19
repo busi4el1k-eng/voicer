@@ -21,6 +21,7 @@ model User {
   takes           Take[]
   hostedRooms     Room[]         @relation("RoomHost")
   ratingsReceived PlayerRating[] @relation("RatedUser")
+  duelWins        DuelWin[]
   createdAt       DateTime       @default(now())
 }
 
@@ -99,6 +100,11 @@ model VideoUpload {
   // solo run). Nullable so existing rows migrate cleanly; backfilled on read.
   shareId    String?        @unique
   userId     String?
+  // When set, this video belongs to a featured Creator (uploaded/edited via
+  // /admin/creators). Such videos appear ONLY under that creator in the library's
+  // Creators tab — never in the public Community feed (which filters creatorId:null).
+  creator    Creator?       @relation(fields: [creatorId], references: [id], onDelete: SetNull)
+  creatorId  String?
   title      String         @default("")
   // Content language of the dub, one of the app locales (en|es|fr|ru|ro) or null
   // when unset. Used to filter/group the shared library so visitors see videos
@@ -137,6 +143,7 @@ model VideoUpload {
   @@index([userId])
   @@index([visibility])
   @@index([language])
+  @@index([creatorId])
 }
 
 // A finished dub of a PUBLIC library video, kept so it can compete on the
@@ -152,6 +159,7 @@ model Clip {
   uploadId String
   videoUrl String // public Spaces URL of the rendered dub (the /watch clip)
   mode     String      @default("solo") // 'solo' | 'party'
+  author   String      @default("") // who performed the dub (player name(s); "Guest" if unknown)
   // Raw performance features from the voice takes (music/bed excluded):
   loudness Float    @default(-70) // integrated loudness, LUFS (higher = louder)
   lra      Float    @default(0) // loudness range, LU (dynamics / expressiveness)
@@ -237,6 +245,10 @@ model Room {
   // 'lobby' (dashboard invite) | 'playing' (host picking a video on /party) |
   // 'dubbing' (everyone recording in the studio) | 'finished' (rendered)
   status    String       @default("lobby")
+  // 'party' (co-op: sectors split across seats, one combined render) |
+  // 'duel'  (1v1: BOTH players dub the whole video, each gets their own render,
+  //          winner by capture score). Additive column; existing rows are "party".
+  mode      String       @default("party")
   pack      Pack?        @relation(fields: [packId], references: [id], onDelete: SetNull)
   packId    String?
   // The video the host locked in for a party dub, and the rendered result URL.
@@ -250,6 +262,7 @@ model Room {
   round     Int          @default(0)
   players   RoomPlayer[]
   takes     RoomTake[]
+  duelTakes DuelTake[]
   createdAt DateTime     @default(now())
 }
 
@@ -273,8 +286,13 @@ model RoomPlayer {
   status      String   @default("playing")
   // This player's average on-device "match with original" %, computed in their
   // browser and sent on submit. Null until they finish; cleared each new game.
-  // Averaged across players for the party's result-screen score.
+  // Averaged across players for the party's result-screen score; in DUEL mode it
+  // is the head-to-head capture score that decides the winner.
   matchAvg    Int?
+  // DUEL only: this player's OWN rendered dub of the whole video (each duelist
+  // gets a separate result video). Empty in party mode (party has one combined
+  // Room.finalUrl instead). Additive column.
+  finalUrl    String   @default("")
   createdAt   DateTime @default(now())
 
   @@index([roomCode])
@@ -293,6 +311,25 @@ model RoomTake {
   createdAt DateTime @default(now())
 
   @@unique([roomCode, segmentId]) // one owner per sector (seat → sector is 1:1)
+  @@index([roomCode])
+}
+
+// DUEL mode take: unlike party (RoomTake), BOTH duelists dub the SAME sectors, so
+// takes are keyed per (segment, player) — each player owns their own recording of
+// every sector. Kept as a separate table (not a change to RoomTake) so party's
+// take pipeline is completely untouched. Cleared when a duel launches; the render
+// gathers each player's rows to produce their individual dub.
+model DuelTake {
+  id        String   @id @default(cuid())
+  room      Room     @relation(fields: [roomCode], references: [code], onDelete: Cascade)
+  roomCode  String
+  segmentId String
+  playerId  String
+  partKey   String // Spaces object key of the recorded audio
+  partUrl   String
+  createdAt DateTime @default(now())
+
+  @@unique([roomCode, segmentId, playerId]) // one take per player per sector
   @@index([roomCode])
 }
 
@@ -318,4 +355,44 @@ model PlayerRating {
   @@unique([roomCode, raterPlayerId, ratedPlayerId]) // one score per pair per game
   @@index([ratedUserId])
   @@index([roomCode])
+}
+
+// A duel victory credited to a signed-in player, counted as "crowns" on the
+// dashboard. One row per (room, winning user); a tie at the top score credits
+// every tied signed-in player. Guests (no userId) aren't recorded — the stat is
+// per-account. The unique constraint makes a re-render idempotent (no double
+// count). Cascade so wins vanish if the account is deleted.
+model DuelWin {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  roomCode  String // which duel this win came from
+  createdAt DateTime @default(now())
+
+  @@unique([roomCode, userId]) // one win per user per duel (idempotent)
+  @@index([userId])
+}
+
+// A featured creator/artist shown in the Video library's "Creators" tab. Managed
+// by an admin (see /admin/creators). Replaces the old hardcoded config; the
+// former config still seeds the first row on an empty table.
+model Creator {
+  id        String        @id @default(cuid())
+  handle    String        @unique // url-safe, also the asset-folder name
+  name      String        @default("")
+  tagline   String        @default("")
+  bio       String        @default("")
+  avatar    String        @default("") // image URL (empty ⇒ gradient + initial)
+  color     String        @default("#FF3D8B") // accent colour
+  instagram String        @default("") // primary Instagram link
+  // Extra social/external links: JSON array of { platform, url }. Lets the admin
+  // add YouTube / TikTok / X / website / etc. beyond Instagram.
+  links     Json?
+  verified  Boolean       @default(false)
+  sort      Int           @default(0) // display order (ascending)
+  // The creator's videos are real uploads (with sectors), made through the same
+  // upload → editor flow as the creator studio and tagged with this creator's id.
+  videos    VideoUpload[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }

@@ -47,10 +47,14 @@ export function ScenarioWindow({
   mySeat,
   lines,
   currentKey,
+  allMine = false,
 }: {
   mySeat: number;
   lines: ScenarioLine[];
   currentKey?: string;
+  // Duel: the player dubs EVERY line, so mark them all as "yours" rather than
+  // highlighting only the lines matching a single seat.
+  allMine?: boolean;
 }) {
   const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -89,7 +93,7 @@ export function ScenarioWindow({
           className="cd-scroll flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-1.5 max-h-[46vh] lg:max-h-none"
         >
           {lines.map((l) => {
-            const mine = l.player === mySeat;
+            const mine = allMine || l.player === mySeat;
             const isCurrent = !!currentKey && l.key === currentKey;
             return (
               <div

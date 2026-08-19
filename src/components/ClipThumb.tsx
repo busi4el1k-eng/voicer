@@ -2,17 +2,21 @@
 
 import { useRef, useState } from "react";
 import { VideoStage } from "@/components/VideoStage";
+import { useCenterPreview } from "@/lib/useCenterPreview";
 
 // A podium clip's video icon. Small by default; hovering (mouse) plays a short
-// muted preview and scales it up. To watch the FULL dub with sound, click it
-// (mouse) or press-and-hold it (touch) — that opens an app-styled player modal
-// that autostarts. A quick tap on mobile just toggles the muted preview.
+// muted preview and scales it up. To watch the FULL dub with sound:
+//   • mouse  — click the icon.
+//   • touch  — first tap enlarges the preview, a second tap on the same clip
+//              opens the player (press-and-hold opens it straight away too).
+// A little ▶ badge marks that it's playable.
 const STILL_AT = 0.5; // seconds — the idle frame
 const PREVIEW_SECONDS = 4; // loop the opening seconds while previewing
 const HOLD_MS = 450; // press-and-hold threshold to open the full player
 
 export function ClipThumb({ src }: { src: string }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState(false);
   const [open, setOpen] = useState(false);
   const holdTimer = useRef<number | null>(null);
@@ -42,6 +46,16 @@ export function ClipThumb({ src }: { src: string }) {
     if (v && v.currentTime > PREVIEW_SECONDS) v.currentTime = 0;
   };
 
+  // On mobile (no hover), preview while this clip is centred on screen. Skip
+  // while the full player is open (the thumb is hidden behind the modal).
+  useCenterPreview(
+    wrapRef,
+    () => {
+      if (!open) startPreview();
+    },
+    stopPreview,
+  );
+
   const openPlayer = () => {
     stopPreview();
     setOpen(true);
@@ -63,17 +77,21 @@ export function ClipThumb({ src }: { src: string }) {
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     cancelHold();
-    // Stop the synthetic mouse click that a tap would otherwise fire (which would
-    // open the player on a short tap instead of only on hold).
+    // Stop the synthetic mouse click a tap would otherwise fire.
     e.preventDefault();
     if (openedByHold.current) return; // hold already opened it
-    if (hover) stopPreview();
+    // First tap enlarges the preview; tapping the already-enlarged clip opens it.
+    if (hover) openPlayer();
     else startPreview();
   };
 
   return (
     <>
-      <div className="flex justify-center" style={{ width: 72 }}>
+      <div
+        ref={wrapRef}
+        className="group relative flex cursor-pointer justify-center"
+        style={{ width: 72 }}
+      >
         <video
           ref={ref}
           src={`${src}#t=${STILL_AT}`}
@@ -97,6 +115,18 @@ export function ClipThumb({ src }: { src: string }) {
             boxShadow: hover ? "0 12px 34px rgba(0,0,0,0.55)" : "none",
           }}
         />
+        {/* ▶ badge — signals the icon is playable (tap/click to watch). Hidden
+            while enlarged so it doesn't cover the preview. */}
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 grid place-items-center transition-opacity ${
+            hover ? "opacity-0" : "opacity-100"
+          }`}
+        >
+          <span className="grid h-5 w-5 place-items-center rounded-full bg-ink/55 text-[9px] text-cream shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
+            ▶
+          </span>
+        </span>
       </div>
 
       {/* Full-clip player, opened by click / hold. Autostarts with sound (the

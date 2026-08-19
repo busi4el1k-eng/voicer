@@ -35,11 +35,14 @@ export async function POST(req: NextRequest) {
   }
   await db.$transaction([
     db.roomTake.deleteMany({ where: { roomCode: code } }),
+    // Duel takes live in their own table — clear them too (no-op for a party).
+    db.duelTake.deleteMany({ where: { roomCode: code } }),
     // Clear frozen seats too — the next game re-assigns them in select, so a
-    // party that changed size between rounds gets fresh, correct seating.
+    // party that changed size between rounds gets fresh, correct seating. Also
+    // wipe each duelist's own result URL from the finished game.
     db.roomPlayer.updateMany({
       where: { roomCode: code },
-      data: { status: "playing", seat: 0, matchAvg: null },
+      data: { status: "playing", seat: 0, matchAvg: null, finalUrl: "" },
     }),
     db.room.update({ where: { code }, data: { status, videoUploadId: null, finalUrl: "" } }),
   ]);

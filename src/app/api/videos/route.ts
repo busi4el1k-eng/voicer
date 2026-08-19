@@ -13,7 +13,9 @@ export const dynamic = "force-dynamic";
 // when a video isn't playable yet.
 export async function GET() {
   const uploads = await db.videoUpload.findMany({
-    where: { visibility: "public" },
+    // Public uploads only — and never a creator's videos, which live exclusively
+    // under the Creators tab (see /api/creators).
+    where: { visibility: "public", creatorId: null },
     orderBy: { createdAt: "desc" },
     take: 300,
     include: { segments: { select: { id: true, player: true } } },

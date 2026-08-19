@@ -10,11 +10,18 @@ export const runtime = "nodejs";
 // room's videoUploadId and flip status to "dubbing" so waiting members follow
 // into the studio. Enforces the "party size must match the video's seats" rule.
 export async function POST(req: NextRequest) {
-  const { code: rawCode, playerId, uploadId } = (await req.json().catch(() => ({}))) as {
+  const { code: rawCode, playerId, uploadId, mode: rawMode } = (await req
+    .json()
+    .catch(() => ({}))) as {
     code?: string;
     playerId?: string;
     uploadId?: string;
+    mode?: string;
   };
+  // Optional: the game type to lock in for this launch (from the library
+  // chooser). Only 'party'|'duel' are valid; anything else is ignored and the
+  // room keeps whatever mode it already had (e.g. chosen on the dashboard).
+  const mode = rawMode === "duel" || rawMode === "party" ? rawMode : null;
   const code = normalizeRoomCode(rawCode ?? "");
   if (!code || !playerId || !uploadId) {
     return NextResponse.json({ error: "Missing room, player, or video." }, { status: 400 });
@@ -61,21 +68,32 @@ export async function POST(req: NextRequest) {
   // mid-game leave can never shift who dubs which sector.
   await db.$transaction([
     db.roomTake.deleteMany({ where: { roomCode: code } }),
+    // Clear any prior duel takes too (harmless no-op for a party — that table is
+    // only written in duel mode). Keeps a relaunch from inheriting old takes.
+    db.duelTake.deleteMany({ where: { roomCode: code } }),
     ...roster.map((p, i) =>
       db.roomPlayer.update({
         where: { id: p.id },
-        data: { seat: i + 1, status: "playing", matchAvg: null },
+        // Also clear each player's own duel result URL from any previous game.
+        data: { seat: i + 1, status: "playing", matchAvg: null, finalUrl: "" },
       }),
     ),
     db.room.update({
       where: { code },
-      data: { videoUploadId: uploadId, finalUrl: "", status: "dubbing", seatCount: roster.length },
+      data: {
+        videoUploadId: uploadId,
+        finalUrl: "",
+        status: "dubbing",
+        seatCount: roster.length,
+        // Only override the room's mode when the caller specified one.
+        ...(mode ? { mode } : {}),
+      },
     }),
   ]);
 
-  // Record this as a party "run" of the video (one per launch), for the
-  // library's "most played today" window. Fire-and-forget.
-  void db.videoPlay.create({ data: { uploadId, mode: "party" } }).catch(() => {});
+  // Record this as a "run" of the video (one per launch), for the library's
+  // "most played today" window. Fire-and-forget.
+  void db.videoPlay.create({ data: { uploadId, mode: mode ?? "party" } }).catch(() => {});
 
   emitRoom(code); // everyone jumps into the studio on the chosen video
   return NextResponse.json({ room: await roomView(code) });

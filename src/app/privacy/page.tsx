@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "Privacy Policy · Cinema Dub",
@@ -174,8 +175,8 @@ export default function PrivacyPage() {
             </h2>
             <p>
               Questions or requests:{" "}
-              <a className="text-mint underline" href="mailto:nichitabusuioc@gmail.com">
-                nichitabusuioc@gmail.com
+              <a className="text-mint underline" href="mailto:busi4el1k@gmail.com">
+                busi4el1k@gmail.com
               </a>
               . We may update this policy from time to time; the date above shows
               the latest revision.
@@ -189,6 +190,8 @@ export default function PrivacyPage() {
           </Link>
         </div>
       </div>
+
+      <SiteFooter />
     </main>
   );
 }

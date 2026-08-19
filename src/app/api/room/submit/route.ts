@@ -49,38 +49,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No video selected." }, { status: 409 });
   }
 
-  // Which sectors this player is allowed to dub. The assignment adapts to the
-  // party size (see lib/party-assign): with the seats frozen at launch
-  // ([1..seatCount]) every client and the server compute the SAME sector→seat
-  // map, so a player can only upload takes for the sectors they were given.
+  const isDuel = room.mode === "duel";
+
   const segments = await db.videoSegment.findMany({
     where: { uploadId: room.videoUploadId },
     select: { id: true, player: true, startMs: true, endMs: true },
   });
-  const seatUniverse = Array.from(
-    { length: room.seatCount > 0 ? room.seatCount : room.players.length },
-    (_, i) => i + 1,
-  );
-  const assignment = assignSectors(segments, seatUniverse);
-  const mine = new Set(
-    segments.filter((s) => assignment.get(s.id) === seat).map((s) => s.id),
-  );
+
+  // Which sectors this player is allowed to dub.
+  //   • Party: the sector→seat assignment adapts to the party size (see
+  //     lib/party-assign); with the seats frozen at launch ([1..seatCount]) every
+  //     client and the server compute the SAME map, so a player can only upload
+  //     takes for the sectors they were given.
+  //   • Duel: BOTH duelists dub the WHOLE video, so every playable sector is
+  //     theirs to record.
+  const playable = segments.filter((s) => s.endMs > s.startMs);
+  let mine: Set<string>;
+  if (isDuel) {
+    mine = new Set(playable.map((s) => s.id));
+  } else {
+    const seatUniverse = Array.from(
+      { length: room.seatCount > 0 ? room.seatCount : room.players.length },
+      (_, i) => i + 1,
+    );
+    const assignment = assignSectors(segments, seatUniverse);
+    mine = new Set(segments.filter((s) => assignment.get(s.id) === seat).map((s) => s.id));
+  }
 
   for (const [field, value] of form.entries()) {
     if (!field.startsWith("take:")) continue;
     const segmentId = field.slice("take:".length);
-    if (!mine.has(segmentId)) continue; // ignore sectors not assigned to this seat
+    if (!mine.has(segmentId)) continue; // ignore sectors not assigned to this player
     if (!(value instanceof File) || value.size === 0) continue;
 
     const buf = Buffer.from(await value.arrayBuffer());
-    const key = `${SPACES_PREFIX}rooms/${code}/takes/${segmentId}.webm`;
-    const { url } = await putObject(key, buf, value.type || "audio/webm");
 
-    await db.roomTake.upsert({
-      where: { roomCode_segmentId: { roomCode: code, segmentId } },
-      update: { playerId, partKey: key, partUrl: url },
-      create: { roomCode: code, segmentId, playerId, partKey: key, partUrl: url },
-    });
+    if (isDuel) {
+      // Per-player storage + row so both duelists keep their own recording of the
+      // same sector (RoomTake, used by party, is never touched here).
+      const key = `${SPACES_PREFIX}rooms/${code}/duel/${playerId}/${segmentId}.webm`;
+      const { url } = await putObject(key, buf, value.type || "audio/webm");
+      await db.duelTake.upsert({
+        where: { roomCode_segmentId_playerId: { roomCode: code, segmentId, playerId } },
+        update: { partKey: key, partUrl: url },
+        create: { roomCode: code, segmentId, playerId, partKey: key, partUrl: url },
+      });
+    } else {
+      const key = `${SPACES_PREFIX}rooms/${code}/takes/${segmentId}.webm`;
+      const { url } = await putObject(key, buf, value.type || "audio/webm");
+      await db.roomTake.upsert({
+        where: { roomCode_segmentId: { roomCode: code, segmentId } },
+        update: { playerId, partKey: key, partUrl: url },
+        create: { roomCode: code, segmentId, playerId, partKey: key, partUrl: url },
+      });
+    }
   }
 
   // The player's browser scored each of its sectors against the original and

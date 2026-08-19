@@ -139,7 +139,7 @@ export default function CreatorPage() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/creator/jobs");
+      const r = await fetch("/api/creator/jobs?scope=personal");
       const d = (await r.json()) as { uploads: Upload[] };
       setJobs(d.uploads ?? []);
     } catch {

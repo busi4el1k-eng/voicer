@@ -26,7 +26,7 @@ function Step({ rank, clip }: { rank: 1 | 2 | 3; clip?: PodiumClip }) {
       {/* The dub's video icon — enlarges on hover, click / hold opens the full
           player. Empty place → a "SOON" tile so the podium still reads as three
           steps and invites dubs. */}
-      <div className="mb-2">
+      <div className="mb-1">
         {clip ? (
           <ClipThumb src={clip.videoUrl} />
         ) : (
@@ -35,6 +35,10 @@ function Step({ rank, clip }: { rank: 1 | 2 | 3; clip?: PodiumClip }) {
           </div>
         )}
       </div>
+      {/* Author(s) of the dub, under the video. */}
+      <span className="mb-1.5 max-w-[86px] truncate text-center font-display text-[11px] font-bold text-cream/75">
+        {clip ? clip.author || "Guest" : " "}
+      </span>
       {/* Pillar with its place number for style. */}
       <div
         className="flex w-full items-start justify-center rounded-t-[8px] pt-1.5 font-display text-[24px] font-black leading-none text-ink/55"

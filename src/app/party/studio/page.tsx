@@ -85,11 +85,16 @@ export default function PartyStudioPage() {
   const capRef = useRef<number | null>(null); // auto-stop timer (sector-length cap)
   const countdownRef = useRef<number | null>(null); // pre-record 3-2-1 ticker
 
+  const isDuel = room?.mode === "duel";
   const me = room?.players.find((p) => p.id === playerId);
   const mySeat = me?.seat ?? 0;
   const mySubmitted = me?.status === "finished";
   const allFinished = !!room && room.players.length > 0 && room.players.every((p) => p.status === "finished");
-  const showResult = room?.status === "finished" && !!room.finalUrl;
+  // Party finishes into one combined room.finalUrl; a duel finishes into per-player
+  // finalUrls (each duelist gets their own dub), so it's "done" once any exist.
+  const showResult =
+    room?.status === "finished" &&
+    (isDuel ? room.players.some((p) => p.finalUrl) : !!room.finalUrl);
 
   // Guards: you must be in a party, and the game must be underway. If the host
   // hasn't started yet, go back to the pick screen; if you're not in a room,
@@ -129,10 +134,18 @@ export default function PartyStudioPage() {
         setVideo(d.video);
 
         const seats = Array.from({ length: seatCount }, (_, i) => i + 1);
-        const assignment = assignSectors(d.video.segments, seats);
-        const mine = d.video.segments.filter((s) => assignment.get(s.id) === mySeat);
+        // Duel: BOTH players dub the WHOLE video, so everyone gets every playable
+        // sector (no seat split). Party: each seat dubs only its assigned sectors.
+        const mine = isDuel
+          ? d.video.segments.filter((s) => s.endMs > s.startMs)
+          : (() => {
+              const assignment = assignSectors(d.video.segments, seats);
+              return d.video.segments.filter((s) => assignment.get(s.id) === mySeat);
+            })();
         setSegs(mine);
         setPhase(mine.length === 0 ? "empty" : "run");
+
+        if (isDuel) return; // no uneven-cast heads-up in a duel
 
         // Work out whether the party is uneven, and how it affects ME, so we can
         // show a one-time heads-up. Only when I actually have sectors.
@@ -499,6 +512,142 @@ export default function PartyStudioPage() {
             const canRate = !!playerId && (needVideo || needPlayers);
             const ratingsDone =
               (!needVideo || videoSaved) && (!needPlayers || playersSaved);
+
+            // ── Duel: competitive result decided by capture score. Any number of
+            // players — everyone dubbed the whole video, ranked highest-first, the
+            // top score(s) win. ────────────────────────────────────────────────
+            if (isDuel) {
+              const topScore = Math.max(0, ...room.players.map((p) => p.matchAvg ?? 0));
+              const winners = room.players.filter((p) => (p.matchAvg ?? 0) === topScore);
+              const tie = winners.length > 1;
+              const soleWinner = tie ? null : winners[0];
+              const iAmWinner = winners.some((w) => w.id === playerId);
+              const maxScore = Math.max(topScore, 1);
+              return (
+                <div className="g-panel text-center">
+                  {/* Verdict banner */}
+                  <div className="mx-auto mb-1 text-[40px] leading-none">
+                    {tie ? "🤝" : "🏆"}
+                  </div>
+                  <h2 className="g-title">
+                    {iAmWinner ? (tie ? t("duel.youTied") : t("duel.youWin")) : t("duel.youLose")}
+                  </h2>
+                  <p className="mb-4 text-[13px] text-cream/60">
+                    {tie
+                      ? t("duel.tieBody")
+                      : t("duel.winnerBody", { name: soleWinner?.displayName ?? "" })}
+                  </p>
+
+                  {/* Capture-score leaderboard (highest first) */}
+                  <div className="mb-4 flex flex-col gap-2 rounded-[12px] bg-white/5 p-4">
+                    {[...room.players]
+                      .sort((a, b) => (b.matchAvg ?? 0) - (a.matchAvg ?? 0))
+                      .map((p) => {
+                      const score = p.matchAvg ?? 0;
+                      const isWinner = score === topScore;
+                      return (
+                        <div key={p.id} className="flex items-center gap-3">
+                          <span
+                            className="grid h-8 w-8 flex-none place-items-center rounded-full font-display text-[13px] font-black text-white"
+                            style={{ backgroundColor: p.avatarColor }}
+                          >
+                            {p.displayName.charAt(0).toUpperCase()}
+                          </span>
+                          <div className="flex-1">
+                            <div className="mb-1 flex items-center justify-between text-left">
+                              <span className="truncate text-[13px] text-cream/85">
+                                {p.displayName}
+                                {p.id === playerId && (
+                                  <span className="text-cream/45"> {t("common.you")}</span>
+                                )}
+                                {isWinner && <span className="ml-1">👑</span>}
+                              </span>
+                              <span
+                                className="font-display text-[16px] font-black"
+                                style={{ color: matchColor(score) }}
+                              >
+                                {score}%
+                              </span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${Math.round((score / maxScore) * 100)}%`,
+                                  backgroundColor: matchColor(score),
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <p className="mt-1 text-center text-[11px] text-cream/45">
+                      {t("duel.captureHint")}
+                    </p>
+                  </div>
+
+                  {/* Each duelist's own rendered dub */}
+                  <div className="mb-4 flex flex-col gap-4">
+                    {room.players
+                      .filter((p) => p.finalUrl)
+                      .map((p) => (
+                        <div key={p.id}>
+                          <p className="mb-2 text-left font-display text-[12px] font-bold uppercase tracking-[0.08em] text-cream/60">
+                            {p.id === playerId
+                              ? t("duel.yourDub")
+                              : t("duel.theirDub", { name: p.displayName })}
+                          </p>
+                          <VideoStage src={p.finalUrl} />
+                          <div className="mt-2 flex w-full flex-wrap items-center gap-3">
+                            <a
+                              href={downloadHref(p.finalUrl, `${title}-${p.displayName}.mp4`)}
+                              className="g-btn g-btn-start min-w-[150px] flex-1"
+                            >
+                              {t("game.downloadVideo")}
+                            </a>
+                            <ShareButton videoUrl={p.finalUrl} title={title} mode="party" />
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Ratings gate (same as party) then the exit. */}
+                  <div className="flex flex-col items-center gap-3">
+                    {canRate && playerId && (
+                      <div className="w-full">
+                        {needVideo && (
+                          <RateVideo
+                            uploadId={room.videoUploadId!}
+                            raterKey={playerId}
+                            onSaved={setVideoSaved}
+                          />
+                        )}
+                        {needPlayers && (
+                          <RatePlayers
+                            code={room.code}
+                            playerId={playerId}
+                            players={room.players}
+                            onSaved={setPlayersSaved}
+                          />
+                        )}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => void backToLobby()}
+                      disabled={leaving || !ratingsDone}
+                      className="g-btn g-btn-ghost w-full"
+                    >
+                      {leaving ? "…" : t("game.backToDashboard")}
+                    </button>
+                    {!ratingsDone && (
+                      <p className="text-[12px] text-sun">{t("pstud.rateToContinue")}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
             // Party match: average of every player's on-device match score.
             const scoredPlayers = room.players.filter((p) => p.matchAvg != null);
             const partyMatch = scoredPlayers.length
@@ -856,6 +1005,7 @@ export default function PartyStudioPage() {
                   <div className="lg:absolute lg:inset-0">
                     <ScenarioWindow
                       mySeat={mySeat}
+                      allMine={isDuel}
                       lines={scenarioFromSegments(video?.segments ?? [])}
                       currentKey={seg.id}
                     />

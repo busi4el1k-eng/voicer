@@ -16,11 +16,15 @@ const isPublicRoute = createRouteMatcher([
   "/party(.*)", // online party lobby + studio (guest)
   "/watch(.*)", // public shared-dub watch page (anyone with the link)
   "/privacy", // public privacy policy (required for AdSense; linked in consent msg)
+  "/about", // public "About us" page (AdSense trust/transparency)
+  "/contact", // public "Contacts" page (AdSense trust/transparency)
   "/ingest(.*)", // PostHog analytics reverse proxy (see next.config.ts)
   "/api/user", // GET returns the current identity (guest-safe) for analytics
   "/api/clerk/webhook",
   "/api/library(.*)",
   "/api/videos(.*)",
+  "/api/creators(.*)", // public featured-creators list (Creators tab, guest-safe)
+  "/api/admin(.*)", // admin creator management — handlers self-guard via isAdmin(), so they must reply with JSON (403), not a login redirect
   "/api/video(.*)", // per-video rating after a play
   "/api/room(.*)", // all party room actions (join/select/submit/render/…)
   "/api/solo(.*)", // solo lookup + video fetch

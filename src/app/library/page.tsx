@@ -5,12 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AccountBar } from "@/components/AccountBar";
 import { useI18n } from "@/components/LanguageProvider";
-import { VideoThumb } from "@/components/VideoThumb";
+import { Poster } from "@/components/Poster";
+import { SiteFooter } from "@/components/SiteFooter";
 import { formatShareId } from "@/lib/share-id";
 import { LOCALES, LOCALE_META } from "@/lib/i18n";
-
-// One fixed colour per player seat (1-4), matching the creator/editor.
-const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8", "#A78BFA", "#FB923C", "#F87171"];
 
 type Video = {
   id: string;
@@ -41,10 +39,11 @@ const fmtDuration = (ms: number) => {
 
 // ── Sorting: pick one field to order by, plus one direction (ascending or
 // descending). Fields are mutually exclusive; the direction toggle flips them. ─
-type SortField = "date" | "rating" | "popular" | "sectors" | "length";
+type SortField = "trending" | "date" | "rating" | "popular" | "sectors" | "length";
 type SortDir = "asc" | "desc";
 // Labels are i18n keys, translated where the chips render.
 const FIELDS: { key: SortField; labelKey: string }[] = [
+  { key: "trending", labelKey: "lib.field.trending" },
   { key: "date", labelKey: "lib.field.date" },
   { key: "popular", labelKey: "lib.field.popular" },
   { key: "rating", labelKey: "lib.field.rated" },
@@ -52,9 +51,22 @@ const FIELDS: { key: SortField; labelKey: string }[] = [
   { key: "length", labelKey: "lib.field.length" },
 ];
 
+// Trending score: recent play velocity with a time-decay, so videos gaining
+// traction *now* rise while stale ones sink even if they're all-time popular.
+// Today's runs dominate; all-time runs, ratings, and average score are lighter
+// signals. Dividing by (ageHours + 2)^1.5 (a HN/Reddit-style gravity) surfaces
+// fresh, active videos over old ones — the essence of "trending".
+const trendingScore = (v: Video): number => {
+  const ageHours = Math.max(0, (Date.now() - new Date(v.createdAt).getTime()) / 3_600_000) || 0;
+  const engagement = v.todayPlayCount * 8 + v.playCount + v.ratingCount * 2 + v.rating;
+  return engagement / Math.pow(ageHours + 2, 1.5);
+};
+
 // The comparable number behind each sort field.
 const fieldValue = (v: Video, field: SortField): number => {
   switch (field) {
+    case "trending":
+      return trendingScore(v);
     case "date":
       return new Date(v.createdAt).getTime() || 0;
     case "rating":
@@ -373,92 +385,87 @@ export default function LibraryPage() {
               </button>
             </div>
           ) : (
-            <ul className="flex flex-col gap-3">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {paged.map((v) => {
                 return (
                   <li
                     key={v.id}
-                    className="rounded-[12px] bg-violet-deep/40 p-3 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
+                    className="flex flex-col gap-2.5 rounded-[12px] bg-violet-deep/40 p-3 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      {/* Preview */}
-                      {v.sourceUrl && (
-                        <div className="flex-none">
-                          <VideoThumb src={v.sourceUrl} />
-                        </div>
-                      )}
-
-                      {/* Title + creator + meta */}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-display text-[17px] font-bold text-cream">
-                          {v.title || t("lib.untitled")}
-                        </div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-cream/70">
-                          <span className="flex items-center gap-1.5">
-                            <span
-                              aria-hidden
-                              className="grid h-5 w-5 flex-none place-items-center rounded-full font-display text-[11px] font-black text-white"
-                              style={{ backgroundColor: v.creatorColor }}
-                            >
-                              {v.creator.charAt(0).toUpperCase()}
-                            </span>
-                            <span className="text-cream/85">{v.creator}</span>
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <span className="font-display font-bold text-cream/85">{v.lines}</span>
-                            <span className="text-cream/45">
-                              {v.lines === 1 ? t("lib.line") : t("lib.lines")}
-                            </span>
-                          </span>
-                          {v.ratingCount > 0 ? (
-                            <span
-                              className="flex items-center gap-1"
-                              title={t("lib.ratedBy", { n: v.ratingCount })}
-                            >
-                              <span className="text-sun">★</span>
-                              <span className="font-display font-bold text-cream/85">
-                                {v.rating.toFixed(1)}
-                              </span>
-                              <span className="text-cream/45">({v.ratingCount})</span>
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-cream/35">
-                              <span>★</span>
-                              <span>{t("lib.unrated")}</span>
-                            </span>
-                          )}
-                          {v.players > 0 && (
-                            <span className="flex items-center gap-1">
-                              {Array.from({ length: v.players }, (_, i) => (
-                                <span
-                                  key={i}
-                                  title={t("lib.playerN", { n: i + 1 })}
-                                  className="h-2.5 w-2.5 rounded-full shadow-[inset_0_0_0_1.5px_rgba(31,7,51,0.4)]"
-                                  style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] }}
-                                />
-                              ))}
-                            </span>
-                          )}
-                          {v.durationMs > 0 && (
-                            <span className="text-cream/55">{fmtDuration(v.durationMs)}</span>
-                          )}
-                          {v.shareId && (
-                            <span className="font-display font-bold tracking-[0.1em] text-mint">
-                              {formatShareId(v.shareId)}
-                            </span>
-                          )}
-                        </div>
+                    {/* Preview — big static poster that plays on hover/tap (no zoom). */}
+                    {v.sourceUrl && (
+                      <div className="overflow-hidden rounded-[8px]">
+                        <Poster src={v.sourceUrl} />
                       </div>
+                    )}
 
-                      {/* Play — opens a chooser for Solo run vs Party mode. */}
-                      <div className="flex flex-none items-center gap-2">
-                        <button
-                          onClick={() => setChosen(v)}
-                          title={t("lib.dubThis")}
-                          className="g-btn g-btn-start flex h-10 flex-1 items-center justify-center px-5 text-[13px] sm:flex-none"
-                        >
-                          {t("lib.play")}
-                        </button>
+                    {/* Play — opens a chooser for Solo run vs Party mode. */}
+                    <button
+                      onClick={() => setChosen(v)}
+                      title={t("lib.dubThis")}
+                      className="g-btn g-btn-start flex h-10 w-full items-center justify-center text-[13px]"
+                    >
+                      {t("lib.play")}
+                    </button>
+
+                    {/* Info, kept under the Play button */}
+                    <div className="min-w-0">
+                      <div className="truncate font-display text-[16px] font-bold text-cream">
+                        {v.title || t("lib.untitled")}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-cream/70">
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            aria-hidden
+                            className="grid h-5 w-5 flex-none place-items-center rounded-full font-display text-[11px] font-black text-white"
+                            style={{ backgroundColor: v.creatorColor }}
+                          >
+                            {v.creator.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="text-cream/85">{v.creator}</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-display font-bold text-cream/85">{v.lines}</span>
+                          <span className="text-cream/45">
+                            {v.lines === 1 ? t("lib.line") : t("lib.lines")}
+                          </span>
+                        </span>
+                        {v.ratingCount > 0 ? (
+                          <span
+                            className="flex items-center gap-1"
+                            title={t("lib.ratedBy", { n: v.ratingCount })}
+                          >
+                            <span className="text-sun">★</span>
+                            <span className="font-display font-bold text-cream/85">
+                              {v.rating.toFixed(1)}
+                            </span>
+                            <span className="text-cream/45">({v.ratingCount})</span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-cream/35">
+                            <span>★</span>
+                            <span>{t("lib.unrated")}</span>
+                          </span>
+                        )}
+                        {v.players > 0 && (
+                          <span
+                            className="flex items-center gap-1"
+                            title={t("lib.recommendedPlayers", { n: v.players })}
+                          >
+                            <span aria-hidden className="text-cream/70">
+                              👤
+                            </span>
+                            <span className="font-display font-bold text-cream/85">{v.players}</span>
+                          </span>
+                        )}
+                        {v.durationMs > 0 && (
+                          <span className="text-cream/55">{fmtDuration(v.durationMs)}</span>
+                        )}
+                        {v.shareId && (
+                          <span className="font-display font-bold tracking-[0.1em] text-mint">
+                            {formatShareId(v.shareId)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </li>
@@ -538,9 +545,22 @@ export default function LibraryPage() {
             >
               {t("lib.partyMode")}
             </button>
+            <button
+              type="button"
+              className="g-btn g-btn-primary w-full"
+              onClick={() =>
+                router.push(
+                  chosen.shareId ? `/party?code=${chosen.shareId}&mode=duel` : "/party?mode=duel",
+                )
+              }
+            >
+              {t("lib.duelMode")}
+            </button>
           </div>
         </div>
       )}
+
+      <SiteFooter />
     </main>
   );
 }

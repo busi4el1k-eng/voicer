@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useCenterPreview } from "@/lib/useCenterPreview";
 
 // A tiny still frame pulled from the uploaded video. Hovering plays a short,
 // muted preview (looping the first few seconds) and scales the frame up a bit.
@@ -9,6 +10,7 @@ const PREVIEW_SECONDS = 4; // loop the opening few seconds while hovering
 
 export function VideoThumb({ src }: { src: string }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState(false);
 
   // Seek to a frame so a still image shows even before playback.
@@ -49,8 +51,14 @@ export function VideoThumb({ src }: { src: string }) {
     if (v && v.currentTime > PREVIEW_SECONDS) v.currentTime = 0;
   };
 
+  // On mobile (no hover), play the preview while this thumb is centred on screen.
+  useCenterPreview(wrapRef, onEnter, onLeave);
+
   return (
-    <div className="flex justify-center" style={{ width: 72 }}>
+    // On phones the frame is centred across the full row width, so the zoom
+    // grows from the middle of the screen and its edges stay on-screen. On
+    // desktop (sm+) it's a compact fixed-width cell at the left of the row.
+    <div ref={wrapRef} className="flex w-full justify-center sm:w-[100px]">
       <video
         ref={ref}
         src={`${src}#t=${STILL_AT}`}
@@ -62,7 +70,7 @@ export function VideoThumb({ src }: { src: string }) {
         onMouseLeave={onLeave}
         onTouchStart={onTouch}
         onTimeUpdate={onTime}
-        className="h-11 w-[72px] cursor-pointer rounded-[8px] border-2 border-violet-lift bg-black object-cover transition-transform duration-200"
+        className="h-[60px] w-[100px] cursor-pointer rounded-[8px] border-2 border-violet-lift bg-black object-cover transition-transform duration-200"
         style={{
           transform: hover ? "scale(2.9)" : "scale(1)",
           transformOrigin: "center",

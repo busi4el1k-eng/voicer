@@ -6,14 +6,19 @@ import { emitRoom } from "@/lib/room-events";
 
 export const runtime = "nodejs";
 
-// The host starts the party for everyone: flip the room to "playing" so the
+// The host starts the game for everyone: flip the room to "playing" so the
 // other members (who are polling and waiting) follow into the game. Only the
-// host may do this, and only once the party is big enough.
+// host may do this, and only once the party is big enough. The game TYPE is
+// chosen here, not at room creation: "party" (co-op — sectors split across
+// players, one combined render) or "duel" (competitive — everyone dubs the whole
+// video, ranked by capture score, each gets their own render).
 export async function POST(req: NextRequest) {
-  const { code: rawCode, playerId } = (await req.json().catch(() => ({}))) as {
+  const { code: rawCode, playerId, mode: rawMode } = (await req.json().catch(() => ({}))) as {
     code?: string;
     playerId?: string;
+    mode?: string;
   };
+  const mode = rawMode === "duel" ? "duel" : "party";
   const code = normalizeRoomCode(rawCode ?? "");
   if (!code || !playerId) {
     return NextResponse.json({ error: "Missing room or player." }, { status: 400 });
@@ -35,7 +40,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await db.room.update({ where: { code }, data: { status: "playing" } });
+  await db.room.update({ where: { code }, data: { status: "playing", mode } });
   emitRoom(code); // waiting members follow the host into the game
   return NextResponse.json({ room: await roomView(code) });
 }

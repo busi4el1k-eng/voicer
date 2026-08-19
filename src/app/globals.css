@@ -255,7 +255,10 @@ body {
 .g-center {
   display: flex;
   gap: 16px;
-  /* stretch = the modes window and the profile/room window share one height */
+  /* stretch = the profile/room window and the modes window share one height and
+     bottom-align. The modes grid (6 cards) is the taller column, so the left
+     window stretches up to match it — its flex layout (+ the guest note's
+     mt-auto) absorbs the slack, so there's no empty gap under the mode cards. */
   align-items: stretch;
   align-self: stretch;
   width: 100%;
@@ -564,9 +567,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* Keep the panel compact no matter how many seats there are: show a few
-     seats, then scroll inside the list instead of growing the whole page. */
-  max-height: 216px;
+  /* This is the flexible region of the left window. flex-basis 0 means the list
+     never reports its own content height, so it can't push the panel taller —
+     it just fills the leftover space and scrolls its names internally. The left
+     window therefore stays exactly the modes window's height in every room state
+     (invite banner appearing, seats filling, the guest note dropping). */
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-width: thin;
@@ -951,6 +958,16 @@ button.g-ghost-slot:disabled {
   .g-left {
     width: 100%;
   }
+  /* The windows stack vertically here, so there's no tall sibling to stretch the
+     left panel to. The desktop `flex: 1 1 0` (which pins the seat list to the
+     modes-window height and scrolls it) would collapse the list to nothing —
+     hiding the "add player" seats. On mobile keep it compact: show at most ~3
+     seats (3 × 54px + 2 × 8px gap ≈ 178px), then scroll inside the list. */
+  .g-party {
+    flex: 0 0 auto;
+    max-height: 178px;
+    overflow-y: auto;
+  }
 }
 
 /* Thin, on-theme scrollbar for the zoomable timeline viewport. */
@@ -1002,21 +1019,23 @@ button.g-ghost-slot:disabled {
   background-clip: padding-box;
 }
 
-/* Video library — "Trending today" sidebar. On desktop it becomes a
-   full-viewport-height sticky rail whose content is vertically centred, so it
-   tracks the middle of the screen while the list scrolls, instead of pinning to
-   the top (where it used to ride down and overlap the yellow "back to lobby"
-   button). Height is divided by --g-zoom to cancel the big-screen `zoom` on
-   .g-screen so the rail is exactly one screen tall. Phones are untouched — the
-   window just stacks above the list as before. */
+/* Video library — "Trending today" sidebar. On desktop it's pinned to the
+   VERTICAL MIDDLE of the screen and stays put while the video list scrolls (it
+   never rides up/down). We do this by stretching the rail to the list column's
+   full height (align-self: stretch) and making the inner panel `sticky` centred
+   at top:50% — so it holds at the viewport's middle for the whole scroll without
+   any pixel maths (percentages stay correct under the big-screen `zoom`, and it
+   can't overlap the yellow "back to lobby" button at the end). Phones are
+   untouched — the window just stacks above the list as before. */
 @media (min-width: 1024px) {
   .lib-trending {
+    align-self: stretch;
+    position: relative;
+  }
+  .lib-trending > * {
     position: sticky;
-    top: 0;
-    align-self: flex-start;
-    height: calc(100vh / var(--g-zoom));
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    top: 50%;
+    transform: translateY(-50%);
   }
 }
+

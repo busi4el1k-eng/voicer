@@ -39,6 +39,13 @@ const MODES: Mode[] = [
     href: "/party",
   },
   {
+    id: "duel",
+    icon: "⚔️",
+    titleKey: "mode.duel.title",
+    textKey: "mode.duel.text",
+    href: "/party", // shared pick screen; room.mode drives the duel flow
+  },
+  {
     id: "solo",
     icon: "🎬",
     titleKey: "mode.solo.title",
@@ -176,9 +183,10 @@ export function Lobby({
   const [note, setNote] = useState(false);
   const [gate, setGate] = useState(false);
 
-  // Party mode entry: a party (room) is required to play. With no party we hide
+  // Party/duel entry: a room (party) is required to play. With no room we hide
   // "Start" and open a modal (same panel style as the studio's "Add a player")
-  // to create/join one; once you have a party you can enter the game directly.
+  // to create/join one; once you have a party of players the host chooses the
+  // game — co-op "party" or competitive "duel" — right there.
   const [partyOpen, setPartyOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [joinCode, setJoinCode] = useState("");
@@ -196,7 +204,9 @@ export function Lobby({
     leave,
   } = useRoom({ displayName: playerName, avatarColor });
 
-  // Party mode needs a party of at least MIN_PLAYERS before anyone can enter.
+  // A room needs at least MIN_PLAYERS before any game (party or duel) can start.
+  // The game TYPE is not fixed to the room — it's chosen at launch (see start()),
+  // so the same party can play either mode.
   const partyReady = !!room && room.players.length >= MIN_PLAYERS;
 
   // Only the host leads: they pick the mode and start for everyone. Everyone
@@ -217,9 +227,10 @@ export function Lobby({
     // get pulled in when the host starts the next one.
   }, [room, isHost, router]);
 
-  // Host action: start the party for everyone, then head in.
-  const startParty = async () => {
-    if (await start()) router.push("/party");
+  // Host action: launch the chosen game type for everyone, then head in. The
+  // members follow automatically once the room flips to "playing".
+  const startGame = async (mode: "party" | "duel") => {
+    if (await start(mode)) router.push("/party");
   };
 
   const copyCode = async () => {
@@ -239,12 +250,12 @@ export function Lobby({
       setGate(true);
       return;
     }
-    // Party mode: a full-enough party (≥ MIN_PLAYERS) enters the game directly;
-    // otherwise open the modal to create/join or gather more players.
-    if (mode.id === "party") {
+    // Party & duel share one room; the modal gathers players and, once there are
+    // enough, lets the host pick the game. Both cards enter the same way — click
+    // opens the create/join modal, whether or not a room exists yet.
+    if (mode.id === "party" || mode.id === "duel") {
       setRoomError(null);
-      if (partyReady) router.push("/party");
-      else setPartyOpen(true);
+      setPartyOpen(true);
       return;
     }
     if (mode.href) router.push(mode.href);
@@ -255,7 +266,7 @@ export function Lobby({
     <div className="g-right self-stretch">
       <h2 className="g-title">{t("lobby.modes")}</h2>
 
-      <div className="g-panel min-h-[340px] flex-1">
+      <div className="g-panel">
         <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 [&_.g-card-inner]:min-h-[104px]">
           {MODES.map((m) => (
             <button
@@ -293,30 +304,13 @@ export function Lobby({
         </div>
       </div>
 
-      {/* Only render the actions row when it has something to show. An always-on
-          empty row still carries its margin-top, which pushes the modes panel up
-          so it no longer bottom-aligns with the room/profile window. */}
-      {(selected === "party" || note) && (
+      {/* Actions row: mode entry is driven entirely by clicking the cards (which
+          open the create/join/start modal), so the only thing left here is the
+          coming-soon note for mock modes. Render it only when present — an empty
+          row still carries its margin-top and misaligns the modes panel. */}
+      {note && (
         <div className="g-actions flex-col gap-2">
-          {selected === "party" &&
-            // Party mode requires a party of at least MIN_PLAYERS. Ready → enter
-            // directly; otherwise a button opens the create/gather modal.
-            (partyReady ? (
-              <button className="g-btn g-btn-start" onClick={startParty} disabled={roomBusy}>
-                {t("party.startParty")}
-              </button>
-            ) : (
-              <button
-                className="g-btn g-btn-primary"
-                onClick={() => {
-                  setRoomError(null);
-                  setPartyOpen(true);
-                }}
-              >
-                {room ? t("party.setup") : t("party.create")}
-              </button>
-            ))}
-          {note && <p className="text-[12px] text-cream/60">{t("lobby.comingSoon")}</p>}
+          <p className="text-[12px] text-cream/60">{t("lobby.comingSoon")}</p>
         </div>
       )}
 
@@ -329,8 +323,9 @@ export function Lobby({
         <WaitingRoom room={room} playerId={playerId} busy={roomBusy} onLeave={leave} />
       )}
 
-      {/* Party-mode modal — same panel style as the studio's "Add a player".
-          Create/join a party, or (once you have one) enter the game. */}
+      {/* Setup modal — same panel style as the studio's "Add a player". One room
+          for both game types: create / join / invite players, then (once there
+          are enough) the host picks the game — co-op Party or competitive Duel. */}
       {partyOpen && !isMember && (
         <div className="g-modal-overlay" onClick={() => setPartyOpen(false)}>
           <div className="g-modal" onClick={(e) => e.stopPropagation()}>
@@ -343,9 +338,11 @@ export function Lobby({
               ×
             </button>
             <div className="mx-auto mb-1 grid h-12 w-12 place-items-center rounded-full bg-mint/20 text-[24px]">
-              🎉
+              {selected === "duel" ? "⚔️" : "🎉"}
             </div>
-            <h3 className="g-modal-title">{t("party.title")}</h3>
+            <h3 className="g-modal-title">
+              {selected === "duel" ? t("duel.title") : t("party.title")}
+            </h3>
 
             {room ? (
               <>
@@ -358,14 +355,18 @@ export function Lobby({
                   {t("wait.inRoom", { a: room.players.length, b: MAX_PLAYERS })}
                 </p>
                 {partyReady ? (
-                  <button
-                    type="button"
-                    className="g-btn g-btn-start w-full"
-                    onClick={startParty}
-                    disabled={roomBusy}
-                  >
-                    {t("party.startParty")}
-                  </button>
+                  // Enough players — launch the game the host picked with the card
+                  // (party or duel). Only that mode's button shows here.
+                  <div className="flex w-full flex-col gap-2">
+                    <button
+                      type="button"
+                      className="g-btn g-btn-start w-full"
+                      onClick={() => void startGame(selected as "party" | "duel")}
+                      disabled={roomBusy}
+                    >
+                      {selected === "duel" ? t("duel.startDuel") : t("party.startParty")}
+                    </button>
+                  </div>
                 ) : (
                   <p className="g-modal-sub text-sun">{t("party.needMore", { n: MIN_PLAYERS })}</p>
                 )}
@@ -375,7 +376,9 @@ export function Lobby({
             ) : (
               <>
                 {roomError && <p className="g-modal-sub text-magenta">{roomError}</p>}
-                <p className="g-modal-sub">{t("party.host")}</p>
+                <p className="g-modal-sub">
+                  {selected === "duel" ? t("duel.host") : t("party.host")}
+                </p>
                 <button type="button" className="g-btn g-btn-primary w-full" onClick={() => create()}>
                   {t("party.generate")}
                 </button>
