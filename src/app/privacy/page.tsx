@@ -8,8 +8,7 @@ export const metadata: Metadata = {
 };
 
 // Static legal page — kept in English (the app default) and deliberately plain
-// so it's easy to read and to keep accurate. Linked from the AdSense consent
-// message and required for AdSense approval. Public route (see proxy.ts).
+// so it's easy to read and to keep accurate. Public route (see proxy.ts).
 export default function PrivacyPage() {
   const updated = "15 August 2026";
   return (
@@ -80,42 +79,44 @@ export default function PrivacyPage() {
             </h2>
             <p className="mb-2">
               We use cookies for essential features (guest identity, language)
-              and analytics. We also show ads through <strong>Google
-              AdSense</strong>.
+              and analytics. We also show ads through{" "}
+              <strong>Adsterra</strong>.
             </p>
             <ul className="list-disc space-y-2 pl-5">
               <li>
-                Third-party vendors, including Google, use cookies to serve ads
-                based on your prior visits to this and other websites.
+                Adsterra and its partners may use cookies to serve relevant ads
+                based on your browsing activity on this and other websites.
               </li>
               <li>
-                Google&rsquo;s use of advertising cookies enables it and its
-                partners to serve ads to you based on your visits. You can opt
-                out of personalized advertising by visiting{" "}
+                You can opt out of interest-based advertising by visiting{" "}
                 <a
                   className="text-mint underline"
-                  href="https://www.google.com/settings/ads"
+                  href="https://www.youronlinechoices.com"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Google Ads Settings
-                </a>
-                .
-              </li>
-              <li>
-                For visitors in the EEA, UK, and Switzerland, we show a consent
-                banner and only serve personalized ads with your consent, as
-                required by GDPR.
-              </li>
-              <li>
-                Learn more about how Google uses data at{" "}
+                  youronlinechoices.com
+                </a>{" "}
+                (EEA) or{" "}
                 <a
                   className="text-mint underline"
-                  href="https://policies.google.com/technologies/partner-sites"
+                  href="https://optout.aboutads.info"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  policies.google.com/technologies/partner-sites
+                  optout.aboutads.info
+                </a>{" "}
+                (US).
+              </li>
+              <li>
+                Learn more about Adsterra&rsquo;s data practices at{" "}
+                <a
+                  className="text-mint underline"
+                  href="https://adsterra.com/privacy-policy/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  adsterra.com/privacy-policy
                 </a>
                 .
               </li>
@@ -129,7 +130,7 @@ export default function PrivacyPage() {
             <p>
               We share data only with the processors needed to run the service:
               Clerk (accounts), Neon (database), DigitalOcean (hosting &amp;
-              file storage), PostHog (analytics), Google AdSense (advertising),
+              file storage), PostHog (analytics), Adsterra (advertising),
               and speech/audio processing services used to prepare clips. We do
               not sell your personal data.
             </p>

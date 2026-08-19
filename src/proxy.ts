@@ -15,9 +15,9 @@ const isPublicRoute = createRouteMatcher([
   "/play(.*)", // solo dubbing (guest)
   "/party(.*)", // online party lobby + studio (guest)
   "/watch(.*)", // public shared-dub watch page (anyone with the link)
-  "/privacy", // public privacy policy (required for AdSense; linked in consent msg)
-  "/about", // public "About us" page (AdSense trust/transparency)
-  "/contact", // public "Contacts" page (AdSense trust/transparency)
+  "/privacy", // public privacy policy
+  "/about", // public "About us" page
+  "/contact", // public "Contacts" page
   "/ingest(.*)", // PostHog analytics reverse proxy (see next.config.ts)
   "/api/user", // GET returns the current identity (guest-safe) for analytics
   "/api/clerk/webhook",

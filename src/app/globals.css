@@ -115,12 +115,10 @@ body {
 }
 
 /* ============================================================
-   Right ad rail (desktop only) — Gartic-Phone style persistent skyscraper.
+   Right ad rail (desktop only) — Adsterra 160×300 banner.
    The rail is position:fixed on the far RIGHT; the page reserves --ad-rail on
    BOTH sides so the content column stays centred in the true middle of the
-   viewport (the ad lives in the reserved right gutter instead of shoving the
-   whole page off-centre). With no ad rendered the symmetric gutters still keep
-   content centred. Below the breakpoint the var is 0, the rail is display:none,
+   viewport. Below the breakpoint the var is 0, the rail is display:none,
    and the layout is full-width — phones get no ad and no wasted gutter.
    ============================================================ */
 :root {
@@ -131,15 +129,15 @@ body {
   display: none;
 }
 
-/* Only show the rail where there's real room for a skyscraper beside the
-   ~1080px content column (i.e. desktop, never phones/tablets). */
+/* Only show the rail where there's real room beside the ~1080px content
+   column (desktop only, never phones/tablets). */
 @media (min-width: 1200px) {
   :root {
+    /* 160px ad + 20px padding each side = 200px reserved gutter */
     --ad-rail: 200px;
   }
   body {
-    /* Symmetric gutters keep the centred content column in the middle of the
-       viewport regardless of whether an ad actually fills the right rail. */
+    /* Symmetric gutters keep the content column centred in the viewport. */
     padding-left: var(--ad-rail);
     padding-right: var(--ad-rail);
   }
@@ -153,18 +151,32 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 12px;
-    /* Let clicks through the empty gutter, but keep the ad itself clickable. */
+    /* Let clicks pass through the empty gutter, but keep the card clickable. */
     pointer-events: none;
   }
+  /* Clean, frameless ad — exact Adsterra banner dimensions, no card/window. */
   .ad-rail-unit {
     pointer-events: auto;
-    width: 100%;
-    /* Not a locked 160x600 — the responsive unit sizes itself to the tallest
-       vertical creative that fits the rail (up to AdSense's 300x600 half-page),
-       so it grows instead of staying a fixed small box. */
-    height: auto;
-    max-height: 92vh;
+    display: block;
+    width: 160px;
+    height: 300px;
+    border: none;
+    background: transparent;
+  }
+}
+
+/* Adsterra native banner, shown UNDER the content on mobile/tablet only — i.e.
+   exactly where the desktop side rail is hidden, so every viewport gets one ad.
+   Sits in normal flow at the bottom of the page and sizes to its own height. */
+.ad-mobile {
+  width: 100%;
+  max-width: 680px;
+  margin: 4px auto 24px;
+  padding: 0 12px;
+}
+@media (min-width: 1200px) {
+  .ad-mobile {
+    display: none;
   }
 }
 
