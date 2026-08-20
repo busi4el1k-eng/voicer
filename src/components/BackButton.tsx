@@ -21,20 +21,7 @@ export function BackButton() {
   };
 
   return (
-    <div
-      className="pointer-events-none fixed inset-x-0 top-0 z-40"
-      // Mirror the body's symmetric ad-rail gutters so this fixed bar's centred
-      // 1080 column sits in the exact same box as the page content — otherwise
-      // the button drifts into the left gutter on narrower desktops, where the
-      // content column is squeezed below 1080. See --ad-rail in globals.css.
-      // Also mirror the content's --g-zoom so this button matches the size of the
-      // top-right controls (which live inside the zoomed .g-screen).
-      style={{
-        zoom: "var(--g-zoom, 1)" as React.CSSProperties["zoom"],
-        paddingLeft: "var(--ad-rail, 0px)",
-        paddingRight: "var(--ad-rail, 0px)",
-      }}
-    >
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-40">
       <div className="relative mx-auto max-w-[1080px]">
         <button
           type="button"

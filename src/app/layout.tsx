@@ -4,8 +4,6 @@ import { cookies } from "next/headers";
 import { ClerkResilientProvider } from "@/components/ClerkResilientProvider";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { BackButton } from "@/components/BackButton";
-import { AdRail } from "@/components/AdRail";
-import { MobileAdBanner } from "@/components/MobileAdBanner";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { PostHogIdentify } from "@/components/PostHogIdentify";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
@@ -49,9 +47,7 @@ export default async function RootLayout({
           <PostHogIdentify />
           <AnimatedBackground />
           <BackButton />
-          <AdRail />
           {children}
-          <MobileAdBanner />
         </LanguageProvider>
       </body>
     </html>

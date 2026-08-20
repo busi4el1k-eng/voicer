@@ -114,91 +114,6 @@ body {
   transform-origin: top center;
 }
 
-/* ============================================================
-   Right ad rail (desktop only) — Adsterra 160×300 banner.
-   The rail is position:fixed on the far RIGHT; the page reserves --ad-rail on
-   BOTH sides so the content column stays centred in the true middle of the
-   viewport. Below the breakpoint the var is 0, the rail is display:none,
-   and the layout is full-width — phones get no ad and no wasted gutter.
-   ============================================================ */
-:root {
-  --ad-rail: 0px;
-}
-
-.ad-rail {
-  display: none;
-}
-
-/* Only show the rail where there's real room beside the ~1080px content
-   column (desktop only, never phones/tablets). */
-@media (min-width: 1200px) {
-  :root {
-    /* 160px ad + 20px padding each side = 200px reserved gutter */
-    --ad-rail: 200px;
-  }
-  body {
-    /* Symmetric gutters keep the content column centred in the viewport. */
-    padding-left: var(--ad-rail);
-    padding-right: var(--ad-rail);
-  }
-  .ad-rail {
-    position: fixed;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: var(--ad-rail);
-    z-index: 30;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* Let clicks pass through the empty gutter, but keep the card clickable. */
-    pointer-events: none;
-  }
-  /* Clean, frameless ad — exact Adsterra banner dimensions, no card/window. */
-  .ad-rail-unit {
-    pointer-events: auto;
-    display: block;
-    width: 160px;
-    height: 300px;
-    border: none;
-    background: transparent;
-  }
-}
-
-/* Adsterra native banner, shown UNDER the content on mobile/tablet only — i.e.
-   exactly where the desktop side rail is hidden, so every viewport gets one ad.
-   Sits in normal flow at the bottom of the page and sizes to its own height. */
-.ad-mobile {
-  width: 100%;
-  max-width: 680px;
-  margin: 4px auto 24px;
-  padding: 0 12px;
-}
-@media (min-width: 1200px) {
-  .ad-mobile {
-    display: none;
-  }
-}
-
-/* --g-zoom uniformly scales the centred content column up on big screens so it
-   fills more of the viewport instead of floating small in a sea of empty margin
-   (the content is otherwise capped at 1080px). Applied via `zoom` on .g-screen
-   (and mirrored on the fixed top-left back button so both corners match). Kept
-   modest and stepped by width so the scaled column still fits inside the ad-rail
-   gutters without overflowing. */
-:root {
-  --g-zoom: 1;
-}
-@media (min-width: 1500px) {
-  :root {
-    --g-zoom: 1.15;
-  }
-}
-@media (min-width: 1850px) {
-  :root {
-    --g-zoom: 1.3;
-  }
-}
 
 /* ============================================================
    Gartic Phone lobby skin — the "g-" component classes
@@ -225,13 +140,9 @@ body {
    normally, with nothing clipped. Phones are left untouched. */
 @media (min-width: 1200px) {
   .g-screen {
-    /* Uniformly scale the whole column up on big screens (see --g-zoom). Because
-       `zoom` also scales the vh unit, divide the min-height back down so the
-       column is still exactly one viewport tall (no phantom scrollbar). */
-    zoom: var(--g-zoom);
-    min-height: calc(100vh / var(--g-zoom));
+    min-height: 100vh;
     /* `safe` centres when the content fits but falls back to top-alignment when
-       it's taller than the viewport, so the podium below the fold stays
+       it's taller than the viewport, so content below the fold stays
        scroll-reachable instead of being clipped off the bottom. */
     justify-content: safe center;
   }
