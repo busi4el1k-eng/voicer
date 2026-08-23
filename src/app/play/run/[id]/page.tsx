@@ -121,9 +121,10 @@ export default function SoloRunPage({ params }: { params: Promise<{ id: string }
   }, []);
 
   const seg = segs[cur];
-  // Ready to record only when the video can play AND this sector's original
-  // audio envelope is decoded — until then the Record button shows a loader.
-  const sectorReady = videoReady && !!(seg && origWave[seg.id]);
+  // Ready to record as soon as the video can play. The original-audio waveform
+  // (origWave) is a best-effort scoring overlay decoded in the background — it
+  // must NEVER gate recording, or a slow/failed decode hangs the scene forever.
+  const sectorReady = videoReady && !!seg;
 
 
   const stopRecording = useCallback(async () => {
