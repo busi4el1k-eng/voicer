@@ -4,22 +4,7 @@
 export type Pcm = { data: Float32Array; rate: number };
 
 export async function decodeAudio(src: Blob | string): Promise<Pcm> {
-  let blob: Blob;
-  if (typeof src === "string") {
-    // Cap the fetch so a slow/stalled network can never leave the decode (and
-    // anything waiting on it) hanging indefinitely.
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15000);
-    try {
-      const res = await fetch(src, { signal: ctrl.signal });
-      if (!res.ok) throw new Error(`decodeAudio: fetch ${res.status}`);
-      blob = await res.blob();
-    } finally {
-      clearTimeout(timer);
-    }
-  } else {
-    blob = src;
-  }
+  const blob = typeof src === "string" ? await (await fetch(src)).blob() : src;
   const buf = await blob.arrayBuffer();
   const Ctx =
     window.AudioContext ||

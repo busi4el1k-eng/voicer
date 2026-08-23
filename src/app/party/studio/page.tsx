@@ -235,9 +235,7 @@ export default function PartyStudioPage() {
   const seg = segs[cur];
   // Ready to record only when the video can play AND this sector's original
   // audio envelope is decoded — until then the Record button shows a loader.
-  // origWave is a best-effort scoring overlay (decoded in the background); it
-  // must never gate recording, or a slow/failed decode hangs the scene forever.
-  const sectorReady = videoReady && !!seg;
+  const sectorReady = videoReady && !!(seg && origWave[seg.id]);
 
   const stopRecording = useCallback(async () => {
     if (capRef.current != null) {
