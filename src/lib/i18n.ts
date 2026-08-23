@@ -315,6 +315,12 @@ const en: Dict = {
   "home.step.judged.d": "The robot judge scores your pitch, rhythm and words.",
   "home.step.win.t": "Win the run",
   "home.step.win.d": "Six scenes. The highest total takes the crown.",
+  "home.feat.party.t": "Bring your friends",
+  "home.feat.party.d": "Start a party and dub scenes together in real time.",
+  "home.feat.dub.t": "Dub what you love",
+  "home.feat.dub.d": "Turn funny moments or your favorite videos into your own dub.",
+  "home.feat.share.t": "Show it off",
+  "home.feat.share.d": "Share your creations and watch what everyone else made.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "Welcome back to the booth",
@@ -828,6 +834,12 @@ const es: Dict = {
   "home.step.judged.d": "El juez robot puntúa tu tono, ritmo y palabras.",
   "home.step.win.t": "Gana la partida",
   "home.step.win.d": "Seis escenas. El total más alto se lleva la corona.",
+  "home.feat.party.t": "Trae a tus amigos",
+  "home.feat.party.d": "Crea una fiesta y doblad escenas juntos en tiempo real.",
+  "home.feat.dub.t": "Dobla lo que te gusta",
+  "home.feat.dub.d": "Convierte momentos divertidos o tus vídeos favoritos en tu propio doblaje.",
+  "home.feat.share.t": "Presume de ello",
+  "home.feat.share.d": "Comparte tus creaciones y mira lo que hicieron los demás.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "Bienvenido de nuevo a la cabina",
@@ -1337,6 +1349,12 @@ const fr: Dict = {
   "home.step.judged.d": "Le juge robot note votre hauteur, votre rythme et vos mots.",
   "home.step.win.t": "Gagnez la partie",
   "home.step.win.d": "Six scènes. Le meilleur total remporte la couronne.",
+  "home.feat.party.t": "Invite tes amis",
+  "home.feat.party.d": "Lance une partie et doublez des scènes ensemble en temps réel.",
+  "home.feat.dub.t": "Double ce que tu aimes",
+  "home.feat.dub.d": "Transforme des moments drôles ou tes vidéos préférées en ton propre doublage.",
+  "home.feat.share.t": "Fais-le voir",
+  "home.feat.share.d": "Partage tes créations et découvre celles des autres.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "De retour dans la cabine",
@@ -1846,6 +1864,12 @@ const ru: Dict = {
   "home.step.judged.d": "Робот-судья оценивает твою высоту, ритм и слова.",
   "home.step.win.t": "Выиграй партию",
   "home.step.win.d": "Шесть сцен. Наибольшая сумма забирает корону.",
+  "home.feat.party.t": "Позови друзей",
+  "home.feat.party.d": "Создай вечеринку и озвучивайте сцены вместе в реальном времени.",
+  "home.feat.dub.t": "Озвучивай любимое",
+  "home.feat.dub.d": "Преврати смешные моменты или любимые видео в собственную озвучку.",
+  "home.feat.share.t": "Покажи всем",
+  "home.feat.share.d": "Делись своими работами и смотри, что создали другие.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "С возвращением в студию",
@@ -2355,6 +2379,12 @@ const ro: Dict = {
   "home.step.judged.d": "Judecătorul robot îți notează tonul, ritmul și cuvintele.",
   "home.step.win.t": "Câștigă runda",
   "home.step.win.d": "Șase scene. Cel mai mare total ia coroana.",
+  "home.feat.party.t": "Cheamă-ți prietenii",
+  "home.feat.party.d": "Pornește o petrecere și dublați scene împreună în timp real.",
+  "home.feat.dub.t": "Dublează ce-ți place",
+  "home.feat.dub.d": "Transformă momente amuzante sau videoclipurile preferate în propriul dublaj.",
+  "home.feat.share.t": "Arată tuturor",
+  "home.feat.share.d": "Împarte creațiile tale și vezi ce au făcut ceilalți.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "Bine ai revenit în cabină",

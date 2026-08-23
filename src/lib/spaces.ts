@@ -2,6 +2,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  CopyObjectCommand,
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
@@ -43,6 +44,34 @@ export function getSpaces(): S3Client {
 export function publicUrl(key: string): string {
   const clean = key.replace(/^\/+/, "");
   return `${PUBLIC_BASE}/${clean}`;
+}
+
+// Inverse of publicUrl: pull the bucket key back out of a public URL, but only
+// if it really points at our bucket (else null). Used to promote a throwaway
+// render into a durable copy when someone shares it.
+export function keyFromPublicUrl(url: string): string | null {
+  const prefix = `${PUBLIC_BASE}/`;
+  if (!url.startsWith(prefix)) return null;
+  return url.slice(prefix.length);
+}
+
+// Server-side copy an object to a new key (no download/re-upload), public-read so
+// the browser can stream it. Used to move a shared dub out of the auto-expiring
+// rooms/ prefix into a permanent home so the /watch link never dies.
+export async function copyObject(
+  srcKey: string,
+  destKey: string,
+): Promise<{ key: string; url: string }> {
+  await getSpaces().send(
+    new CopyObjectCommand({
+      Bucket: SPACES_BUCKET,
+      CopySource: `${SPACES_BUCKET}/${srcKey}`,
+      Key: destKey,
+      ACL: "public-read",
+      MetadataDirective: "COPY",
+    }),
+  );
+  return { key: destKey, url: publicUrl(destKey) };
 }
 
 // Upload a buffer, public-read by default (so the browser can stream it).

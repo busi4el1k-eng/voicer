@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRoom, type RoomView } from "@/lib/useRoom";
 import { useI18n } from "@/components/LanguageProvider";
+import { GameIcon, type GameIconName } from "@/components/GameIcon";
 import { MAX_PLAYERS, MIN_PLAYERS, normalizeRoomCode } from "@/lib/room-code";
 
 type Mode = {
@@ -19,42 +20,42 @@ type Mode = {
 const MODES: Mode[] = [
   {
     id: "creator",
-    icon: "✂️",
+    icon: "creator",
     titleKey: "mode.creator.title",
     textKey: "mode.creator.text",
     href: "/creator",
   },
   {
     id: "library",
-    icon: "🎞️",
+    icon: "library",
     titleKey: "mode.library.title",
     textKey: "mode.library.text",
     href: "/library",
   },
   {
     id: "party",
-    icon: "🎉",
+    icon: "party",
     titleKey: "mode.party.title",
     textKey: "mode.party.text",
     href: "/party",
   },
   {
     id: "duel",
-    icon: "⚔️",
+    icon: "duel",
     titleKey: "mode.duel.title",
     textKey: "mode.duel.text",
     href: "/party", // shared pick screen; room.mode drives the duel flow
   },
   {
     id: "solo",
-    icon: "🎬",
+    icon: "solo",
     titleKey: "mode.solo.title",
     textKey: "mode.solo.text",
     href: "/play",
   },
   {
     id: "ghost",
-    icon: "❓",
+    icon: "soon",
     titleKey: "mode.soon.title",
     textKey: "mode.soon.text",
     ghost: true,
@@ -283,7 +284,9 @@ export function Lobby({
                   // Greyed-out, locked placeholder — unrevealed mode.
                   <>
                     <span className="g-soontag">{t("lobby.soonTag")}</span>
-                    <div className="g-ficon">❓</div>
+                    <div className="g-ficon">
+                      <GameIcon name="soon" />
+                    </div>
                     <section>
                       <h4>{t("mode.soon.title")}</h4>
                       <p>{t("mode.soon.text")}</p>
@@ -291,7 +294,9 @@ export function Lobby({
                   </>
                 ) : (
                   <>
-                    <div className="g-ficon">{m.icon}</div>
+                    <div className="g-ficon">
+                      <GameIcon name={m.icon as GameIconName} />
+                    </div>
                     <section>
                       <h4>{t(m.titleKey)}</h4>
                       <p>{t(m.textKey)}</p>
