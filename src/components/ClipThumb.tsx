@@ -24,8 +24,7 @@ export function ClipThumb({ src }: { src: string }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Watch clip"
-        className="group relative block cursor-pointer overflow-hidden rounded-[10px] border-2 border-violet-lift bg-black shadow-[0_4px_0_0_rgba(8,34,48,0.5)]"
-        style={{ width: 150 }}
+        className="group relative block w-full max-w-[150px] cursor-pointer overflow-hidden rounded-[10px] border-2 border-violet-lift bg-black shadow-[0_4px_0_0_rgba(8,34,48,0.5)]"
       >
         <video
           ref={ref}
@@ -34,7 +33,7 @@ export function ClipThumb({ src }: { src: string }) {
           playsInline
           preload="metadata"
           onLoadedMetadata={showStill}
-          className="h-[90px] w-[150px] object-cover transition-transform duration-200 group-hover:scale-105"
+          className="aspect-[5/3] w-full object-cover transition-transform duration-200 group-hover:scale-105"
         />
         {/* ▶ badge — signals the clip is playable (click / tap to watch). */}
         <span aria-hidden className="pointer-events-none absolute inset-0 grid place-items-center">

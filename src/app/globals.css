@@ -423,9 +423,13 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 12px;
-  scroll-snap-type: x proximity;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x; /* horizontal touch scroll; vertical still scrolls the page */
+  /* Vertical stays with the page; horizontal swipes are handled in JS as a
+     one-card-per-swipe pager (see Lobby.tsx), so the browser must not also
+     fling the strip natively. */
+  touch-action: pan-y;
   cursor: grab;
   user-select: none;
   scrollbar-width: thin;

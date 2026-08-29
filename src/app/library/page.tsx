@@ -139,7 +139,7 @@ export default function LibraryPage() {
   // The video whose "how do you want to play?" chooser is open (null = closed).
   const [chosen, setChosen] = useState<Video | null>(null);
   // Sort field (single-select) + direction. Default: newest first.
-  const [field, setField] = useState<SortField>("date");
+  const [field, setField] = useState<SortField>("trending");
   const [dir, setDir] = useState<SortDir>("desc");
   // Pagination: browse the library 25 at a time.
   const [page, setPage] = useState(1);

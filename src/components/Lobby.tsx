@@ -193,12 +193,38 @@ export function Lobby({
 
   // Mode strip scrolling. On desktop it's click-and-drag: pressing and releasing
   // in place is a real button click, but pressing and moving scrolls the strip
-  // and the trailing click is swallowed (capture-phase guard). On touch it scrolls
-  // natively via overflow, which already tells a tap apart from a swipe.
+  // and the trailing click is swallowed (capture-phase guard). On touch we run a
+  // TikTok/Reels-style pager: a swipe advances exactly one card and eases into
+  // place, instead of free-flinging past several. Vertical swipes still scroll the
+  // page (touch-action: pan-y hands horizontal gestures to us).
   const stripRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = stripRef.current;
     if (!el) return;
+
+    const cards = () => Array.from(el.children) as HTMLElement[];
+    // Index of the card whose left edge currently sits closest to the viewport.
+    const nearestIndex = () => {
+      const c = cards();
+      let best = 0;
+      let bestD = Infinity;
+      c.forEach((child, i) => {
+        const d = Math.abs(child.offsetLeft - el.scrollLeft);
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      });
+      return best;
+    };
+    // Ease to card `i` (clamped), landing exactly on its edge.
+    const pageTo = (i: number) => {
+      const c = cards();
+      const clamped = Math.max(0, Math.min(c.length - 1, i));
+      el.scrollTo({ left: c[clamped].offsetLeft, behavior: "smooth" });
+    };
+
+    // --- desktop: click-and-drag ---
     let down = false;
     let startX = 0;
     let startScroll = 0;
@@ -230,15 +256,60 @@ export function Lobby({
         moved = false;
       }
     };
+
+    // --- touch: one-card-per-swipe pager ---
+    let tDown = false;
+    let tStartX = 0;
+    let tStartY = 0;
+    let tScroll = 0;
+    let tIndex = 0;
+    let horizontal: boolean | null = null; // lock axis after the first few px
+    const onTouchStart = (e: TouchEvent) => {
+      tDown = true;
+      tStartX = e.touches[0].pageX;
+      tStartY = e.touches[0].pageY;
+      tScroll = el.scrollLeft;
+      tIndex = nearestIndex();
+      horizontal = null;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!tDown) return;
+      const dx = e.touches[0].pageX - tStartX;
+      const dy = e.touches[0].pageY - tStartY;
+      if (horizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        horizontal = Math.abs(dx) > Math.abs(dy);
+      }
+      if (horizontal) {
+        e.preventDefault(); // we own this gesture; keep the finger glued to the strip
+        el.scrollLeft = tScroll - dx;
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!tDown) return;
+      tDown = false;
+      if (!horizontal) return;
+      const dx = e.changedTouches[0].pageX - tStartX;
+      // A decisive swipe pages one card; a small nudge snaps back to where it was.
+      if (dx < -40) pageTo(tIndex + 1);
+      else if (dx > 40) pageTo(tIndex - 1);
+      else pageTo(tIndex);
+    };
+
     el.addEventListener("mousedown", onDown);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     el.addEventListener("click", onClickCapture, true);
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
     return () => {
       el.removeEventListener("mousedown", onDown);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       el.removeEventListener("click", onClickCapture, true);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
     };
   }, []);
 
