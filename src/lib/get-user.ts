@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import db from "@/lib/db";
 import { GUEST_COOKIE } from "@/lib/guest-mode";
 
-const COLORS = ["#FFD23F", "#FF3D8B", "#27E1A1", "#7C31BC", "#F97316", "#38BDF8"];
+const COLORS = ["#ffb42e", "#FF3D8B", "#27E1A1", "#7C31BC", "#F97316", "#38BDF8"];
 
 // Mirror the signed-in Clerk user into Postgres, creating the row on first sight.
 // A production deployment would also run the user.created webhook, but lazy

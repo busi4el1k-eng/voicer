@@ -229,8 +229,8 @@ function AccountMenu({ signedIn }: { signedIn: boolean }) {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label={t("acct.menu")}
-        className="grid h-9 w-9 place-items-center rounded-[12px] text-ink shadow-[inset_0_0_0_2px_#fff2c2,0_3px_0_0_#c99a1e] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#fff2c2,0_1px_0_0_#c99a1e]"
-        style={{ background: "linear-gradient(0deg, #ffcf3f 0%, #ffe27a 100%)" }}
+        className="grid h-9 w-9 place-items-center rounded-[12px] text-ink shadow-[inset_0_0_0_2px_#fff2c2,0_3px_0_0_#c8851c] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#fff2c2,0_1px_0_0_#c8851c]"
+        style={{ background: "linear-gradient(0deg, #ffb42e 0%, #ffcf63 100%)" }}
       >
         <span className="flex flex-col items-center gap-[3px]">
           <span className="h-[3.5px] w-[3.5px] rounded-full bg-ink" />

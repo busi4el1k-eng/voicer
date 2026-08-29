@@ -38,7 +38,7 @@ export function AutoDetectProgress({
     ? "linear-gradient(90deg,#f7941d,#d17a0f)"
     : done
       ? "linear-gradient(90deg,#38a8dc,#2f92c8)"
-      : "linear-gradient(90deg,#f7941d,#ffd23f)";
+      : "linear-gradient(90deg,#f7941d,#ffb42e)";
 
   // The three real phases of the job, lit up as the bar advances.
   const steps = [t("cmp.auto.step.listen"), t("cmp.auto.step.transcribe"), t("cmp.auto.step.place")];
@@ -149,7 +149,7 @@ export function AutoDetectProgress({
 
         {/* Accuracy warning — auto-detect is a rough draft, not final. */}
         {done && count > 0 && (
-          <div className="mt-4 flex gap-2.5 rounded-xl bg-[rgba(255,210,63,.12)] px-4 py-3 text-[13px] font-semibold leading-[1.5] text-cream/85 shadow-[inset_0_0_0_2px_rgba(255,210,63,.35)]">
+          <div className="mt-4 flex gap-2.5 rounded-xl bg-[rgba(255,180,46,.12)] px-4 py-3 text-[13px] font-semibold leading-[1.5] text-cream/85 shadow-[inset_0_0_0_2px_rgba(255,180,46,.35)]">
             <span aria-hidden className="text-[16px] leading-none">
               ⚠️
             </span>

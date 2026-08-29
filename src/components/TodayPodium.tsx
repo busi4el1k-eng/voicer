@@ -16,7 +16,7 @@ import { getTopClipsToday, type PodiumClip } from "@/lib/perf-clip";
 // Pillar heights scale with the viewport so the podium never looks oversized on
 // a phone (min) nor cramped on desktop (max) — clamp does the responsive work.
 const PILLAR: Record<1 | 2 | 3, { h: string; accent: string }> = {
-  1: { h: "clamp(84px, 20vw, 150px)", accent: "#FFD23F" },
+  1: { h: "clamp(84px, 20vw, 150px)", accent: "#ffb42e" },
   2: { h: "clamp(62px, 15vw, 112px)", accent: "#C9D2E3" },
   3: { h: "clamp(46px, 11vw, 84px)", accent: "#E0975A" },
 };
@@ -29,7 +29,7 @@ function Step({ rank, clip }: { rank: 1 | 2 | 3; clip?: PodiumClip }) {
           a "SOON" tile so the podium still reads as three steps and invites dubs. */}
       <div className="mb-1.5 w-full max-w-[150px]">
         {clip ? (
-          <ClipThumb src={clip.videoUrl} />
+          <ClipThumb src={clip.videoUrl} clipId={clip.id} />
         ) : (
           <div className="grid aspect-[5/3] w-full place-items-center rounded-[10px] border-2 border-dashed border-violet-lift/70 bg-black/25 font-display text-[11px] font-black uppercase tracking-[0.12em] text-cream/45">
             Soon

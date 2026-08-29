@@ -80,7 +80,7 @@ function GuestGate({ onClose }: { onClose: () => void }) {
         className="g-panel relative z-10 w-full max-w-sm text-center"
         style={{ backgroundColor: "#10394f" }}
       >
-        <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-sun/20 text-[28px] shadow-[inset_0_0_0_2px_rgba(255,210,63,0.4)]">
+        <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-sun/20 text-[28px] shadow-[inset_0_0_0_2px_rgba(255,180,46,0.4)]">
           🔒
         </div>
         <h3 className="font-display text-[20px] font-black uppercase tracking-[0.04em] text-cream">
@@ -462,9 +462,6 @@ export function Lobby({
             >
               ×
             </button>
-            <div className="mx-auto mb-1 grid h-12 w-12 place-items-center rounded-full bg-mint/20 text-[24px]">
-              {selected === "duel" ? "⚔️" : "🎉"}
-            </div>
             <h3 className="g-modal-title">
               {selected === "duel" ? t("duel.title") : t("party.title")}
             </h3>

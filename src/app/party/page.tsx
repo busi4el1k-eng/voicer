@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AccountBar } from "@/components/AccountBar";
 import { VideoStage } from "@/components/VideoStage";
@@ -211,6 +212,16 @@ export default function PartyHome() {
           </div>
           {err && <p className="mt-3 text-[13px] text-magenta">{err}</p>}
           <p className="mt-3 text-[12px] leading-[1.5] text-cream/50">{t("ppick.hint")}</p>
+
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <p className="mb-2 text-[12px] text-cream/50">{t("solo.noCode")}</p>
+            <Link
+              href="/library"
+              className="g-btn g-btn-primary flex w-full items-center justify-center gap-2"
+            >
+              {t("solo.browseLibrary")}
+            </Link>
+          </div>
         </div>
 
         {/* Found video — game info + mock play */}
@@ -241,7 +252,7 @@ export default function PartyHome() {
                     ? "bg-white/5"
                     : match
                       ? "bg-[rgba(39,225,161,0.16)] shadow-[inset_0_0_0_2px_rgba(39,225,161,0.6)]"
-                      : "bg-[rgba(255,210,63,0.16)] shadow-[inset_0_0_0_2px_rgba(255,210,63,0.6)]";
+                      : "bg-[rgba(255,180,46,0.16)] shadow-[inset_0_0_0_2px_rgba(255,180,46,0.6)]";
                 const num =
                   partyCount === null ? "text-cream" : match ? "text-mint" : "text-sun";
                 return (

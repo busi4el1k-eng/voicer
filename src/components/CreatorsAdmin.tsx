@@ -271,9 +271,14 @@ export function CreatorsAdmin() {
 
       <div className="w-full max-w-[760px]">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <Link href="/library?tab=creators" className="text-[13px] text-cream/50 underline">
-            ← Back to library
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/library?tab=creators" className="text-[13px] text-cream/50 underline">
+              ← Back to library
+            </Link>
+            <Link href="/admin/dubs" className="text-[13px] text-cream/50 underline">
+              → Dubs admin
+            </Link>
+          </div>
           {!editing && (
             <button onClick={() => setEditing(blankCreator())} className="g-btn g-btn-primary h-10 px-4 text-[13px]">
               + Add creator
@@ -406,7 +411,7 @@ export function CreatorsAdmin() {
                               {v.shareId && <span className="font-display font-bold tracking-[0.1em] text-mint">{formatShareId(v.shareId)}</span>}
                             </div>
                           </div>
-                          <Link href={`/creator/${v.id}`} className="rounded-full bg-sun/20 px-3 py-1.5 text-[12px] font-bold text-sun shadow-[inset_0_0_0_2px_#FFD23F]">
+                          <Link href={`/creator/${v.id}`} className="rounded-full bg-sun/20 px-3 py-1.5 text-[12px] font-bold text-sun shadow-[inset_0_0_0_2px_#ffb42e]">
                             Open editor
                           </Link>
                           <button onClick={() => delVideo(v.id)} className="rounded-full bg-black/30 px-3 py-1.5 text-[12px] font-bold text-cream/70 hover:text-cream">
@@ -445,7 +450,7 @@ export function CreatorsAdmin() {
                     @{c.handle} · {c.works.length} video{c.works.length === 1 ? "" : "s"}
                   </div>
                 </div>
-                <button onClick={() => setEditing(toEdit(c))} className="rounded-full bg-sun/20 px-3 py-1.5 text-[12px] font-bold text-sun shadow-[inset_0_0_0_2px_#FFD23F]">
+                <button onClick={() => setEditing(toEdit(c))} className="rounded-full bg-sun/20 px-3 py-1.5 text-[12px] font-bold text-sun shadow-[inset_0_0_0_2px_#ffb42e]">
                   Edit
                 </button>
                 <button onClick={() => del(c)} className="rounded-full bg-black/30 px-3 py-1.5 text-[12px] font-bold text-cream/70 hover:text-cream">

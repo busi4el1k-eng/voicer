@@ -84,6 +84,16 @@ export default function PlayHome() {
           </div>
           {err && <p className="mt-3 text-[13px] text-magenta">{err}</p>}
           <p className="mt-3 text-[12px] leading-[1.5] text-cream/50">{t("solo.hint")}</p>
+
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <p className="mb-2 text-[12px] text-cream/50">{t("solo.noCode")}</p>
+            <Link
+              href="/library"
+              className="g-btn g-btn-primary flex w-full items-center justify-center gap-2"
+            >
+              {t("solo.browseLibrary")}
+            </Link>
+          </div>
         </div>
 
         {/* Found video — game info + mock play */}
@@ -135,11 +145,6 @@ export default function PlayHome() {
           </div>
         )}
 
-        <div className="mt-6 text-center">
-          <Link href="/dashboard" className="text-[13px] text-cream/50 underline">
-            {t("lib.backToLobby")}
-          </Link>
-        </div>
       </div>
     </main>
   );

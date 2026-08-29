@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import { getOrCreateUser } from "@/lib/get-user";
 import { deleteObjects, spacesConfigured } from "@/lib/spaces";
 import { LOCALES } from "@/lib/i18n";
+import { guessTitleLang } from "@/lib/lang-detect";
 
 export const runtime = "nodejs";
 
@@ -49,12 +50,18 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const { upload } = await ownedUpload(id);
   if (!upload) return NextResponse.json({ error: "Upload not found." }, { status: 404 });
 
+  // Clearing the tag ("") persists the best-effort title guess rather than null,
+  // so the library's DB `language` column stays authoritative (it filters and
+  // paginates on it directly instead of re-guessing the whole library on read).
+  const effectiveTitle = title !== undefined ? title.slice(0, 120) : upload.title;
   const saved = await db.videoUpload.update({
     where: { id },
     data: {
       ...(title !== undefined ? { title: title.slice(0, 120) } : {}),
       ...(visibility !== undefined ? { visibility } : {}),
-      ...(language !== undefined ? { language: language === "" ? null : language } : {}),
+      ...(language !== undefined
+        ? { language: language === "" ? guessTitleLang(effectiveTitle) || null : language }
+        : {}),
     },
     include: { segments: { orderBy: { index: "asc" } } },
   });

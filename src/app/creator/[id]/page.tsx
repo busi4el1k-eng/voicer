@@ -52,7 +52,7 @@ const fmt = (ms: number) => {
   return `${m}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 };
 // One fixed colour per player seat, so a player reads the same everywhere.
-const PLAYER_COLORS = ["#f7941d", "#FFD23F", "#38a8dc", "#38BDF8", "#7fc4e6", "#FB923C", "#F87171"];
+const PLAYER_COLORS = ["#f7941d", "#ffb42e", "#38a8dc", "#38BDF8", "#7fc4e6", "#FB923C", "#F87171"];
 const playerColor = (player: number) => PLAYER_COLORS[(player - 1) % PLAYER_COLORS.length];
 
 // Timeline zoom: 1× fills the frame; higher values widen the track so it scrolls

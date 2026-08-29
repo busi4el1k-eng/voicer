@@ -2,13 +2,14 @@
 
 import { useRef, useState } from "react";
 import { VideoStage } from "@/components/VideoStage";
+import { ClipReactions } from "@/components/ClipReactions";
 
 // A podium clip's video icon. It shows a still frame only — no auto-play preview
 // on hover or on scroll. Click / tap opens the full dub in a player (with sound).
 // A ▶ badge marks that it's playable.
 const STILL_AT = 0.5; // seconds — the idle frame
 
-export function ClipThumb({ src }: { src: string }) {
+export function ClipThumb({ src, clipId }: { src: string; clipId: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [open, setOpen] = useState(false);
 
@@ -56,6 +57,7 @@ export function ClipThumb({ src }: { src: string }) {
               ×
             </button>
             <VideoStage src={src} autoPlay />
+            <ClipReactions clipId={clipId} />
           </div>
         </div>
       )}

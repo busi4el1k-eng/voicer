@@ -12,7 +12,7 @@ import { LOCALES, LOCALE_META } from "@/lib/i18n";
 import { Flag } from "@/components/Flag";
 
 // One fixed colour per player seat (1-4), matching the editor.
-const PLAYER_COLORS = ["#f7941d", "#FFD23F", "#38a8dc", "#38BDF8", "#7fc4e6", "#FB923C", "#F87171"];
+const PLAYER_COLORS = ["#f7941d", "#ffb42e", "#38a8dc", "#38BDF8", "#7fc4e6", "#FB923C", "#F87171"];
 
 type Segment = {
   id: string;
@@ -527,7 +527,7 @@ export default function CreatorPage() {
                                 title={t("lib.langBy")}
                                 className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-display text-[11px] font-bold uppercase tracking-[0.06em] transition disabled:opacity-60 ${
                                   curLang
-                                    ? "bg-sun/20 text-sun shadow-[inset_0_0_0_1.5px_rgba(255,210,63,0.5)] hover:bg-sun/30"
+                                    ? "bg-sun/20 text-sun shadow-[inset_0_0_0_1.5px_rgba(255,180,46,0.5)] hover:bg-sun/30"
                                     : "bg-white/8 text-cream/60 hover:bg-white/15"
                                 }`}
                               >

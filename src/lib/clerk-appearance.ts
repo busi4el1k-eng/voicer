@@ -10,7 +10,7 @@
 // forces our colors past Clerk's own element styles.
 export const clerkAppearance = {
   variables: {
-    colorPrimary: "#ffd23f",
+    colorPrimary: "#ffb42e",
     colorText: "#fff6ec",
     colorTextSecondary: "rgba(255, 246, 236, 0.65)",
     colorBackground: "#251c5c",
@@ -46,7 +46,7 @@ export const clerkAppearance = {
     formFieldInputShowPasswordButton: "text-cream/50! hover:text-cream!",
 
     formButtonPrimary:
-      "bg-gradient-to-t! from-[#ffcf3f]! to-[#ffe27a]! text-[#4a3400]! font-display font-black uppercase text-[15px] rounded-[8px] shadow-[inset_0_0_0_2px_#fff2c2,0_4px_0_0_#c99a1e]! transition-transform active:translate-y-[2px] hover:opacity-95",
+      "bg-gradient-to-t! from-[#ffb42e]! to-[#ffcf63]! text-[#4a3400]! font-display font-black uppercase text-[15px] rounded-[8px] shadow-[inset_0_0_0_2px_#fff2c2,0_4px_0_0_#c8851c]! transition-transform active:translate-y-[2px] hover:opacity-95",
 
     identityPreviewText: "text-cream!",
     identityPreviewEditButton: "text-mint! hover:text-mint!",

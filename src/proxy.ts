@@ -26,6 +26,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/creators(.*)", // public featured-creators list (Creators tab, guest-safe)
   "/api/admin(.*)", // admin creator management — handlers self-guard via isAdmin(), so they must reply with JSON (403), not a login redirect
   "/api/video(.*)", // per-video rating after a play
+  "/api/clip(.*)", // "Clips of Today" reactions (guest-safe, viewable on the dashboard)
   "/api/room(.*)", // all party room actions (join/select/submit/render/…)
   "/api/solo(.*)", // solo lookup + video fetch
   "/api/creator/dub(.*)", // export the finished solo dub (no membership gate)

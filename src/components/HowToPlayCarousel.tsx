@@ -23,10 +23,10 @@ const STEPS: Step[] = [
   { icon: "listen", titleKey: "home.step.listen.t", textKey: "home.step.listen.d", accent: "#4fb8e6", image: "/howto/listen.png" },
   { icon: "perform", titleKey: "home.step.perform.t", textKey: "home.step.perform.d", accent: "#f7941d", image: "/howto/perform.png" },
   { icon: "judged", titleKey: "home.step.judged.t", textKey: "home.step.judged.d", accent: "#4a90c8", image: "/howto/judged.png" },
-  { icon: "win", titleKey: "home.step.win.t", textKey: "home.step.win.d", accent: "#ffd23f", image: "/howto/win.png" },
+  { icon: "win", titleKey: "home.step.win.t", textKey: "home.step.win.d", accent: "#ffb42e", image: "/howto/win.png" },
   // …then the reasons to come back.
   { icon: "friends", titleKey: "home.feat.party.t", textKey: "home.feat.party.d", accent: "#4fb8e6", image: "/howto/friends.png" },
-  { icon: "share", titleKey: "home.feat.share.t", textKey: "home.feat.share.d", accent: "#ffd23f", image: "/howto/share.png" },
+  { icon: "share", titleKey: "home.feat.share.t", textKey: "home.feat.share.d", accent: "#ffb42e", image: "/howto/share.png" },
 ];
 
 const INTERVAL = 5000; // ms per slide

@@ -36,7 +36,7 @@ const fmt = (ms: number) => {
 
 // Colour a match % — mint (great) → sun (ok) → pink (needs work).
 const matchColor = (pct: number) =>
-  pct >= 70 ? "#38a8dc" : pct >= 40 ? "#FFD23F" : "#f9ab4d";
+  pct >= 70 ? "#38a8dc" : pct >= 40 ? "#ffb42e" : "#f9ab4d";
 
 export default function SoloRunPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);

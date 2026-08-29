@@ -76,7 +76,7 @@ export default async function DashboardPage() {
 
       <div className="flex h-[92px] items-center">
         <h1 className="g-logo">
-          Cinema<em>Dub</em>
+          DubThat<em>Movie</em>
         </h1>
       </div>
 

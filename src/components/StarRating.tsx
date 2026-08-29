@@ -53,8 +53,8 @@ function Star({ filled, size }: { filled: boolean; size: number }) {
       viewBox="0 0 24 24"
       width={size}
       height={size}
-      fill={filled ? "#FFD23F" : "none"}
-      stroke={filled ? "#FFD23F" : "rgba(255,246,236,0.35)"}
+      fill={filled ? "#ffb42e" : "none"}
+      stroke={filled ? "#ffb42e" : "rgba(255,246,236,0.35)"}
       strokeWidth="1.6"
       strokeLinejoin="round"
     >

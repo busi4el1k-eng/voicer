@@ -8,6 +8,7 @@ import { SPACES_PREFIX, deleteObjects, putObjectStream, spacesConfigured } from 
 import { rateLimit } from "@/lib/rate-limit";
 import { generateShareId } from "@/lib/share-id.server";
 import { generateBedForUpload } from "@/lib/bed.server";
+import { guessTitleLang } from "@/lib/lang-detect";
 import { assertReadable, isPermanentInputError } from "@/lib/ffmpeg";
 
 export const runtime = "nodejs";
@@ -69,11 +70,17 @@ export async function POST(req: NextRequest) {
   // Create the row first so its id keys the storage path. Each video gets a
   // short shareable code so it can be opened later (e.g. in a solo run).
   const shareId = await generateShareId();
+  const initialTitle = title || filename || "Untitled";
   const upload = await db.videoUpload.create({
     data: {
       userId: user.id,
       creatorId,
-      title: title || filename || "Untitled",
+      title: initialTitle,
+      // Persist a best-effort content language up front (guessed from the title)
+      // so the library can filter/paginate on the DB column without scanning and
+      // re-guessing the whole library on every read. Re-derived on title/language
+      // edits (see the metadata PATCH).
+      language: guessTitleLang(initialTitle) || null,
       sourceKey: "",
       sourceUrl: "",
       shareId,

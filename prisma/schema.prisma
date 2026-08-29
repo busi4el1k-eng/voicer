@@ -168,8 +168,26 @@ model Clip {
   voicedMs Int      @default(0) // total dubbed (voiced) duration across sectors
   createdAt DateTime @default(now())
 
+  reactions ClipReaction[]
+
   @@index([createdAt])
   @@index([uploadId])
+}
+
+// Reaction tallies for a "Clips of Today" clip: a ❤️ (heart) and 🍅 (tomato).
+// Unlimited — viewers can tap as many times as they like, so this is a running
+// counter per (clip, kind) rather than one row per person. The podium player
+// shows the live count next to each emoji.
+model ClipReaction {
+  id        String   @id @default(cuid())
+  clip      Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  clipId    String
+  kind      String // 'heart' | 'tomato'
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([clipId, kind]) // one tally row per kind per clip
+  @@index([clipId])
 }
 
 // One recorded playthrough ("run") of a library video: written when a solo run
