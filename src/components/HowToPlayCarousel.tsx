@@ -9,18 +9,24 @@ import { GameIcon, type GameIconName } from "@/components/GameIcon";
 // and you can also swipe it by hand or tap the dots. Each step gets its own
 // accent so flipping through feels lively.
 
-type Step = { icon: GameIconName; titleKey: string; textKey: string; accent: string };
+type Step = {
+  icon: GameIconName;
+  titleKey: string;
+  textKey: string;
+  accent: string;
+  // Optional hand-made illustration shown instead of the default GameIcon.
+  image?: string;
+};
 
 const STEPS: Step[] = [
   // The four how-to-play steps…
-  { icon: "listen", titleKey: "home.step.listen.t", textKey: "home.step.listen.d", accent: "#5cffb6" },
-  { icon: "perform", titleKey: "home.step.perform.t", textKey: "home.step.perform.d", accent: "#ff3d8b" },
-  { icon: "judged", titleKey: "home.step.judged.t", textKey: "home.step.judged.d", accent: "#8b5cf6" },
-  { icon: "win", titleKey: "home.step.win.t", textKey: "home.step.win.d", accent: "#ffd23f" },
+  { icon: "listen", titleKey: "home.step.listen.t", textKey: "home.step.listen.d", accent: "#4fb8e6", image: "/howto/listen.png" },
+  { icon: "perform", titleKey: "home.step.perform.t", textKey: "home.step.perform.d", accent: "#f7941d", image: "/howto/perform.png" },
+  { icon: "judged", titleKey: "home.step.judged.t", textKey: "home.step.judged.d", accent: "#4a90c8", image: "/howto/judged.png" },
+  { icon: "win", titleKey: "home.step.win.t", textKey: "home.step.win.d", accent: "#ffd23f", image: "/howto/win.png" },
   // …then the reasons to come back.
-  { icon: "friends", titleKey: "home.feat.party.t", textKey: "home.feat.party.d", accent: "#5cffb6" },
-  { icon: "favorite", titleKey: "home.feat.dub.t", textKey: "home.feat.dub.d", accent: "#ff3d8b" },
-  { icon: "share", titleKey: "home.feat.share.t", textKey: "home.feat.share.d", accent: "#ffd23f" },
+  { icon: "friends", titleKey: "home.feat.party.t", textKey: "home.feat.party.d", accent: "#4fb8e6", image: "/howto/friends.png" },
+  { icon: "share", titleKey: "home.feat.share.t", textKey: "home.feat.share.d", accent: "#ffd23f", image: "/howto/share.png" },
 ];
 
 const INTERVAL = 5000; // ms per slide
@@ -89,39 +95,63 @@ export function HowToPlayCarousel() {
             transition: dragging ? "none" : "transform 0.45s cubic-bezier(0.22,1,0.36,1)",
           }}
         >
-          {STEPS.map((s, i) => (
-            <div
-              key={s.titleKey}
-              className="flex w-full shrink-0 flex-col items-center justify-center gap-4 px-6 text-center"
-              aria-hidden={i !== index}
-            >
+          {STEPS.map((s, i) =>
+            s.image ? (
+              // Image slide: the illustration fills the window height on the
+              // left, with just its short instruction pushed to the right (no
+              // title — the artwork already carries the word). object-contain +
+              // min-h-0 keep it from growing the window taller.
               <div
-                className="grid h-[84px] w-[84px] place-items-center rounded-[18px]"
-                style={{
-                  background: "radial-gradient(120% 120% at 30% 20%, #5a2fb0, #33146e)",
-                  boxShadow: `inset 0 0 0 2px ${s.accent}55, 0 4px 0 0 #1c0b48`,
-                }}
+                key={s.titleKey}
+                className="flex h-full w-full shrink-0 items-center gap-4 px-3"
+                aria-hidden={i !== index}
               >
-                <GameIcon name={s.icon} size={46} />
+                <div className="grid h-full min-h-0 min-w-0 flex-1 place-items-center overflow-hidden">
+                  <img
+                    src={s.image}
+                    alt=""
+                    aria-hidden
+                    className="max-h-[90%] max-w-[90%] rounded-[16px] object-contain shadow-[0_4px_0_0_#0a2b3d]"
+                  />
+                </div>
+                <p className="w-[150px] shrink-0 text-left text-[15px] font-semibold leading-[1.5] text-cream/80">
+                  {t(s.textKey)}
+                </p>
               </div>
+            ) : (
               <div
-                className="font-display text-[11px] font-black uppercase tracking-[0.22em] tnum"
-                style={{ color: s.accent }}
+                key={s.titleKey}
+                className="flex w-full shrink-0 flex-col items-center justify-center gap-4 px-6 text-center"
+                aria-hidden={i !== index}
               >
-                {String(i + 1).padStart(2, "0")} / {String(STEPS.length).padStart(2, "0")}
+                <div
+                  className="grid h-[84px] w-[84px] place-items-center rounded-[18px]"
+                  style={{
+                    background: "radial-gradient(120% 120% at 30% 20%, #226c99, #0f3a54)",
+                    boxShadow: `inset 0 0 0 2px ${s.accent}55, 0 4px 0 0 #0a2b3d`,
+                  }}
+                >
+                  <GameIcon name={s.icon} size={46} />
+                </div>
+                <div
+                  className="font-display text-[11px] font-black uppercase tracking-[0.22em] tnum"
+                  style={{ color: s.accent }}
+                >
+                  {String(i + 1).padStart(2, "0")} / {String(STEPS.length).padStart(2, "0")}
+                </div>
+                <h3 className="font-display text-[24px] font-black uppercase leading-tight text-cream">
+                  {t(s.titleKey)}
+                </h3>
+                <p className="max-w-[46ch] text-[15px] font-semibold leading-[1.5] text-cream/75">
+                  {t(s.textKey)}
+                </p>
               </div>
-              <h3 className="font-display text-[24px] font-black uppercase leading-tight text-cream">
-                {t(s.titleKey)}
-              </h3>
-              <p className="max-w-[46ch] text-[15px] font-semibold leading-[1.5] text-cream/75">
-                {t(s.textKey)}
-              </p>
-            </div>
-          ))}
+            ),
+          )}
         </div>
       </div>
 
-      {/* Dots + a progress bar that fills over the interval, then flips. */}
+      {/* Dots — tap to jump between slides. */}
       <div className="mt-4 flex items-center justify-center gap-2">
         {STEPS.map((s, i) => (
           <button
@@ -137,22 +167,6 @@ export function HowToPlayCarousel() {
           />
         ))}
       </div>
-      <div className="mt-3 h-[4px] w-full overflow-hidden rounded-full bg-white/10">
-        <div
-          key={`${index}-${paused}-${dragging}`}
-          className="h-full rounded-full"
-          style={{
-            background: STEPS[index].accent,
-            animation:
-              paused || dragging || reduce.current
-                ? "none"
-                : `htp-fill ${INTERVAL}ms linear forwards`,
-            width: paused || dragging || reduce.current ? "100%" : undefined,
-          }}
-        />
-      </div>
-
-      <style>{`@keyframes htp-fill{from{width:0%}to{width:100%}}`}</style>
     </div>
   );
 }

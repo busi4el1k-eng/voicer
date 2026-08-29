@@ -76,10 +76,10 @@ export function AnnouncementBell() {
         onClick={toggle}
         aria-label={t("announce.aria")}
         title={t("announce.aria")}
-        className={`relative grid h-9 w-9 place-items-center rounded-[12px] shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#8952dc,0_1px_0_0_rgba(17,0,69,0.4)] ${
+        className={`relative grid h-9 w-9 place-items-center rounded-[12px] shadow-[inset_0_0_0_2px_#3f8fc8,0_3px_0_0_rgba(8,34,48,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#3f8fc8,0_1px_0_0_rgba(8,34,48,0.4)] ${
           ringing ? "bell-ring" : ""
         }`}
-        style={{ background: "rgba(37,28,92,0.7)" }}
+        style={{ background: "rgba(16,57,79,0.7)" }}
       >
         {/* Bell icon */}
         <svg
@@ -99,7 +99,7 @@ export function AnnouncementBell() {
         {unread && (
           <span
             aria-hidden
-            className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-[#251c5c] bg-magenta"
+            className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-[#10394f] bg-magenta"
           />
         )}
       </button>
@@ -109,7 +109,7 @@ export function AnnouncementBell() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             className="absolute right-0 top-[calc(100%+8px)] z-50 w-[280px] rounded-[12px] p-4 text-left shadow-[0_10px_28px_rgba(0,0,0,0.45)]"
-            style={{ backgroundColor: "#251c5c", boxShadow: "inset 0 0 0 2px #8952dc" }}
+            style={{ backgroundColor: "#10394f", boxShadow: "inset 0 0 0 2px #3f8fc8" }}
           >
             <div className="mb-1 flex items-center gap-2">
               <span className="text-[15px]">📢</span>

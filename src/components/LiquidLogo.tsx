@@ -73,9 +73,9 @@ export function LiquidLogo({ progress }: { progress: number }) {
     >
       <defs>
         <linearGradient id="ll-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8affd0" />
-          <stop offset="0.5" stopColor="#5cffb6" />
-          <stop offset="1" stopColor="#2fbf8e" />
+          <stop offset="0" stopColor="#9fe0f5" />
+          <stop offset="0.5" stopColor="#4fb8e6" />
+          <stop offset="1" stopColor="#2f92c8" />
         </linearGradient>
         <clipPath id="ll-clip">
           <text {...textProps}>{WORD}</text>
@@ -92,7 +92,7 @@ export function LiquidLogo({ progress }: { progress: number }) {
       <text
         {...textProps}
         fill="none"
-        stroke="#201255"
+        stroke="#0a2b3d"
         strokeWidth="9"
         strokeLinejoin="round"
         paintOrder="stroke"

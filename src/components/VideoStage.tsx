@@ -229,7 +229,7 @@ export const VideoStage = forwardRef<
     return (
       <div
         ref={playerRef}
-        className="g-player overflow-hidden rounded-[10px] bg-black shadow-[inset_0_0_0_2px_rgba(137,82,220,0.5)]"
+        className="g-player overflow-hidden rounded-[10px] bg-black shadow-[inset_0_0_0_2px_rgba(63,143,200,0.5)]"
       >
         {/* Video + a loading overlay that appears on first load or a mid-play
             stall. `preload="auto"` fetches ahead so playback is less likely to
@@ -281,12 +281,12 @@ export const VideoStage = forwardRef<
         </div>
 
         {/* Custom, app-styled controls */}
-        <div className="flex items-center gap-2 bg-[#160427] px-3 py-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 bg-[#071e2c] px-3 py-2.5 sm:gap-3">
           <button
             onClick={togglePlay}
             aria-label={playing ? t("editor.pause") : t("editor.play")}
-            className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-[#0b3d2c] shadow-[inset_0_0_0_2px_#b6ffe0,0_3px_0_0_#2a8b65] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#b6ffe0,0_1px_0_0_#2a8b65]"
-            style={{ background: "linear-gradient(0deg, #37c491 0%, #5cffb6 100%)" }}
+            className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-[#0c3348] shadow-[inset_0_0_0_2px_#bfe8fb,0_3px_0_0_#1f6b93] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#bfe8fb,0_1px_0_0_#1f6b93]"
+            style={{ background: "linear-gradient(0deg, #2f92c8 0%, #4fb8e6 100%)" }}
           >
             {playing ? "❚❚" : "▶"}
           </button>
@@ -297,7 +297,7 @@ export const VideoStage = forwardRef<
 
           <div
             onPointerDown={onSeekBar}
-            className="group relative h-3 flex-1 cursor-pointer overflow-hidden rounded-full bg-black/50 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
+            className="group relative h-3 flex-1 cursor-pointer overflow-hidden rounded-full bg-black/50 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)]"
           >
             {/* Grey "loaded so far" fill (buffered), behind the played fill. */}
             <div
@@ -309,7 +309,7 @@ export const VideoStage = forwardRef<
               style={{ width: `${frac * 100}%` }}
             />
             <span
-              className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cream shadow-[0_1px_0_rgba(31,7,51,0.6),0_0_0_2px_rgba(31,7,51,0.4)]"
+              className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cream shadow-[0_1px_0_rgba(8,34,48,0.6),0_0_0_2px_rgba(8,34,48,0.4)]"
               style={{ left: `${frac * 100}%` }}
             />
           </div>
@@ -321,8 +321,8 @@ export const VideoStage = forwardRef<
           <button
             onClick={toggleMute}
             aria-label={muted ? t("editor.unmute") : t("editor.mute")}
-            className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#8952dc,0_1px_0_0_rgba(17,0,69,0.4)]"
-            style={{ background: "rgba(37, 28, 92, 0.6)" }}
+            className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#3f8fc8,0_3px_0_0_rgba(8,34,48,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#3f8fc8,0_1px_0_0_rgba(8,34,48,0.4)]"
+            style={{ background: "rgba(16, 57, 79, 0.6)" }}
           >
             {muted ? "🔇" : "🔊"}
           </button>
@@ -330,8 +330,8 @@ export const VideoStage = forwardRef<
           <button
             onClick={toggleFullscreen}
             aria-label={t("editor.fullscreen")}
-            className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#8952dc,0_1px_0_0_rgba(17,0,69,0.4)]"
-            style={{ background: "rgba(37, 28, 92, 0.6)" }}
+            className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#3f8fc8,0_3px_0_0_rgba(8,34,48,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#3f8fc8,0_1px_0_0_rgba(8,34,48,0.4)]"
+            style={{ background: "rgba(16, 57, 79, 0.6)" }}
           >
             ⛶
           </button>

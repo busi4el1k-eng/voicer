@@ -40,7 +40,7 @@ const fmt = (ms: number) => {
 
 // Colour a match % — mint (great) → sun (ok) → pink (needs work). Mirrors solo.
 const matchColor = (pct: number) =>
-  pct >= 70 ? "#27E1A1" : pct >= 40 ? "#FFD23F" : "#FF6FA5";
+  pct >= 70 ? "#38a8dc" : pct >= 40 ? "#FFD23F" : "#f9ab4d";
 
 export default function PartyStudioPage() {
   const router = useRouter();
@@ -895,9 +895,9 @@ export default function PartyStudioPage() {
                       style={{
                         background:
                           i === cur
-                            ? "#FF3D8B"
+                            ? "#f7941d"
                             : takes[s.id]
-                              ? "#27E1A1"
+                              ? "#38a8dc"
                               : "rgba(255,246,236,0.18)",
                       }}
                     />

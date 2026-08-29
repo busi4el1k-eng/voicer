@@ -315,7 +315,7 @@ export default function LibraryPage() {
                     "flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold transition " +
                     (active
                       ? "bg-sun/20 text-sun shadow-[inset_0_0_0_2px_#FFD23F]"
-                      : "bg-violet-deep/40 text-cream/70 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] hover:text-cream")
+                      : "bg-violet-deep/40 text-cream/70 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)] hover:text-cream")
                   }
                 >
                   {tab.label}
@@ -342,8 +342,8 @@ export default function LibraryPage() {
                   className={
                     "rounded-full px-3 py-1 text-[12px] font-bold transition " +
                     (active
-                      ? "bg-mint/20 text-mint shadow-[inset_0_0_0_2px_#5cffb6]"
-                      : "bg-violet-deep/40 text-cream/70 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] hover:text-cream")
+                      ? "bg-mint/20 text-mint shadow-[inset_0_0_0_2px_#4fb8e6]"
+                      : "bg-violet-deep/40 text-cream/70 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)] hover:text-cream")
                   }
                 >
                   {t(f.labelKey)}
@@ -355,7 +355,7 @@ export default function LibraryPage() {
               onClick={toggleDir}
               title={dir === "desc" ? t("lib.descTitle") : t("lib.ascTitle")}
               aria-label={dir === "desc" ? t("lib.descTitle") : t("lib.ascTitle")}
-              className="ml-1 flex items-center gap-1 rounded-full bg-violet-deep/40 px-3 py-1 text-[12px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] transition hover:text-cream"
+              className="ml-1 flex items-center gap-1 rounded-full bg-violet-deep/40 px-3 py-1 text-[12px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)] transition hover:text-cream"
             >
               <span aria-hidden>{dir === "desc" ? "↓" : "↑"}</span>
               {dir === "desc" ? t("lib.desc") : t("lib.asc")}
@@ -379,7 +379,7 @@ export default function LibraryPage() {
               <p className="text-[13px] leading-[1.6] text-cream/50">{t("lib.lang.none")}</p>
               <button
                 onClick={() => applyLang(ALL_LANG)}
-                className="rounded-full bg-mint/20 px-4 py-1.5 text-[13px] font-bold text-mint shadow-[inset_0_0_0_2px_#5cffb6] transition hover:bg-mint/30"
+                className="rounded-full bg-mint/20 px-4 py-1.5 text-[13px] font-bold text-mint shadow-[inset_0_0_0_2px_#4fb8e6] transition hover:bg-mint/30"
               >
                 {t("lib.lang.showAll")}
               </button>
@@ -390,7 +390,7 @@ export default function LibraryPage() {
                 return (
                   <li
                     key={v.id}
-                    className="flex flex-col gap-2.5 rounded-[12px] bg-violet-deep/40 p-3 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
+                    className="flex flex-col gap-2.5 rounded-[12px] bg-violet-deep/40 p-3 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)]"
                   >
                     {/* Preview — big static poster that plays on hover/tap (no zoom). */}
                     {v.sourceUrl && (
@@ -482,7 +482,7 @@ export default function LibraryPage() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={current <= 1}
-              className="rounded-full bg-violet-deep/40 px-4 py-1.5 text-[13px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-cream/85"
+              className="rounded-full bg-violet-deep/40 px-4 py-1.5 text-[13px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)] transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-cream/85"
             >
               ← {t("lib.prev")}
             </button>
@@ -492,7 +492,7 @@ export default function LibraryPage() {
             <button
               onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
               disabled={current >= pageCount}
-              className="rounded-full bg-violet-deep/40 px-4 py-1.5 text-[13px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-cream/85"
+              className="rounded-full bg-violet-deep/40 px-4 py-1.5 text-[13px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)] transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-cream/85"
             >
               {t("lib.next")} →
             </button>

@@ -41,7 +41,7 @@ export function scenarioFromSegments(segs: readonly SectorLike[]): ScenarioLine[
 
 // Colour per player seat so lines are easy to scan in the script.
 const seatColor = (seat: number) =>
-  ["#8952dc", "#FF3D8B", "#27E1A1", "#f6b73c", "#4fc3f7"][seat % 5];
+  ["#3f8fc8", "#f7941d", "#38a8dc", "#f6b73c", "#4fc3f7"][seat % 5];
 
 export function ScenarioWindow({
   mySeat,
@@ -101,7 +101,7 @@ export function ScenarioWindow({
                 ref={isCurrent ? curRef : undefined}
                 className={`rounded-[12px] px-3 py-2.5 transition-colors ${
                   isCurrent
-                    ? "bg-magenta/[0.16] shadow-[inset_0_0_0_2px_#ff3d8b]"
+                    ? "bg-magenta/[0.16] shadow-[inset_0_0_0_2px_#f7941d]"
                     : mine
                       ? "bg-white/[0.06] shadow-[inset_0_0_0_1.5px_rgba(39,225,161,0.4)]"
                       : ""

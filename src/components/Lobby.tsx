@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoom, type RoomView } from "@/lib/useRoom";
 import { useI18n } from "@/components/LanguageProvider";
 import { GameIcon, type GameIconName } from "@/components/GameIcon";
@@ -15,6 +15,7 @@ type Mode = {
   textKey: string;
   href?: string; // present = working; absent = placeholder (coming soon)
   ghost?: boolean; // hidden/unrevealed slot ("???")
+  image?: string; // illustration shown in place of the GameIcon
 };
 
 const MODES: Mode[] = [
@@ -24,6 +25,7 @@ const MODES: Mode[] = [
     titleKey: "mode.creator.title",
     textKey: "mode.creator.text",
     href: "/creator",
+    image: "/modes/creator.png",
   },
   {
     id: "library",
@@ -31,6 +33,7 @@ const MODES: Mode[] = [
     titleKey: "mode.library.title",
     textKey: "mode.library.text",
     href: "/library",
+    image: "/modes/library.png",
   },
   {
     id: "party",
@@ -38,6 +41,7 @@ const MODES: Mode[] = [
     titleKey: "mode.party.title",
     textKey: "mode.party.text",
     href: "/party",
+    image: "/modes/party.png",
   },
   {
     id: "duel",
@@ -45,6 +49,7 @@ const MODES: Mode[] = [
     titleKey: "mode.duel.title",
     textKey: "mode.duel.text",
     href: "/party", // shared pick screen; room.mode drives the duel flow
+    image: "/modes/duel.png",
   },
   {
     id: "solo",
@@ -52,6 +57,7 @@ const MODES: Mode[] = [
     titleKey: "mode.solo.title",
     textKey: "mode.solo.text",
     href: "/play",
+    image: "/modes/solo.png",
   },
   {
     id: "ghost",
@@ -59,6 +65,7 @@ const MODES: Mode[] = [
     titleKey: "mode.soon.title",
     textKey: "mode.soon.text",
     ghost: true,
+    image: "/modes/soon.png",
   },
 ];
 
@@ -71,7 +78,7 @@ function GuestGate({ onClose }: { onClose: () => void }) {
       <div className="absolute inset-0 bg-ink/70" onClick={onClose} />
       <div
         className="g-panel relative z-10 w-full max-w-sm text-center"
-        style={{ backgroundColor: "#251c5c" }}
+        style={{ backgroundColor: "#10394f" }}
       >
         <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-sun/20 text-[28px] shadow-[inset_0_0_0_2px_rgba(255,210,63,0.4)]">
           🔒
@@ -184,6 +191,57 @@ export function Lobby({
   const [note, setNote] = useState(false);
   const [gate, setGate] = useState(false);
 
+  // Mode strip scrolling. On desktop it's click-and-drag: pressing and releasing
+  // in place is a real button click, but pressing and moving scrolls the strip
+  // and the trailing click is swallowed (capture-phase guard). On touch it scrolls
+  // natively via overflow, which already tells a tap apart from a swipe.
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    let down = false;
+    let startX = 0;
+    let startScroll = 0;
+    let moved = false;
+    const onDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      down = true;
+      moved = false;
+      startX = e.pageX;
+      startScroll = el.scrollLeft;
+      el.classList.add("dragging");
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!down) return;
+      const walk = e.pageX - startX;
+      if (Math.abs(walk) > 5) moved = true;
+      el.scrollLeft = startScroll - walk;
+      e.preventDefault();
+    };
+    const onUp = () => {
+      down = false;
+      el.classList.remove("dragging");
+    };
+    // If the press turned into a drag, swallow the click so the mode doesn't open.
+    const onClickCapture = (e: MouseEvent) => {
+      if (moved) {
+        e.preventDefault();
+        e.stopPropagation();
+        moved = false;
+      }
+    };
+    el.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    el.addEventListener("click", onClickCapture, true);
+    return () => {
+      el.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      el.removeEventListener("click", onClickCapture, true);
+    };
+  }, []);
+
   // Party/duel entry: a room (party) is required to play. With no room we hide
   // "Start" and open a modal (same panel style as the studio's "Add a player")
   // to create/join one; once you have a party of players the host chooses the
@@ -268,7 +326,9 @@ export function Lobby({
       <h2 className="g-title">{t("lobby.modes")}</h2>
 
       <div className="g-panel">
-        <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 [&_.g-card-inner]:min-h-[104px]">
+        {/* Big image tiles in a horizontal, left-right scrolling strip. The image
+            IS the button (no frame / crop / shadow); the name sits below it. */}
+        <div ref={stripRef} className="g-modestrip">
           {MODES.map((m) => (
             <button
               key={m.id}
@@ -277,33 +337,22 @@ export function Lobby({
                 launch(m);
               }}
               disabled={m.ghost}
-              className={`g-card${m.ghost ? " soon" : ""}`}
+              className={`g-modecard${m.ghost ? " soon" : ""}${selected === m.id ? " checked" : ""}`}
             >
-              <div className="g-card-inner">
-                {m.ghost ? (
-                  // Greyed-out, locked placeholder — unrevealed mode.
-                  <>
-                    <span className="g-soontag">{t("lobby.soonTag")}</span>
-                    <div className="g-ficon">
-                      <GameIcon name="soon" />
-                    </div>
-                    <section>
-                      <h4>{t("mode.soon.title")}</h4>
-                      <p>{t("mode.soon.text")}</p>
-                    </section>
-                  </>
+              <div className="g-modecard-imgwrap">
+                {m.image ? (
+                  <img src={m.image} alt="" aria-hidden className="g-modecard-img" />
                 ) : (
-                  <>
-                    <div className="g-ficon">
-                      <GameIcon name={m.icon as GameIconName} />
-                    </div>
-                    <section>
-                      <h4>{t(m.titleKey)}</h4>
-                      <p>{t(m.textKey)}</p>
-                    </section>
-                  </>
+                  <div
+                    className="g-modecard-img grid aspect-square place-items-center"
+                    style={{ background: "radial-gradient(120% 120% at 30% 20%, #226c99, #0f3a54)" }}
+                  >
+                    <GameIcon name={(m.ghost ? "soon" : m.icon) as GameIconName} size={72} />
+                  </div>
                 )}
+                {m.ghost && <span className="g-soontag">{t("lobby.soonTag")}</span>}
               </div>
+              <span className="g-modecard-title">{t(m.ghost ? "mode.soon.title" : m.titleKey)}</span>
             </button>
           ))}
         </div>

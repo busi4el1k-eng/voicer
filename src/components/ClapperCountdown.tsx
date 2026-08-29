@@ -60,11 +60,11 @@ export function ClapperCountdown({ count }: { count: number }) {
       <div key={`s${count}`} className="cd-stage">
         <svg viewBox="0 0 100 100" width="100%" role="img" aria-label={t("cmp.clap.aria", { label, n: count })}>
           {/* slate board */}
-          <rect x="14" y="44" width="72" height="42" rx="7" fill="#fff6ec" stroke="#201255" strokeWidth="4" />
-          <path d="M41 55 L41 75 L60 65 Z" fill="#ff3d8b" stroke="#201255" strokeWidth="3" strokeLinejoin="round" />
+          <rect x="14" y="44" width="72" height="42" rx="7" fill="#fff6ec" stroke="#0a2b3d" strokeWidth="4" />
+          <path d="M41 55 L41 75 L60 65 Z" fill="#f7941d" stroke="#0a2b3d" strokeWidth="3" strokeLinejoin="round" />
 
           {/* fixed jaw */}
-          <rect x="13" y="37" width="74" height="10" rx="3" fill="#2a0845" stroke="#201255" strokeWidth="4" />
+          <rect x="13" y="37" width="74" height="10" rx="3" fill="#0c2e42" stroke="#0a2b3d" strokeWidth="4" />
           <g stroke="#fff6ec" strokeWidth="6" strokeLinecap="round">
             <line x1="26" y1="38" x2="21" y2="46" />
             <line x1="42" y1="38" x2="37" y2="46" />
@@ -74,7 +74,7 @@ export function ClapperCountdown({ count }: { count: number }) {
 
           {/* hinged arm (claps) */}
           <g className="cd-arm">
-            <rect x="12" y="23" width="80" height="15" rx="4" fill="#2a0845" stroke="#201255" strokeWidth="4" />
+            <rect x="12" y="23" width="80" height="15" rx="4" fill="#0c2e42" stroke="#0a2b3d" strokeWidth="4" />
             <g stroke="#fff6ec" strokeWidth="6" strokeLinecap="round">
               <line x1="26" y1="24" x2="20" y2="37" />
               <line x1="40" y1="24" x2="34" y2="37" />

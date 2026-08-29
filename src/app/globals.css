@@ -3,35 +3,35 @@
 /* Cinema Dub design system — Gartic Phone register, sound instead of drawing.
    Saturated, chunky, playful. Hard offset shadows, zero blur. */
 @theme {
-  --color-violet-deep: #2a0845; /* stage background */
-  --color-violet: #6520a0; /* primary surface */
-  --color-violet-lift: #7c31bc; /* raised rows, list items */
-  --color-magenta: #ff3d8b; /* record state, primary action */
+  --color-violet-deep: #0c2e42; /* stage background */
+  --color-violet: #1f6d99; /* primary surface */
+  --color-violet-lift: #2a86b8; /* raised rows, list items */
+  --color-magenta: #f7941d; /* record state, primary action */
   --color-sun: #ffd23f; /* scores, highlights, winner */
-  --color-mint: #27e1a1; /* live / connected / mic OK — reserved, never decorative */
+  --color-mint: #38a8dc; /* live / connected / mic OK — reserved, never decorative */
   --color-cream: #fff6ec; /* cards, text on violet */
-  --color-ink: #1f0733; /* text on cream */
+  --color-ink: #0a2233; /* text on cream */
 
   --font-display: var(--font-fredoka), system-ui, sans-serif;
   --font-body: var(--font-nunito), system-ui, sans-serif;
 
   /* Hard offset shadow — sticker & cardboard, never glass. */
-  --shadow-hard: 4px 4px 0 rgba(31, 7, 51, 0.55);
-  --shadow-hard-sm: 1px 1px 0 rgba(31, 7, 51, 0.55);
+  --shadow-hard: 4px 4px 0 rgba(8, 34, 48, 0.55);
+  --shadow-hard-sm: 1px 1px 0 rgba(8, 34, 48, 0.55);
 }
 
 /* Reusable multi-layer text outlines, straight from Gartic Phone. */
 :root {
-  --g-outline-dark: #201255 2px 1.5px 0, #201255 1.75517px 2.458851px 0,
-    #201255 1.0806px 3.18294px 0, #201255 0.141474px 3.49499px 0, #201255 -0.832294px 3.31859px 0,
-    #201255 -1.60229px 2.69694px 0, #201255 -1.97998px 1.78224px 0, #201255 -1.87291px 0.798434px 0,
-    #201255 -1.30729px -0.0136px 0, #201255 -0.421592px -0.45506px 0, #201255 0.567324px -0.41785px 0,
-    #201255 1.41734px 0.08892px 0, #201255 1.92034px 0.941169px 0;
-  --g-outline-light: #f1ebff 2px 0 0, #f1ebff 1.75517px 0.958851px 0, #f1ebff 1.0806px 1.68294px 0,
-    #f1ebff 0.141474px 1.99499px 0, #f1ebff -0.832294px 1.81859px 0, #f1ebff -1.60229px 1.19694px 0,
-    #f1ebff -1.97998px 0.28224px 0, #f1ebff -1.87291px -0.701566px 0, #f1ebff -1.30729px -1.5136px 0,
-    #f1ebff -0.421592px -1.95506px 0, #f1ebff 0.567324px -1.91785px 0, #f1ebff 1.41734px -1.41108px 0,
-    #f1ebff 1.92034px -0.558831px 0;
+  --g-outline-dark: #0a2b3d 2px 1.5px 0, #0a2b3d 1.75517px 2.458851px 0,
+    #0a2b3d 1.0806px 3.18294px 0, #0a2b3d 0.141474px 3.49499px 0, #0a2b3d -0.832294px 3.31859px 0,
+    #0a2b3d -1.60229px 2.69694px 0, #0a2b3d -1.97998px 1.78224px 0, #0a2b3d -1.87291px 0.798434px 0,
+    #0a2b3d -1.30729px -0.0136px 0, #0a2b3d -0.421592px -0.45506px 0, #0a2b3d 0.567324px -0.41785px 0,
+    #0a2b3d 1.41734px 0.08892px 0, #0a2b3d 1.92034px 0.941169px 0;
+  --g-outline-light: #eaf6fd 2px 0 0, #eaf6fd 1.75517px 0.958851px 0, #eaf6fd 1.0806px 1.68294px 0,
+    #eaf6fd 0.141474px 1.99499px 0, #eaf6fd -0.832294px 1.81859px 0, #eaf6fd -1.60229px 1.19694px 0,
+    #eaf6fd -1.97998px 0.28224px 0, #eaf6fd -1.87291px -0.701566px 0, #eaf6fd -1.30729px -1.5136px 0,
+    #eaf6fd -0.421592px -1.95506px 0, #eaf6fd 0.567324px -1.91785px 0, #eaf6fd 1.41734px -1.41108px 0,
+    #eaf6fd 1.92034px -0.558831px 0;
 }
 
 html {
@@ -40,7 +40,7 @@ html {
      briefly reveal the area behind that layer, so this must be an on-theme
      tone — an ON-BRAND purple, NOT the near-black violet-deep, which read as a
      black flash on phones. Matches the mid-point of the .g-bg gradient. */
-  background-color: #7a1f9e;
+  background-color: #155474;
 }
 
 body {
@@ -62,7 +62,7 @@ body {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  background: linear-gradient(200deg, rgba(92, 9, 190, 1) 0%, rgba(207, 48, 93, 1) 100%);
+  background: linear-gradient(200deg, rgba(31, 110, 150, 1) 0%, rgba(12, 58, 82, 1) 100%);
 }
 .g-bg-float {
   position: absolute;
@@ -146,6 +146,16 @@ body {
        scroll-reachable instead of being clipped off the bottom. */
     justify-content: safe center;
   }
+
+  /* Landing page: lock to the dynamic viewport height so the whole thing always
+     fits on one screen with no scroll. The centred logo + panels column shrinks
+     (min-h-0) and the how-to-play illustration is object-contain, so any extra
+     height is absorbed by scaling the artwork down rather than overflowing. */
+  .landing-fit {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
 }
 
 .g-logo {
@@ -154,7 +164,7 @@ body {
   font-size: clamp(28px, 6vw, 42px);
   letter-spacing: -0.01em;
   text-transform: uppercase;
-  color: #5cffb6;
+  color: #4fb8e6;
   text-shadow: var(--g-outline-dark);
   text-align: center;
   line-height: 1.05;
@@ -170,7 +180,7 @@ body {
   font-size: 22px;
   text-transform: uppercase;
   text-align: center;
-  color: #5cffb6;
+  color: #4fb8e6;
   text-shadow: var(--g-outline-dark);
   margin: 4px 0 14px;
 }
@@ -188,9 +198,9 @@ body {
 }
 
 .g-panel {
-  background-color: rgba(37, 28, 92, 0.4);
-  border: 2px solid rgba(32, 18, 85, 0.2);
-  box-shadow: inset 0 0 0 2px #8952dc;
+  background-color: rgba(16, 57, 79, 0.4);
+  border: 2px solid rgba(14, 50, 72, 0.2);
+  box-shadow: inset 0 0 0 2px #3f8fc8;
   border-radius: 14px;
   padding: 14px;
 }
@@ -208,8 +218,6 @@ body {
 }
 /* Today's top-3 dubbed clips: a full-width window under the profile + modes. */
 .g-podium {
-  width: 100%;
-  margin-top: 16px;
   display: flex;
   flex-direction: column;
 }
@@ -254,14 +262,14 @@ body {
   background: #ffd23f;
   opacity: 0;
   box-shadow:
-    0 -20px 0 #ff3d8b,
-    0 20px 0 #27e1a1,
+    0 -20px 0 #f7941d,
+    0 20px 0 #38a8dc,
     -20px 0 0 #38bdf8,
     20px 0 0 #ffd23f,
-    14px -14px 0 #a78bfa,
+    14px -14px 0 #7fc4e6,
     -14px -14px 0 #fb923c,
-    14px 14px 0 #5cffb6,
-    -14px 14px 0 #ff3d8b;
+    14px 14px 0 #4fb8e6,
+    -14px 14px 0 #f7941d;
   animation: g-fw-explode 2.4s ease-out infinite;
   animation-delay: var(--d);
 }
@@ -333,22 +341,22 @@ body {
   gap: 12px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: linear-gradient(0deg, #d4c5ff 0%, #ebe0ff 100%);
+  background: linear-gradient(0deg, #cfeaf7 0%, #e6f4fc 100%);
   /* Outline + bottom 3D edge as one concentric shadow stack (no mismatched
      outer border), so corners line up and dimmed cards fade evenly. */
-  box-shadow: inset 0 0 0 2px #f2e9ff, 0 0 0 2px #201255, 0 4px 0 0 #a890e8;
+  box-shadow: inset 0 0 0 2px #eef8fd, 0 0 0 2px #0a2b3d, 0 4px 0 0 #8fceec;
   transition: transform 0.08s, box-shadow 0.08s;
 }
 .g-card:hover .g-card-inner {
-  background: linear-gradient(0deg, #dfd3ff 0%, #fcfbff 100%);
+  background: linear-gradient(0deg, #dbf0fb 0%, #f5fbff 100%);
 }
 /* Chunky press, matching the buttons — no persistent selection ring. */
 .g-card:active .g-card-inner {
   transform: translateY(2px);
-  box-shadow: inset 0 0 0 2px #f2e9ff, 0 0 0 2px #201255, 0 2px 0 0 #a890e8;
+  box-shadow: inset 0 0 0 2px #eef8fd, 0 0 0 2px #0a2b3d, 0 2px 0 0 #8fceec;
 }
 .g-card.checked .g-card-inner {
-  box-shadow: inset 0 0 0 4px #5bffb6, inset 0 0 0 6px rgba(17, 53, 60, 0.5), 0 3px 0 0 #a890e8;
+  box-shadow: inset 0 0 0 4px #4fb8e6, inset 0 0 0 6px rgba(17, 53, 60, 0.5), 0 3px 0 0 #8fceec;
 }
 .g-card.soon {
   cursor: default;
@@ -362,15 +370,15 @@ body {
   border-radius: 13px;
   display: grid;
   place-items: center;
-  background: radial-gradient(120% 120% at 30% 20%, #5a2fb0, #33146e);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.16), 0 3px 0 0 #1c0b48;
+  background: radial-gradient(120% 120% at 30% 20%, #226c99, #0f3a54);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.16), 0 3px 0 0 #0a2b3d;
 }
 .g-card h4 {
   font-family: var(--font-nunito), sans-serif;
   font-weight: 900;
   text-transform: uppercase;
   font-size: 16px;
-  color: #301a6b;
+  color: #0f3a54;
   text-shadow: var(--g-outline-light);
   margin: 0 0 4px;
 }
@@ -394,13 +402,113 @@ body {
   text-transform: uppercase;
 }
 .g-card .g-newtag {
-  background: #74ff8f;
-  border: 2px solid #5534dc;
-  color: #5635dc;
+  background: #4fb8e6;
+  border: 2px solid #2277aa;
+  color: #2277aa;
 }
 .g-card .g-soontag {
-  background: #634ac9;
-  color: #eadfff;
+  background: #2a6f9e;
+  color: #e6f4fc;
+}
+
+/* Mode picker — big image tiles in a horizontal (left-right) scrolling strip.
+   The image IS the button (no card frame, no crop, no shadow); the name sits
+   below it. The strip fills the window height so it matches the studio panel. */
+.g-modestrip {
+  display: flex;
+  gap: 10px;
+  /* Fixed height (not vh) so at least ~3 studio seats always show at the start,
+     independent of screen size. */
+  height: 350px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 12px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x; /* horizontal touch scroll; vertical still scrolls the page */
+  cursor: grab;
+  user-select: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(63, 143, 200, 0.7) transparent;
+}
+.g-modestrip.dragging {
+  cursor: grabbing;
+}
+.g-modestrip::-webkit-scrollbar {
+  height: 8px;
+}
+.g-modestrip::-webkit-scrollbar-track {
+  background: rgba(10, 34, 48, 0.35);
+  border-radius: 100px;
+}
+.g-modestrip::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, #3f8fc8, #4fb8e6);
+  border-radius: 100px;
+}
+.g-modestrip::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, #4fb8e6, #8fceec);
+}
+.g-modecard {
+  flex: 0 0 auto;
+  width: 300px; /* fixed tile width → constant, tight spacing between tiles */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: transform 0.08s;
+}
+.g-modecard-imgwrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.g-modecard-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* whole image, never cropped */
+  display: block;
+}
+.g-modecard-title {
+  flex: none;
+  text-align: center;
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 15px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  color: var(--color-cream);
+  text-shadow: var(--g-outline-dark);
+}
+.g-modecard:active {
+  transform: translateY(2px);
+}
+.g-modecard.checked .g-modecard-title {
+  color: #4fb8e6;
+}
+.g-modecard.soon {
+  cursor: default;
+  opacity: 0.72;
+}
+.g-modecard .g-soontag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 10px;
+  text-transform: uppercase;
+  background: #2a6f9e;
+  color: #e6f4fc;
 }
 
 /* User / player card */
@@ -411,8 +519,8 @@ body {
   min-height: 62px;
   padding: 8px 12px 8px 8px;
   border-radius: 100px 30px 30px 100px;
-  background: linear-gradient(0deg, #c8b7fa 0%, #e1d7ff 100%);
-  box-shadow: inset 0 0 0 2px #f2e9ff, 0 3px 0 0 #a890e8;
+  background: linear-gradient(0deg, #bfe3f5 0%, #dbf0fb 100%);
+  box-shadow: inset 0 0 0 2px #eef8fd, 0 3px 0 0 #8fceec;
 }
 .g-user .g-avt {
   flex: none;
@@ -425,7 +533,7 @@ body {
   font-weight: 900;
   font-size: 20px;
   color: #fff;
-  border: 2px solid #2d208e;
+  border: 2px solid #14476a;
   box-shadow: 0 0 0 2px #fff;
 }
 .g-user .g-uname {
@@ -442,15 +550,15 @@ body {
   font-weight: 900;
   font-size: 10px;
   letter-spacing: 0.06em;
-  color: #6f57c9;
+  color: #3a7fae;
 }
 .g-user.empty {
-  background: rgba(76, 46, 171, 0.7);
-  border: 2px solid #634ac9;
+  background: rgba(34, 111, 158, 0.7);
+  border: 2px solid #2a6f9e;
   box-shadow: none;
 }
 .g-user.empty .g-uname {
-  color: #7a63da;
+  color: #4a8ec0;
   text-shadow: none;
 }
 
@@ -468,11 +576,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  background: rgba(45, 32, 142, 0.14);
+  background: rgba(20, 71, 106, 0.14);
   transition: background 0.12s, transform 0.08s;
 }
 .g-user .g-dots:hover {
-  background: rgba(45, 32, 142, 0.24);
+  background: rgba(20, 71, 106, 0.24);
 }
 .g-user .g-dots:active {
   transform: scale(0.92);
@@ -485,7 +593,7 @@ body {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #2d208e;
+  background: #14476a;
 }
 
 /* Empty player slots (ghosts) under the user box */
@@ -503,13 +611,13 @@ body {
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(137, 82, 220, 0.6) transparent;
+  scrollbar-color: rgba(63, 143, 200, 0.6) transparent;
 }
 .g-party::-webkit-scrollbar {
   width: 6px;
 }
 .g-party::-webkit-scrollbar-thumb {
-  background: rgba(137, 82, 220, 0.6);
+  background: rgba(63, 143, 200, 0.6);
   border-radius: 100px;
 }
 .g-ghost-slot {
@@ -520,8 +628,8 @@ body {
   min-height: 54px;
   padding: 6px 12px 6px 6px;
   border-radius: 100px 30px 30px 100px;
-  border: 2px dashed rgba(137, 82, 220, 0.5);
-  background: rgba(37, 28, 92, 0.28);
+  border: 2px dashed rgba(63, 143, 200, 0.5);
+  background: rgba(16, 57, 79, 0.28);
   text-align: left;
   font: inherit;
   color: inherit;
@@ -529,8 +637,8 @@ body {
   transition: border-color 0.12s, background 0.12s, transform 0.08s;
 }
 button.g-ghost-slot:hover:not(:disabled) {
-  border-color: rgba(137, 82, 220, 0.9);
-  background: rgba(37, 28, 92, 0.45);
+  border-color: rgba(63, 143, 200, 0.9);
+  background: rgba(16, 57, 79, 0.45);
 }
 button.g-ghost-slot:active:not(:disabled) {
   transform: translateY(1px);
@@ -541,8 +649,8 @@ button.g-ghost-slot:disabled {
 }
 .g-ghost-slot.filled {
   border-style: solid;
-  border-color: rgba(137, 82, 220, 0.55);
-  background: rgba(60, 44, 130, 0.5);
+  border-color: rgba(63, 143, 200, 0.55);
+  background: rgba(30, 90, 128, 0.5);
   cursor: default;
 }
 .g-player-name {
@@ -550,7 +658,7 @@ button.g-ghost-slot:disabled {
   font-weight: 900;
   text-transform: uppercase;
   font-size: 14px;
-  color: #e7dfff;
+  color: #e6f4fc;
 }
 .g-player-tag {
   margin-left: auto;
@@ -558,7 +666,7 @@ button.g-ghost-slot:disabled {
   font-weight: 900;
   font-size: 10px;
   letter-spacing: 0.06em;
-  color: #5cffb6;
+  color: #4fb8e6;
 }
 
 /* Invite-code banner */
@@ -570,13 +678,13 @@ button.g-ghost-slot:disabled {
   width: 100%;
   padding: 8px 12px;
   border-radius: 12px;
-  border: 2px solid rgba(92, 255, 182, 0.35);
-  background: rgba(55, 196, 145, 0.14);
+  border: 2px solid rgba(79, 184, 230, 0.35);
+  background: rgba(47, 146, 200, 0.14);
   cursor: pointer;
   transition: background 0.12s, transform 0.08s;
 }
 .g-invite:hover {
-  background: rgba(55, 196, 145, 0.22);
+  background: rgba(47, 146, 200, 0.22);
 }
 .g-invite:active {
   transform: translateY(1px);
@@ -587,14 +695,14 @@ button.g-ghost-slot:disabled {
   text-transform: uppercase;
   font-size: 10px;
   letter-spacing: 0.06em;
-  color: rgba(231, 223, 255, 0.6);
+  color: rgba(224, 240, 251, 0.6);
 }
 .g-invite-code {
   font-family: var(--font-nunito), sans-serif;
   font-weight: 900;
   font-size: 26px;
   letter-spacing: 0.22em;
-  color: #5cffb6;
+  color: #4fb8e6;
   text-shadow: var(--g-outline-dark);
 }
 .g-invite-copied {
@@ -602,7 +710,7 @@ button.g-ghost-slot:disabled {
   font-weight: 900;
   font-size: 10px;
   text-transform: uppercase;
-  color: #5cffb6;
+  color: #4fb8e6;
 }
 
 /* Invite popup window */
@@ -614,7 +722,7 @@ button.g-ghost-slot:disabled {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(31, 7, 51, 0.7);
+  background: rgba(8, 34, 48, 0.7);
 }
 .g-modal {
   position: relative;
@@ -626,9 +734,9 @@ button.g-ghost-slot:disabled {
   gap: 10px;
   padding: 22px 20px 20px;
   border-radius: 16px;
-  background: #251c5c;
-  border: 2px solid rgba(32, 18, 85, 0.2);
-  box-shadow: inset 0 0 0 2px #8952dc, 0 12px 0 0 rgba(17, 0, 69, 0.4);
+  background: #10394f;
+  border: 2px solid rgba(14, 50, 72, 0.2);
+  box-shadow: inset 0 0 0 2px #3f8fc8, 0 12px 0 0 rgba(8, 34, 48, 0.4);
   text-align: center;
 }
 .g-modal-x {
@@ -641,7 +749,7 @@ button.g-ghost-slot:disabled {
   border-radius: 50%;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.08);
-  color: #e7dfff;
+  color: #e6f4fc;
   font-size: 20px;
   line-height: 1;
 }
@@ -666,14 +774,14 @@ button.g-ghost-slot:disabled {
   width: 100%;
   padding: 12px;
   border-radius: 12px;
-  border: 2px dashed rgba(92, 255, 182, 0.5);
-  background: rgba(55, 196, 145, 0.12);
+  border: 2px dashed rgba(79, 184, 230, 0.5);
+  background: rgba(47, 146, 200, 0.12);
   font-family: var(--font-nunito), sans-serif;
   font-weight: 900;
   font-size: 42px;
   letter-spacing: 0.28em;
   text-indent: 0.28em;
-  color: #5cffb6;
+  color: #4fb8e6;
   text-shadow: var(--g-outline-dark);
 }
 .g-modal-count {
@@ -690,8 +798,8 @@ button.g-ghost-slot:disabled {
   width: 100%;
   height: 46px;
   border-radius: 10px;
-  border: 2px solid #8952dc;
-  background: rgba(37, 28, 92, 0.5);
+  border: 2px solid #3f8fc8;
+  background: rgba(16, 57, 79, 0.5);
   color: #fff;
   text-align: center;
   font-family: var(--font-nunito), sans-serif;
@@ -705,7 +813,7 @@ button.g-ghost-slot:disabled {
   outline-offset: 2px;
 }
 .g-code-input::placeholder {
-  color: rgba(231, 223, 255, 0.35);
+  color: rgba(224, 240, 251, 0.35);
   letter-spacing: 0.12em;
 }
 .g-ghost-avt {
@@ -715,9 +823,9 @@ button.g-ghost-slot:disabled {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: #7a63da;
-  background: rgba(76, 46, 171, 0.35);
-  border: 2px dashed rgba(137, 82, 220, 0.6);
+  color: #4a8ec0;
+  background: rgba(34, 111, 158, 0.35);
+  border: 2px dashed rgba(63, 143, 200, 0.6);
 }
 .g-ghost-label {
   font-family: var(--font-nunito), sans-serif;
@@ -725,7 +833,7 @@ button.g-ghost-slot:disabled {
   text-transform: uppercase;
   font-size: 12px;
   letter-spacing: 0.04em;
-  color: rgba(231, 223, 255, 0.4);
+  color: rgba(224, 240, 251, 0.4);
 }
 
 /* Collapsible stats: 0fr -> 1fr grows to content height (auto-height animation) */
@@ -771,17 +879,17 @@ button.g-ghost-slot:disabled {
 }
 .g-btn-start {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 46%),
-    linear-gradient(0deg, #37c491 0%, #5cffb6 100%);
-  color: #0b3d2c;
-  box-shadow: inset 0 0 0 2px #b6ffe0, 0 6px 0 0 #2a8b65, 0 12px 16px rgba(11, 61, 44, 0.4);
+    linear-gradient(0deg, #2f92c8 0%, #4fb8e6 100%);
+  color: #0c3348;
+  box-shadow: inset 0 0 0 2px #bfe8fb, 0 6px 0 0 #1f6b93, 0 12px 16px rgba(12, 51, 72, 0.4);
 }
 .g-btn-start:hover {
   transform: translateY(-2px);
-  box-shadow: inset 0 0 0 2px #b6ffe0, 0 8px 0 0 #2a8b65, 0 16px 20px rgba(11, 61, 44, 0.45);
+  box-shadow: inset 0 0 0 2px #bfe8fb, 0 8px 0 0 #1f6b93, 0 16px 20px rgba(12, 51, 72, 0.45);
 }
 .g-btn-start:active {
   transform: translateY(6px);
-  box-shadow: inset 0 0 0 2px #b6ffe0, 0 0 0 0 #2a8b65, 0 4px 8px rgba(11, 61, 44, 0.35);
+  box-shadow: inset 0 0 0 2px #bfe8fb, 0 0 0 0 #1f6b93, 0 4px 8px rgba(12, 51, 72, 0.35);
 }
 .g-btn-primary {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 46%),
@@ -799,31 +907,31 @@ button.g-ghost-slot:disabled {
 }
 .g-btn-ghost {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 46%),
-    rgba(37, 28, 92, 0.6);
-  color: #e7dfff;
-  box-shadow: inset 0 0 0 2px #8952dc, 0 6px 0 0 rgba(17, 0, 69, 0.55), 0 12px 16px rgba(0, 0, 0, 0.35);
+    rgba(16, 57, 79, 0.6);
+  color: #e6f4fc;
+  box-shadow: inset 0 0 0 2px #3f8fc8, 0 6px 0 0 rgba(8, 34, 48, 0.55), 0 12px 16px rgba(0, 0, 0, 0.35);
 }
 .g-btn-ghost:hover {
   transform: translateY(-2px);
-  box-shadow: inset 0 0 0 2px #8952dc, 0 8px 0 0 rgba(17, 0, 69, 0.55), 0 16px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 0 0 2px #3f8fc8, 0 8px 0 0 rgba(8, 34, 48, 0.55), 0 16px 20px rgba(0, 0, 0, 0.4);
 }
 .g-btn-ghost:active {
   transform: translateY(6px);
-  box-shadow: inset 0 0 0 2px #8952dc, 0 0 0 0 rgba(17, 0, 69, 0.55), 0 4px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 0 0 2px #3f8fc8, 0 0 0 0 rgba(8, 34, 48, 0.55), 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 .g-btn-danger {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 46%),
-    linear-gradient(0deg, #e21e6a 0%, #ff3d8b 100%);
+    linear-gradient(0deg, #e07d10 0%, #f7941d 100%);
   color: #fff;
-  box-shadow: inset 0 0 0 2px #ff9ac4, 0 6px 0 0 #a01050, 0 12px 16px rgba(160, 16, 80, 0.4);
+  box-shadow: inset 0 0 0 2px #ffc07a, 0 6px 0 0 #8a4a10, 0 12px 16px rgba(160, 16, 80, 0.4);
 }
 .g-btn-danger:hover {
   transform: translateY(-2px);
-  box-shadow: inset 0 0 0 2px #ff9ac4, 0 8px 0 0 #a01050, 0 16px 20px rgba(160, 16, 80, 0.45);
+  box-shadow: inset 0 0 0 2px #ffc07a, 0 8px 0 0 #8a4a10, 0 16px 20px rgba(160, 16, 80, 0.45);
 }
 .g-btn-danger:active {
   transform: translateY(6px);
-  box-shadow: inset 0 0 0 2px #ff9ac4, 0 0 0 0 #a01050, 0 4px 8px rgba(160, 16, 80, 0.3);
+  box-shadow: inset 0 0 0 2px #ffc07a, 0 0 0 0 #8a4a10, 0 4px 8px rgba(160, 16, 80, 0.3);
 }
 @media (prefers-reduced-motion: reduce) {
   .g-btn {
@@ -864,22 +972,22 @@ button.g-ghost-slot:disabled {
 .g-tab {
   flex: 1;
   cursor: pointer;
-  border: 2px solid rgba(32, 18, 85, 0.2);
+  border: 2px solid rgba(14, 50, 72, 0.2);
   border-bottom: none;
   border-radius: 12px 12px 0 0;
-  background: rgba(37, 28, 92, 0.3);
+  background: rgba(16, 57, 79, 0.3);
   padding: 10px;
   font-family: var(--font-nunito), sans-serif;
   font-weight: 900;
   font-size: 15px;
   text-transform: uppercase;
-  color: #ded8ef;
+  color: #d6ecf6;
   text-align: center;
 }
 .g-tab.active {
-  background: rgba(37, 28, 92, 0.4);
-  color: #5cffb6;
-  box-shadow: inset 0 0 0 2px #8952dc;
+  background: rgba(16, 57, 79, 0.4);
+  color: #4fb8e6;
+  box-shadow: inset 0 0 0 2px #3f8fc8;
 }
 
 /* Small stat row inside the left panel */
@@ -904,7 +1012,7 @@ button.g-ghost-slot:disabled {
   font-family: var(--font-nunito), sans-serif;
   font-weight: 900;
   font-size: 20px;
-  color: #5cffb6;
+  color: #4fb8e6;
   font-variant-numeric: tabular-nums;
 }
 
@@ -912,6 +1020,22 @@ button.g-ghost-slot:disabled {
   .g-center {
     flex-direction: column;
     align-items: stretch;
+  }
+  /* Clips of Today + the socials window stack too — "Follow us" drops under the
+     clips instead of sitting beside it. */
+  .g-podium-row {
+    flex-direction: column;
+  }
+  /* Compact social buttons on mobile: don't stretch to fill a tall window —
+     keep them short, full-width banners. */
+  .g-social-panel {
+    min-height: 0;
+  }
+  .g-social-panel > a {
+    flex: 0 0 auto;
+  }
+  .g-social-panel > a img {
+    height: 84px;
   }
   .g-left {
     width: 100%;
@@ -931,7 +1055,7 @@ button.g-ghost-slot:disabled {
 /* Thin, on-theme scrollbar for the zoomable timeline viewport. */
 .g-timeline-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #8952dc transparent;
+  scrollbar-color: #3f8fc8 transparent;
 }
 .g-timeline-scroll::-webkit-scrollbar {
   height: 8px;
@@ -940,7 +1064,7 @@ button.g-ghost-slot:disabled {
   background: transparent;
 }
 .g-timeline-scroll::-webkit-scrollbar-thumb {
-  background: #8952dc;
+  background: #3f8fc8;
   border-radius: 8px;
 }
 

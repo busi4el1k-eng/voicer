@@ -8,6 +8,7 @@ import { T } from "@/components/LanguageProvider";
 import { Lobby } from "@/components/Lobby";
 import { StudioPanel, type Stat } from "@/components/StudioPanel";
 import { TodayPodium } from "@/components/TodayPodium";
+import { SocialCard } from "@/components/SocialCard";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function DashboardPage() {
   }
   const name = user?.displayName || "Guest";
   const isGuest = !user;
-  const avatarColor = user?.avatarColor || "#6F48FF";
+  const avatarColor = user?.avatarColor || "#3f8fc8";
   const initial = name.charAt(0).toUpperCase();
 
   // Real stats from the DB for the signed-in user. Guests have none yet → "—".
@@ -104,8 +105,11 @@ export default async function DashboardPage() {
         <Lobby isGuest={isGuest} playerName={name} avatarColor={avatarColor} />
       </div>
 
-      {/* BELOW — today's top-3 dubbed clips, full width (mock data for now) */}
-      <TodayPodium />
+      {/* BELOW — today's top-3 dubbed clips (2/3) beside the socials (1/3). */}
+      <div className="g-podium-row mt-4 flex w-full items-stretch gap-4">
+        <TodayPodium />
+        <SocialCard />
+      </div>
     </main>
   );
 }

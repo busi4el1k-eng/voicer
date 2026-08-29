@@ -35,7 +35,7 @@ export function BackButton() {
             height="18"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#1f0733"
+            stroke="#0a2233"
             strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"

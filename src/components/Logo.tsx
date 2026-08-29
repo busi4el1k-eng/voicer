@@ -20,7 +20,7 @@ export function Logo({
       style={{
         display: "block",
         overflow: "visible",
-        filter: "drop-shadow(3px 3px 0 rgba(31,7,51,0.55))",
+        filter: "drop-shadow(3px 3px 0 rgba(8,34,48,0.55))",
       }}
     >
       <defs>
@@ -34,13 +34,13 @@ export function Logo({
       </defs>
 
       {/* Slate board */}
-      <rect x="14" y="44" width="72" height="42" rx="7" fill="#fff6ec" stroke="#201255" strokeWidth="4" />
+      <rect x="14" y="44" width="72" height="42" rx="7" fill="#fff6ec" stroke="#0a2b3d" strokeWidth="4" />
       {/* Play triangle — "start" */}
-      <path d="M41 55 L41 75 L60 65 Z" fill="#ff3d8b" stroke="#201255" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M41 55 L41 75 L60 65 Z" fill="#f7941d" stroke="#0a2b3d" strokeWidth="3" strokeLinejoin="round" />
 
       {/* Fixed lower jaw of the clapper (striped) */}
       <g>
-        <rect x="13" y="37" width="74" height="10" rx="3" fill="#2a0845" stroke="#201255" strokeWidth="4" />
+        <rect x="13" y="37" width="74" height="10" rx="3" fill="#0c2e42" stroke="#0a2b3d" strokeWidth="4" />
         <g clipPath="url(#cd-jaw-clip)" stroke="#fff6ec" strokeWidth="7">
           <line x1="26" y1="35" x2="20" y2="49" />
           <line x1="42" y1="35" x2="36" y2="49" />
@@ -51,7 +51,7 @@ export function Logo({
 
       {/* Hinged top arm, raised open on the left pivot (striped) */}
       <g transform="rotate(-13 17 41)">
-        <rect x="12" y="23" width="80" height="15" rx="4" fill="#2a0845" stroke="#201255" strokeWidth="4" />
+        <rect x="12" y="23" width="80" height="15" rx="4" fill="#0c2e42" stroke="#0a2b3d" strokeWidth="4" />
         <g clipPath="url(#cd-arm-clip)" stroke="#fff6ec" strokeWidth="7">
           <line x1="24" y1="21" x2="16" y2="40" />
           <line x1="40" y1="21" x2="32" y2="40" />

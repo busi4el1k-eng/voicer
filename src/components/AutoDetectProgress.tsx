@@ -35,10 +35,10 @@ export function AutoDetectProgress({
   const closable = done || errored;
 
   const fill = errored
-    ? "linear-gradient(90deg,#ff3d8b,#d61f6c)"
+    ? "linear-gradient(90deg,#f7941d,#d17a0f)"
     : done
-      ? "linear-gradient(90deg,#27e1a1,#12b98a)"
-      : "linear-gradient(90deg,#ff3d8b,#ffd23f)";
+      ? "linear-gradient(90deg,#38a8dc,#2f92c8)"
+      : "linear-gradient(90deg,#f7941d,#ffd23f)";
 
   // The three real phases of the job, lit up as the bar advances.
   const steps = [t("cmp.auto.step.listen"), t("cmp.auto.step.transcribe"), t("cmp.auto.step.place")];
@@ -94,7 +94,7 @@ export function AutoDetectProgress({
         <div className="mt-6 flex items-end justify-between">
           <div
             className="cd-adp-pct font-display text-[64px] font-black"
-            style={{ color: errored ? "#ff88b6" : done ? "var(--color-mint)" : "var(--color-cream)" }}
+            style={{ color: errored ? "#ffc07a" : done ? "var(--color-mint)" : "var(--color-cream)" }}
           >
             {pct}
             <span className="text-[30px]">%</span>

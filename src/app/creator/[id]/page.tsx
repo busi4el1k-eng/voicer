@@ -52,7 +52,7 @@ const fmt = (ms: number) => {
   return `${m}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 };
 // One fixed colour per player seat, so a player reads the same everywhere.
-const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8", "#A78BFA", "#FB923C", "#F87171"];
+const PLAYER_COLORS = ["#f7941d", "#FFD23F", "#38a8dc", "#38BDF8", "#7fc4e6", "#FB923C", "#F87171"];
 const playerColor = (player: number) => PLAYER_COLORS[(player - 1) % PLAYER_COLORS.length];
 
 // Timeline zoom: 1× fills the frame; higher values widen the track so it scrolls
@@ -77,7 +77,7 @@ function SectionHead({
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <div className="flex items-center gap-2">
-        <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-violet-lift/50 text-[18px] shadow-[inset_0_0_0_2px_rgba(137,82,220,0.6)]">
+        <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-violet-lift/50 text-[18px] shadow-[inset_0_0_0_2px_rgba(63,143,200,0.6)]">
           {icon}
         </span>
         <h2 className="font-display text-[15px] font-black uppercase tracking-[0.08em] text-cream">
@@ -93,7 +93,7 @@ function SectionHead({
 function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full bg-violet-deep/70 px-3 py-1 font-display text-[12px] font-bold tabular-nums text-cream/80 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full bg-violet-deep/70 px-3 py-1 font-display text-[12px] font-bold tabular-nums text-cream/80 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.4)] ${className}`}
     >
       {children}
     </span>
@@ -907,7 +907,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           </SectionHead>
           <div
             ref={playerRef}
-            className="g-player overflow-hidden rounded-[10px] bg-black shadow-[inset_0_0_0_2px_rgba(137,82,220,0.5)]"
+            className="g-player overflow-hidden rounded-[10px] bg-black shadow-[inset_0_0_0_2px_rgba(63,143,200,0.5)]"
           >
             <div className="relative">
               <video
@@ -952,12 +952,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             </div>
 
             {/* Custom, app-styled controls */}
-            <div className="flex items-center gap-2 bg-[#160427] px-3 py-2.5 sm:gap-3">
+            <div className="flex items-center gap-2 bg-[#071e2c] px-3 py-2.5 sm:gap-3">
               <button
                 onClick={togglePlay}
                 aria-label={playing ? t("editor.pause") : t("editor.play")}
-                className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-[#0b3d2c] shadow-[inset_0_0_0_2px_#b6ffe0,0_3px_0_0_#2a8b65] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#b6ffe0,0_1px_0_0_#2a8b65]"
-                style={{ background: "linear-gradient(0deg, #37c491 0%, #5cffb6 100%)" }}
+                className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-[#0c3348] shadow-[inset_0_0_0_2px_#bfe8fb,0_3px_0_0_#1f6b93] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#bfe8fb,0_1px_0_0_#1f6b93]"
+                style={{ background: "linear-gradient(0deg, #2f92c8 0%, #4fb8e6 100%)" }}
               >
                 {playing ? "❚❚" : "▶"}
               </button>
@@ -969,7 +969,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {/* Seek / progress bar */}
               <div
                 onPointerDown={onSeekBar}
-                className="group relative h-3 flex-1 cursor-pointer overflow-hidden rounded-full bg-black/50 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
+                className="group relative h-3 flex-1 cursor-pointer overflow-hidden rounded-full bg-black/50 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)]"
               >
                 {/* Grey "loaded so far" fill (buffered), behind the played fill. */}
                 <div
@@ -981,7 +981,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   style={{ width: `${durMs > 0 ? (playhead / durMs) * 100 : 0}%` }}
                 />
                 <span
-                  className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cream shadow-[0_1px_0_rgba(31,7,51,0.6),0_0_0_2px_rgba(31,7,51,0.4)]"
+                  className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cream shadow-[0_1px_0_rgba(8,34,48,0.6),0_0_0_2px_rgba(8,34,48,0.4)]"
                   style={{ left: `${durMs > 0 ? (playhead / durMs) * 100 : 0}%` }}
                 />
               </div>
@@ -993,8 +993,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <button
                 onClick={toggleMute}
                 aria-label={muted ? t("editor.unmute") : t("editor.mute")}
-                className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#8952dc,0_1px_0_0_rgba(17,0,69,0.4)]"
-                style={{ background: "rgba(37, 28, 92, 0.6)" }}
+                className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#3f8fc8,0_3px_0_0_rgba(8,34,48,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#3f8fc8,0_1px_0_0_rgba(8,34,48,0.4)]"
+                style={{ background: "rgba(16, 57, 79, 0.6)" }}
               >
                 {muted ? "🔇" : "🔊"}
               </button>
@@ -1002,8 +1002,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <button
                 onClick={toggleFullscreen}
                 aria-label={t("editor.fullscreen")}
-                className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#8952dc,0_1px_0_0_rgba(17,0,69,0.4)]"
-                style={{ background: "rgba(37, 28, 92, 0.6)" }}
+                className="grid h-10 w-10 flex-none place-items-center rounded-[10px] text-[16px] text-cream shadow-[inset_0_0_0_2px_#3f8fc8,0_3px_0_0_rgba(8,34,48,0.4)] transition-transform active:translate-y-[2px] active:shadow-[inset_0_0_0_2px_#3f8fc8,0_1px_0_0_rgba(8,34,48,0.4)]"
+                style={{ background: "rgba(16, 57, 79, 0.6)" }}
               >
                 ⛶
               </button>
@@ -1019,7 +1019,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             onChange={(e) => updateSel({ transcript: e.target.value })}
             placeholder={t("editor.linePlaceholder")}
             rows={2}
-            className="w-full resize-none rounded-[12px] bg-violet-deep/60 px-4 py-3 text-center font-display text-[20px] leading-[1.4] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+            className="w-full resize-none rounded-[12px] bg-violet-deep/60 px-4 py-3 text-center font-display text-[20px] leading-[1.4] text-cream shadow-[inset_0_0_0_2px_rgba(63,143,200,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
           />
         )}
 
@@ -1034,8 +1034,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 disabled={durMs <= 0}
                 title={t("editor.zoomTitle")}
                 aria-label={t("editor.zoomAria", { zoom })}
-                className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black tabular-nums text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[1px] disabled:opacity-35 sm:px-3"
-                style={{ background: "rgba(37, 28, 92, 0.6)" }}
+                className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black tabular-nums text-cream shadow-[inset_0_0_0_2px_#3f8fc8,0_3px_0_0_rgba(8,34,48,0.4)] transition-transform active:translate-y-[1px] disabled:opacity-35 sm:px-3"
+                style={{ background: "rgba(16, 57, 79, 0.6)" }}
               >
                 🔍 {zoom % 1 === 0 ? zoom : zoom.toFixed(1)}×
               </button>
@@ -1054,7 +1054,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   setActivePlayer(np);
                 }}
                 title={t("editor.whichPlayer")}
-                className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_3px_0_rgba(31,7,51,0.35)] transition-transform active:translate-y-[1px] sm:px-3"
+                className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black uppercase tracking-[0.04em] text-ink shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_3px_0_rgba(8,34,48,0.35)] transition-transform active:translate-y-[1px] sm:px-3"
                 style={{ background: playerColor(sel?.player ?? activePlayer) }}
               >
                 🎙 <span className="sm:hidden">P{sel?.player ?? activePlayer}</span>
@@ -1067,8 +1067,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 onClick={() => setSpeakers((n) => (n % MAX_PLAYERS) + 1)}
                 disabled={durMs <= 0 || busy === "auto"}
                 title={t("editor.speakersTitle")}
-                className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black tabular-nums text-cream shadow-[inset_0_0_0_2px_#8952dc,0_3px_0_0_rgba(17,0,69,0.4)] transition-transform active:translate-y-[1px] disabled:opacity-35 sm:px-3"
-                style={{ background: "rgba(37, 28, 92, 0.6)" }}
+                className="h-9 flex-none rounded-[9px] px-2.5 font-display text-[13px] font-black tabular-nums text-cream shadow-[inset_0_0_0_2px_#3f8fc8,0_3px_0_0_rgba(8,34,48,0.4)] transition-transform active:translate-y-[1px] disabled:opacity-35 sm:px-3"
+                style={{ background: "rgba(16, 57, 79, 0.6)" }}
               >
                 👥 {speakers}
               </button>
@@ -1090,8 +1090,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 title={t("editor.deleteSectorTitle")}
                 className="g-btn h-9 flex-none px-3 text-[13px] text-cream disabled:opacity-35 sm:px-4"
                 style={{
-                  background: "linear-gradient(0deg, #d61f6c 0%, #ff3d8b 100%)",
-                  boxShadow: "inset 0 0 0 2px #ffb0d2, 0 4px 0 0 #a4165a",
+                  background: "linear-gradient(0deg, #d17a0f 0%, #f7941d 100%)",
+                  boxShadow: "inset 0 0 0 2px #ffd0a0, 0 4px 0 0 #9a5410",
                 }}
               >
                 ✕ {t("editor.delete")}<span className="hidden sm:inline">{t("editor.sectorSuffix")}</span>
@@ -1100,7 +1100,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           </SectionHead>
 
           {/* Framed track — a scroll viewport wraps the (zoomable) inner track */}
-          <div className="rounded-[12px] bg-violet-deep p-2 shadow-[inset_0_0_0_2px_#8952dc]">
+          <div className="rounded-[12px] bg-violet-deep p-2 shadow-[inset_0_0_0_2px_#3f8fc8]">
             <div ref={scrollRef} className="g-timeline-scroll relative overflow-x-auto overflow-y-hidden rounded-[9px]">
             <div
               ref={trackRef}
@@ -1114,7 +1114,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               style={{
                 width: `${zoom * 100}%`,
                 background:
-                  "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 44px), linear-gradient(180deg, #1c0733 0%, #2a0845 100%)",
+                  "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 44px), linear-gradient(180deg, #0a2233 0%, #0c2e42 100%)",
               }}
             >
               <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
@@ -1127,7 +1127,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 >
                   {/* Wider transparent grab zone so the thin line is easy to catch. */}
                   <span className="absolute -left-[9px] top-0 bottom-0 w-[20px]" />
-                  <span className="absolute -left-[7px] -top-[4px] h-[15px] w-[15px] rotate-45 rounded-[3px] bg-sun shadow-[0_0_0_2px_rgba(31,7,51,0.5)]" />
+                  <span className="absolute -left-[7px] -top-[4px] h-[15px] w-[15px] rotate-45 rounded-[3px] bg-sun shadow-[0_0_0_2px_rgba(8,34,48,0.5)]" />
                 </div>
               )}
               {/* sectors */}
@@ -1167,8 +1167,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                         background: color,
                         opacity: isSel ? 1 : 0.66,
                         boxShadow: isSel
-                          ? "inset 0 0 0 2px rgba(255,255,255,0.95), inset 0 0 0 4px rgba(31,7,51,0.35), 0 3px 0 rgba(31,7,51,0.4)"
-                          : "inset 0 0 0 2px rgba(255,255,255,0.35), 0 3px 0 rgba(31,7,51,0.3)",
+                          ? "inset 0 0 0 2px rgba(255,255,255,0.95), inset 0 0 0 4px rgba(8,34,48,0.35), 0 3px 0 rgba(8,34,48,0.4)"
+                          : "inset 0 0 0 2px rgba(255,255,255,0.35), 0 3px 0 rgba(8,34,48,0.3)",
                         zIndex: isSel ? 20 : 10,
                       }}
                       title={s.transcript || t("editor.sectorN", { n: i + 1 })}
@@ -1181,7 +1181,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                       </span>
                       <span className="pointer-events-none flex flex-1 items-center justify-center gap-1 truncate px-3 text-center font-display text-[13px] font-black text-ink [text-shadow:0_1px_0_rgba(255,255,255,0.4)]">
                         {i + 1}
-                        <span className="rounded-full bg-[rgba(31,7,51,0.45)] px-1.5 text-[10px] leading-[15px] text-cream">
+                        <span className="rounded-full bg-[rgba(8,34,48,0.45)] px-1.5 text-[10px] leading-[15px] text-cream">
                           P{s.player}
                         </span>
                       </span>
@@ -1201,7 +1201,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   className="pointer-events-none absolute top-0 bottom-0 z-30 w-[2px] bg-magenta"
                   style={{ left: `${(pendingStart / durMs) * 100}%` }}
                 >
-                  <span className="absolute -left-[5px] -top-[5px] h-[11px] w-[11px] rounded-full bg-magenta shadow-[0_0_0_2px_rgba(31,7,51,0.5)]" />
+                  <span className="absolute -left-[5px] -top-[5px] h-[11px] w-[11px] rounded-full bg-magenta shadow-[0_0_0_2px_rgba(8,34,48,0.5)]" />
                 </div>
               )}
             </div>
@@ -1209,7 +1209,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           </div>
 
           {/* Help / hint strip */}
-          <div className="mt-3 flex items-start gap-2 rounded-[10px] bg-violet-deep/50 px-3 py-2 text-[12px] leading-[1.5] text-cream/60 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.3)]">
+          <div className="mt-3 flex items-start gap-2 rounded-[10px] bg-violet-deep/50 px-3 py-2 text-[12px] leading-[1.5] text-cream/60 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.3)]">
             <span aria-hidden className="mt-[1px] text-[13px]">
               {pendingStart !== null ? "🎯" : "💡"}
             </span>

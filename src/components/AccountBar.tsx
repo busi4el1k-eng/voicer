@@ -55,7 +55,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
       <div className="absolute inset-0 bg-ink/70" onClick={onClose} />
       <div
         className="g-panel relative z-10 w-full max-w-sm"
-        style={{ backgroundColor: "#251c5c" }}
+        style={{ backgroundColor: "#10394f" }}
       >
         <h3 className="mb-3 font-display text-[20px] font-black uppercase tracking-[0.04em] text-cream">
           {t("settings.title")}
@@ -73,7 +73,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             if (e.key === "Escape") onClose();
           }}
           placeholder={t("settings.usernamePh")}
-          className="w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+          className="w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(63,143,200,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
         />
         {err && <p className="mt-2 text-[13px] text-magenta">{err}</p>}
         {done && <p className="mt-2 text-[13px] text-mint">{t("common.saved")}</p>}
@@ -168,7 +168,7 @@ function ChangePassword() {
               if (e.key === "Enter") void save();
             }}
             placeholder="••••••••"
-            className="mb-3 w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+            className="mb-3 w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(63,143,200,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
           />
         </>
       )}
@@ -184,7 +184,7 @@ function ChangePassword() {
           if (e.key === "Enter") void save();
         }}
         placeholder={t("settings.atLeast8")}
-        className="w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+        className="w-full rounded-[10px] bg-violet-deep/60 px-4 py-3 text-[15px] text-cream shadow-[inset_0_0_0_2px_rgba(63,143,200,0.4)] placeholder:text-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
       />
       {err && <p className="mt-2 text-[13px] text-magenta">{err}</p>}
       {done && <p className="mt-2 text-[13px] text-mint">{t("settings.passwordUpdated")}</p>}
@@ -244,7 +244,7 @@ function AccountMenu({ signedIn }: { signedIn: boolean }) {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             className="absolute right-0 top-[calc(100%+8px)] z-50 w-56 overflow-hidden rounded-[12px] shadow-[0_10px_28px_rgba(0,0,0,0.45)]"
-            style={{ backgroundColor: "#251c5c", boxShadow: "inset 0 0 0 2px #8952dc" }}
+            style={{ backgroundColor: "#10394f", boxShadow: "inset 0 0 0 2px #3f8fc8" }}
           >
             {signedIn ? (
               <>

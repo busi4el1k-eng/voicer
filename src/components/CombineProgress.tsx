@@ -56,7 +56,7 @@ export function CombineProgress({ open }: { open: boolean }) {
         .cd-cmb-badge{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--color-violet-lift);box-shadow:inset 0 0 0 2px rgba(255,255,255,.2),0 3px 0 rgba(17,0,45,.4);}
         .cd-cmb-pct{font-variant-numeric:tabular-nums;line-height:.9;}
         .cd-cmb-bar{position:relative;height:22px;border-radius:12px;background:rgba(17,0,45,.5);box-shadow:inset 0 2px 6px rgba(0,0,0,.45);overflow:hidden;}
-        .cd-cmb-fill{height:100%;border-radius:12px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.3);transition:width .4s cubic-bezier(.4,0,.2,1);min-width:22px;background:linear-gradient(90deg,#ff3d8b,#ffd23f);}
+        .cd-cmb-fill{height:100%;border-radius:12px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.3);transition:width .4s cubic-bezier(.4,0,.2,1);min-width:22px;background:linear-gradient(90deg,#f7941d,#ffd23f);}
         .cd-cmb-shim{position:absolute;inset:0;background:linear-gradient(100deg,transparent 32%,rgba(255,255,255,.3) 50%,transparent 68%);background-size:220% 100%;animation:cd-cmb-shim 1.15s linear infinite;}
         @keyframes cd-cmb-shim{from{background-position:210% 0}to{background-position:-210% 0}}
         .cd-cmb-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--color-sun);animation:cd-cmb-pulse 1s ease-in-out infinite;}

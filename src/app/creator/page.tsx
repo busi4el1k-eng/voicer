@@ -12,7 +12,7 @@ import { LOCALES, LOCALE_META } from "@/lib/i18n";
 import { Flag } from "@/components/Flag";
 
 // One fixed colour per player seat (1-4), matching the editor.
-const PLAYER_COLORS = ["#FF3D8B", "#FFD23F", "#27E1A1", "#38BDF8", "#A78BFA", "#FB923C", "#F87171"];
+const PLAYER_COLORS = ["#f7941d", "#FFD23F", "#38a8dc", "#38BDF8", "#7fc4e6", "#FB923C", "#F87171"];
 
 type Segment = {
   id: string;
@@ -380,7 +380,7 @@ export default function CreatorPage() {
                 ref={fileRef}
                 type="file"
                 accept="video/*"
-                className="cursor-pointer rounded-[10px] border-2 border-violet-lift bg-violet-deep/50 p-2 font-display text-[13px] font-semibold text-cream/70 file:mr-3 file:cursor-pointer file:rounded-[8px] file:border-0 file:bg-violet-lift file:px-3 file:py-2 file:font-display file:font-bold file:uppercase file:tracking-[0.04em] file:text-cream hover:file:bg-[#9a45d6]"
+                className="cursor-pointer rounded-[10px] border-2 border-violet-lift bg-violet-deep/50 p-2 font-display text-[13px] font-semibold text-cream/70 file:mr-3 file:cursor-pointer file:rounded-[8px] file:border-0 file:bg-violet-lift file:px-3 file:py-2 file:font-display file:font-bold file:uppercase file:tracking-[0.04em] file:text-cream hover:file:bg-[#3f8fc8]"
               />
             </label>
 
@@ -438,7 +438,7 @@ export default function CreatorPage() {
                   return (
                     <li
                       key={j.id}
-                      className="rounded-[12px] bg-violet-deep/40 p-3 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]"
+                      className="rounded-[12px] bg-violet-deep/40 p-3 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)]"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                         {/* Title + meta (players / share code) */}
@@ -472,7 +472,7 @@ export default function CreatorPage() {
                                     <span
                                       key={p}
                                       title={t("creator.playerN", { n: p })}
-                                      className="h-2.5 w-2.5 rounded-full shadow-[inset_0_0_0_1.5px_rgba(31,7,51,0.4)]"
+                                      className="h-2.5 w-2.5 rounded-full shadow-[inset_0_0_0_1.5px_rgba(8,34,48,0.4)]"
                                       style={{ background: PLAYER_COLORS[(p - 1) % PLAYER_COLORS.length] }}
                                     />
                                   ))}
@@ -700,7 +700,7 @@ export default function CreatorPage() {
                 fontFamily: "var(--font-nunito), sans-serif",
                 fontWeight: 900,
                 fontSize: 30,
-                color: "#5cffb6",
+                color: "#4fb8e6",
                 textShadow: "var(--g-outline-dark)",
               }}
             >

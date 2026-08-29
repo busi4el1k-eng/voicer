@@ -7,15 +7,15 @@ import { SiteFooter } from "@/components/SiteFooter";
 
 export default function Landing() {
   return (
-    <main className="g-screen">
+    <main className="g-screen landing-fit">
       <div className="absolute right-4 top-4 z-10">
         <AccountBar />
       </div>
 
       {/* Centre the logo + panels vertically in the viewport; the footer stays
           pinned at the bottom (its mt-auto used to push everything to the top). */}
-      <div className="flex w-full flex-1 flex-col items-center justify-center gap-2 py-4">
-        <div className="flex h-[104px] items-center justify-center gap-3">
+      <div className="flex w-full min-h-0 flex-1 flex-col items-center justify-center gap-2 py-3">
+        <div className="flex h-[92px] shrink-0 items-center justify-center gap-3">
           <Logo className="h-[64px] w-[64px] shrink-0" />
           <h1 className="g-logo">
             Cinema<em>Dub</em>
@@ -31,7 +31,6 @@ export default function Landing() {
 
           {/* RIGHT — how to play, as one auto-rotating, swipeable slide */}
           <div className="g-right g-panel">
-            <h2 className="g-title"><T k="home.howToPlay" /></h2>
             <HowToPlayCarousel />
           </div>
         </div>

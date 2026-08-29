@@ -49,6 +49,7 @@ const en: Dict = {
   // Dashboard
   "dash.dbError": "Database is waking up or unreachable — some data may be missing. Refresh in a moment.",
   "dash.studioTitle": "Your studio",
+  "social.title": "Follow us",
   "stat.runs": "Runs",
   "stat.scenes": "Scenes played",
   "stat.rating": "Rating",
@@ -575,6 +576,7 @@ const es: Dict = {
 
   "dash.dbError": "La base de datos se está iniciando o no responde — puede que falten datos. Actualiza en un momento.",
   "dash.studioTitle": "Tu estudio",
+  "social.title": "Síguenos",
   "stat.runs": "Rondas",
   "stat.scenes": "Escenas jugadas",
   "stat.rating": "Valoración",
@@ -1090,6 +1092,7 @@ const fr: Dict = {
 
   "dash.dbError": "La base de données démarre ou est injoignable — certaines données peuvent manquer. Actualisez dans un instant.",
   "dash.studioTitle": "Votre studio",
+  "social.title": "Suivez-nous",
   "stat.runs": "Parties",
   "stat.scenes": "Scènes jouées",
   "stat.rating": "Note",
@@ -1605,6 +1608,7 @@ const ru: Dict = {
 
   "dash.dbError": "База данных запускается или недоступна — часть данных может отсутствовать. Обновите через мгновение.",
   "dash.studioTitle": "Ваша студия",
+  "social.title": "Мы в соцсетях",
   "stat.runs": "Заходы",
   "stat.scenes": "Сыграно сцен",
   "stat.rating": "Рейтинг",
@@ -2120,6 +2124,7 @@ const ro: Dict = {
 
   "dash.dbError": "Baza de date pornește sau este inaccesibilă — unele date pot lipsi. Reîncarcă într-un moment.",
   "dash.studioTitle": "Studioul tău",
+  "social.title": "Urmărește-ne",
   "stat.runs": "Rulări",
   "stat.scenes": "Scene jucate",
   "stat.rating": "Rating",

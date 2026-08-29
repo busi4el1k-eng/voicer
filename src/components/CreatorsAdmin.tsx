@@ -105,7 +105,7 @@ const blankCreator = (): EditCreator => ({
   tagline: "",
   bio: "",
   avatar: "",
-  color: "#FF3D8B",
+  color: "#f7941d",
   instagram: "",
   links: [],
   verified: false,
@@ -118,14 +118,14 @@ const toEdit = (c: Creator): EditCreator => ({
   tagline: c.tagline,
   bio: c.bio,
   avatar: c.avatar,
-  color: c.color || "#FF3D8B",
+  color: c.color || "#f7941d",
   instagram: c.instagram,
   links: c.links ?? [],
   verified: c.verified,
 });
 
 const fieldBase =
-  "rounded-[8px] bg-violet-deep/50 px-3 py-2 text-[13px] text-cream shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)] outline-none focus:shadow-[inset_0_0_0_2px_#8952dc]";
+  "rounded-[8px] bg-violet-deep/50 px-3 py-2 text-[13px] text-cream shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)] outline-none focus:shadow-[inset_0_0_0_2px_#3f8fc8]";
 const field = "w-full " + fieldBase;
 const label = "mb-1 block text-[11px] font-bold uppercase tracking-[0.06em] text-cream/50";
 
@@ -313,7 +313,7 @@ export function CreatorsAdmin() {
               <div className="sm:col-span-2">
                 <div className="mb-1 flex items-center justify-between">
                   <span className={label + " mb-0"}>Other links</span>
-                  <button type="button" onClick={addLink} className="rounded-full bg-mint/20 px-3 py-1 text-[12px] font-bold text-mint shadow-[inset_0_0_0_2px_#5cffb6]">
+                  <button type="button" onClick={addLink} className="rounded-full bg-mint/20 px-3 py-1 text-[12px] font-bold text-mint shadow-[inset_0_0_0_2px_#4fb8e6]">
                     + Add link
                   </button>
                 </div>
@@ -395,7 +395,7 @@ export function CreatorsAdmin() {
                   ) : (
                     <ul className="flex flex-col gap-2">
                       {videos.map((v) => (
-                        <li key={v.id} className="flex items-center gap-3 rounded-[10px] bg-violet-deep/40 p-2.5 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.3)]">
+                        <li key={v.id} className="flex items-center gap-3 rounded-[10px] bg-violet-deep/40 p-2.5 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.3)]">
                           {v.sourceUrl && <VideoThumb src={v.sourceUrl} />}
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-display text-[14px] font-bold text-cream">{v.title || "Untitled"}</div>
@@ -427,7 +427,7 @@ export function CreatorsAdmin() {
         ) : (
           <ul className="flex flex-col gap-2">
             {creators.map((c) => (
-              <li key={c.id} className="flex items-center gap-3 rounded-[12px] bg-violet-deep/40 p-3 shadow-[inset_0_0_0_2px_rgba(137,82,220,0.35)]">
+              <li key={c.id} className="flex items-center gap-3 rounded-[12px] bg-violet-deep/40 p-3 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)]">
                 {c.avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={c.avatar} alt="" className="h-12 w-12 flex-none rounded-full object-cover" />
@@ -466,7 +466,7 @@ export function CreatorsAdmin() {
             </div>
             <div
               className="tnum"
-              style={{ fontFamily: "var(--font-nunito), sans-serif", fontWeight: 900, fontSize: 30, color: "#5cffb6", textShadow: "var(--g-outline-dark)" }}
+              style={{ fontFamily: "var(--font-nunito), sans-serif", fontWeight: 900, fontSize: 30, color: "#4fb8e6", textShadow: "var(--g-outline-dark)" }}
             >
               {Math.round(ov.progress * 100)}%
             </div>

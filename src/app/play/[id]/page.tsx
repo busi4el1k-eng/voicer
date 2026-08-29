@@ -478,7 +478,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
                     style={{
                       left: `${(s.startMs / totalMs) * 100}%`,
                       width: `${((s.endMs - s.startMs) / totalMs) * 100}%`,
-                      borderColor: i === cur ? "#FF3D8B" : "rgba(255,246,236,0.28)",
+                      borderColor: i === cur ? "#f7941d" : "rgba(255,246,236,0.28)",
                       background:
                         i === cur ? "rgba(255,61,139,0.22)" : "rgba(143,212,255,0.10)",
                       cursor: showStudio ? "pointer" : "default",
@@ -565,7 +565,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
             {hasTake && (
               <div className="mt-4 flex flex-col gap-3">
                 <WaveTone trace={segTrace?.orig} color="#8FD4FF" label={t("game.original")} toneLabel={t("pid.tone")} noDataLabel={t("pid.noData")} />
-                <WaveTone trace={segTrace?.mine} color="#FF3D8B" label={t("pid.you")} toneLabel={t("pid.tone")} noDataLabel={t("pid.noData")} />
+                <WaveTone trace={segTrace?.mine} color="#f7941d" label={t("pid.you")} toneLabel={t("pid.tone")} noDataLabel={t("pid.noData")} />
               </div>
             )}
 
