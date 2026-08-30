@@ -33,7 +33,7 @@ function GuestPlay() {
 function SignedInPlay({ nickname }: { nickname: string }) {
   return (
     <div className="flex flex-1 flex-col justify-center gap-3">
-      <Link href="/dashboard" onClick={clearPlayAsGuest} className="g-btn g-btn-start w-full">
+      <Link href="/dashboard" onClick={clearPlayAsGuest} className="g-btn g-btn-primary w-full">
         Play as {nickname}
       </Link>
       <Link href="/dashboard" onClick={setPlayAsGuest} className="g-btn g-btn-ghost w-full">

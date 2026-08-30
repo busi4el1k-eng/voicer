@@ -58,7 +58,11 @@ export async function GET(req: NextRequest) {
   }
 
   const clips = await db.clip.findMany({
-    where: gte ? { createdAt: { gte } } : {},
+    // Only dubs of PUBLIC library videos — never private uploads.
+    where: {
+      upload: { visibility: "public" },
+      ...(gte ? { createdAt: { gte } } : {}),
+    },
     include: { upload: { select: { title: true, durationMs: true } } },
     orderBy: { createdAt: "desc" },
     take: 300,

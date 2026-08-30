@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
-// Admin dub browser. Lists finished dubs (Clip rows) with an inline preview and
-// one-tap Download / Open / Copy-link, so the owner can grab "top clips of today"
-// to edit + post to socials without ever opening the R2/Spaces console. Data and
-// the force-download come from server routes; admin is re-checked there.
+// Admin dub browser. Lists finished dubs (of PUBLIC library videos) with an
+// inline preview and one-tap Download / Open / Copy-link, so the owner can grab
+// dubs to make social videos without ever opening the R2/Spaces console.
 
 type Dub = {
   id: string;

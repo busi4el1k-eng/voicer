@@ -384,7 +384,7 @@ export default function CreatorPage() {
               />
             </label>
 
-            <button className="g-btn g-btn-start w-full" onClick={upload} disabled={ov.active}>
+            <button className="g-btn g-btn-primary w-full" onClick={upload} disabled={ov.active}>
               {ov.active ? t("common.working") : t("creator.upload")}
             </button>
 
@@ -608,7 +608,7 @@ export default function CreatorPage() {
                         {/* Preview */}
                         {j.sourceUrl && (
                           <div className="flex-none">
-                            <VideoThumb src={j.sourceUrl} />
+                            <VideoThumb src={j.sourceUrl} playable />
                           </div>
                         )}
 
@@ -634,7 +634,7 @@ export default function CreatorPage() {
                             <>
                               <Link
                                 href={`/creator/${j.id}`}
-                                className="g-btn g-btn-start flex h-10 flex-1 items-center justify-center px-3 text-[13px] sm:flex-none"
+                                className="g-btn g-btn-primary flex h-10 flex-1 items-center justify-center px-3 text-[13px] sm:flex-none"
                               >
                                 {t("creator.openEditor")}
                               </Link>
@@ -722,7 +722,7 @@ export default function CreatorPage() {
                   {ov.uploadId && (
                     <Link
                       href={`/creator/${ov.uploadId}`}
-                      className="g-btn g-btn-start flex w-full items-center justify-center gap-2"
+                      className="g-btn g-btn-primary flex w-full items-center justify-center gap-2"
                       style={{ height: 52, padding: "0 24px", fontSize: 17 }}
                     >
                       <span aria-hidden>🎬</span> {t("creator.openEditor")}

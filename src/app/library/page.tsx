@@ -375,7 +375,7 @@ export default function LibraryPage() {
                     <button
                       onClick={() => setChosen(v)}
                       title={t("lib.dubThis")}
-                      className="g-btn g-btn-start flex h-10 w-full items-center justify-center text-[13px]"
+                      className="g-btn g-btn-primary flex h-10 w-full items-center justify-center text-[13px]"
                     >
                       {t("lib.play")}
                     </button>

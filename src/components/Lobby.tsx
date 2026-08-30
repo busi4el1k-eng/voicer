@@ -187,7 +187,7 @@ export function Lobby({
 }) {
   const { t } = useI18n();
   const router = useRouter();
-  const [selected, setSelected] = useState("creator");
+  const [selected, setSelected] = useState("");
   const [note, setNote] = useState(false);
   const [gate, setGate] = useState(false);
 

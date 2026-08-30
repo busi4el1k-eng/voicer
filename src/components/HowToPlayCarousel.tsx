@@ -103,10 +103,10 @@ export function HowToPlayCarousel() {
               // min-h-0 keep it from growing the window taller.
               <div
                 key={s.titleKey}
-                className="flex h-full w-full shrink-0 items-center gap-4 px-3"
+                className="howto-slide flex h-full w-full shrink-0 items-center gap-4 px-3"
                 aria-hidden={i !== index}
               >
-                <div className="grid h-full min-h-0 min-w-0 flex-1 place-items-center overflow-hidden">
+                <div className="howto-slide-img grid h-full min-h-0 min-w-0 flex-1 place-items-center overflow-hidden">
                   <img
                     src={s.image}
                     alt=""
@@ -114,7 +114,7 @@ export function HowToPlayCarousel() {
                     className="max-h-[90%] max-w-[90%] rounded-[16px] object-contain shadow-[0_4px_0_0_#0a2b3d]"
                   />
                 </div>
-                <p className="w-[150px] shrink-0 text-left text-[15px] font-semibold leading-[1.5] text-cream/80">
+                <p className="howto-slide-text w-[150px] shrink-0 text-left text-[15px] font-semibold leading-[1.5] text-cream/80">
                   {t(s.textKey)}
                 </p>
               </div>

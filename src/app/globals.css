@@ -558,8 +558,9 @@ body {
 .g-modecard:active {
   transform: translateY(2px);
 }
-.g-modecard.checked .g-modecard-title {
-  color: #4fb8e6;
+.g-modecard.checked .g-modecard-title,
+.g-modecard:not(.soon):hover .g-modecard-title {
+  color: #ffb42e;
 }
 .g-modecard.soon {
   cursor: default;
@@ -1118,6 +1119,27 @@ button.g-ghost-slot:disabled {
     flex: 0 0 auto;
     max-height: 178px;
     overflow-y: auto;
+  }
+  /* How-to-play image slides: on mobile stack the illustration ON TOP of its
+     caption (instead of side-by-side). The freed horizontal space lets the
+     artwork grow, and the caption sits centred underneath. */
+  .howto-slide {
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+  }
+  .howto-slide-img {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+  .howto-slide-img img {
+    max-height: 100%;
+    max-width: 100%;
+  }
+  .howto-slide-text {
+    width: 100%;
+    flex: 0 0 auto;
+    text-align: center;
   }
 }
 
