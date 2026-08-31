@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import { cookies } from "next/headers";
 import { ClerkResilientProvider } from "@/components/ClerkResilientProvider";
-import { AdRail } from "@/components/AdRail";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { BackButton } from "@/components/BackButton";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { PostHogIdentify } from "@/components/PostHogIdentify";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
 import { isClerkConfigured } from "@/lib/clerk";
+import { MONETAG_ENABLED, monetagSnippet } from "@/lib/monetag";
 import "./globals.css";
 import "./mobile.css";
 
@@ -44,9 +44,13 @@ export default async function RootLayout({
   const shell = (
     <html lang={locale} className={`${fredoka.variable} ${nunito.variable} h-full`}>
       <body className="min-h-full flex flex-col">
+        {/* Monetag In-Page Push tag, inline in the server HTML so Monetag's
+            installation check detects it and the floating ad renders. Prod only. */}
+        {MONETAG_ENABLED && (
+          <script dangerouslySetInnerHTML={{ __html: monetagSnippet() }} />
+        )}
         <LanguageProvider initialLocale={locale}>
           <PostHogIdentify />
-          <AdRail />
           <AnimatedBackground />
           <BackButton />
           {children}
