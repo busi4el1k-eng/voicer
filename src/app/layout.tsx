@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import { cookies } from "next/headers";
 import { ClerkResilientProvider } from "@/components/ClerkResilientProvider";
+import { AdRail } from "@/components/AdRail";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { BackButton } from "@/components/BackButton";
 import { LanguageProvider } from "@/components/LanguageProvider";
@@ -45,6 +46,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <LanguageProvider initialLocale={locale}>
           <PostHogIdentify />
+          <AdRail />
           <AnimatedBackground />
           <BackButton />
           {children}
