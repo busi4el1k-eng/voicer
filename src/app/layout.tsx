@@ -8,7 +8,6 @@ import { LanguageProvider } from "@/components/LanguageProvider";
 import { PostHogIdentify } from "@/components/PostHogIdentify";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
 import { isClerkConfigured } from "@/lib/clerk";
-import { MONETAG_ENABLED, monetagSnippet } from "@/lib/monetag";
 import "./globals.css";
 import "./mobile.css";
 
@@ -43,14 +42,6 @@ export default async function RootLayout({
 
   const shell = (
     <html lang={locale} className={`${fredoka.variable} ${nunito.variable} h-full`}>
-      <head>
-        {/* Monetag In-Page Push tag — Monetag's exact snippet, placed literally
-            inside <head> per their install instructions. Prod only. Next merges
-            its generated metadata (<title>, icons, etc.) into this same <head>. */}
-        {MONETAG_ENABLED && (
-          <script dangerouslySetInnerHTML={{ __html: monetagSnippet() }} />
-        )}
-      </head>
       <body className="min-h-full flex flex-col">
         <LanguageProvider initialLocale={locale}>
           <PostHogIdentify />
