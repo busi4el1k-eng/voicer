@@ -44,11 +44,6 @@ type TrendingVideo = {
 // Both a full card (Video) and a trending entry (TrendingVideo) satisfy it.
 type PlayableVideo = { id: string; title: string; shareId: string | null };
 
-// One page of the video list, from /api/videos. The server sorts + paginates in
-// the database, so this only ever carries a single page (never the whole list),
-// and reports whether a next page exists instead of a total count.
-type ListResponse = { videos: Video[]; page: number; hasNext: boolean };
-
 // The library's non-list facets, from /api/videos/facets — loaded separately so
 // they never block the first page of videos from painting.
 type Facets = {
@@ -71,8 +66,8 @@ type SortDir = "asc" | "desc";
 // first + the default: it paginates directly in the DB, so it loads fastest. The
 // aggregate sorts (trending/popular/rated) only scan the library when picked.
 const FIELDS: { key: SortField; labelKey: string }[] = [
-  { key: "date", labelKey: "lib.field.date" },
   { key: "trending", labelKey: "lib.field.trending" },
+  { key: "date", labelKey: "lib.field.date" },
   { key: "popular", labelKey: "lib.field.popular" },
   { key: "rating", labelKey: "lib.field.rated" },
   { key: "sectors", labelKey: "lib.field.sectors" },
@@ -89,23 +84,83 @@ const OTHER_LANG = "other";
 // we fall back to "All" (which always has the most to show).
 const MIN_LANG_VIDEOS = 3;
 
+// How many cards per page (paginated client-side from the cached manifest).
+const PAGE_SIZE = 24;
+
+// ── Client-side library cache ────────────────────────────────────────────────
+// The whole (lightweight) library is fetched once from /api/videos/all and kept
+// in localStorage so that browsing — changing sort, direction, language, or page
+// — never re-hits the server. We re-fetch only when the library's total count
+// changes (a new video was added) or the cache is older than the freshness
+// window, so aggregates like "trending today" still refresh on their own.
+const MANIFEST_KEY = "lib-manifest-v1";
+const MANIFEST_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+type ManifestCache = { key: number; at: number; videos: Video[] };
+
+function readManifest(): ManifestCache | null {
+  try {
+    const raw = localStorage.getItem(MANIFEST_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as ManifestCache;
+    if (!Array.isArray(c.videos) || typeof c.key !== "number") return null;
+    return c;
+  } catch {
+    return null;
+  }
+}
+
+function writeManifest(c: ManifestCache) {
+  try {
+    localStorage.setItem(MANIFEST_KEY, JSON.stringify(c));
+  } catch {
+    /* storage full / disabled — the in-memory copy still works this session */
+  }
+}
+
+// Which language tab a video belongs to: its own locale, or "other" (the server
+// already collapses non-locale/unknown languages to "").
+const bucketOf = (language: string) =>
+  (LOCALES as readonly string[]).includes(language) ? language : OTHER_LANG;
+
+// The ranking score for a sort field — mirrors the server's aggregate scoring so
+// client-side sorting matches what the API used to return. Descending order puts
+// the "best" first; the direction toggle flips it.
+function scoreOf(v: Video, field: SortField): number {
+  switch (field) {
+    case "date":
+      return new Date(v.createdAt).getTime();
+    case "length":
+      return v.durationMs;
+    case "sectors":
+      return v.lines;
+    case "rating":
+      return v.rating;
+    case "popular":
+      return v.ratingCount * 6 + v.rating;
+    case "trending": {
+      const ageHours = Math.max(0, (Date.now() - new Date(v.createdAt).getTime()) / 3_600_000);
+      const engagement = v.todayPlayCount * 8 + v.playCount + v.ratingCount * 2 + v.rating;
+      return engagement / Math.pow(ageHours + 2, 1.5);
+    }
+  }
+}
+
 // The shared Video library: public videos any user can browse and dub. Mirrors
 // the creator's "Your videos" list layout, but read-only + open to everyone.
 export default function LibraryPage() {
   const { t, locale } = useI18n();
   const router = useRouter();
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [hasNext, setHasNext] = useState(false);
-  const [listLoaded, setListLoaded] = useState(false);
+  // The whole library, cached (see the manifest effect). null = not loaded yet.
+  const [manifest, setManifest] = useState<Video[] | null>(null);
   const [facets, setFacets] = useState<Facets | null>(null);
   // Language filter: "all", one of the app locales, or "other". Defaults to the
   // visitor's language once the facets load (see the facets effect below).
   const [lang, setLang] = useState<string>(ALL_LANG);
   // The video whose "how do you want to play?" chooser is open (null = closed).
   const [chosen, setChosen] = useState<PlayableVideo | null>(null);
-  // Sort field (single-select) + direction. Default: newest first (the fast,
-  // DB-paginated path).
-  const [field, setField] = useState<SortField>("date");
+  // Sort field (single-select) + direction. Default: trending.
+  const [field, setField] = useState<SortField>("trending");
   const [dir, setDir] = useState<SortDir>("desc");
   // Pagination: browse the library one page at a time (the server slices it).
   const [page, setPage] = useState(1);
@@ -147,37 +202,44 @@ export default function LibraryPage() {
     setPage(1);
   };
 
-  // Fetch the current page whenever the page, sort, direction, or language
-  // changes. The server sorts/filters/paginates, so this only pulls one page.
+  // Load the whole library once and keep it (localStorage + this component's
+  // state), so sorting / filtering / paging all happen in the browser with no
+  // further network calls. Runs when the total count is first known and again
+  // only when that count changes (a new video was added) — the cache is keyed by
+  // it. A short freshness window also lets time-based data (trending) refresh.
   useEffect(() => {
+    if (!facets) return; // wait for the cheap count before deciding
+    const key = facets.totalAll;
     let alive = true;
-    setListLoaded(false);
+
     (async () => {
+      const cached = readManifest();
+      // Cache hit: same total count and still fresh — reuse it, no network call.
+      if (cached && cached.key === key && Date.now() - cached.at < MANIFEST_TTL_MS) {
+        if (alive) setManifest(cached.videos);
+        return;
+      }
       try {
-        const qs = new URLSearchParams({ page: String(page), sort: field, dir, lang });
-        const r = await fetch(`/api/videos?${qs}`);
-        const d = (await r.json()) as ListResponse;
+        const r = await fetch("/api/videos/all");
+        const d = (await r.json()) as { videos: Video[] };
         if (!alive) return;
-        setVideos(d.videos ?? []);
-        setHasNext(!!d.hasNext);
+        const videos = d.videos ?? [];
+        setManifest(videos);
+        writeManifest({ key, at: Date.now(), videos });
       } catch {
-        if (alive) {
-          setVideos([]);
-          setHasNext(false);
-        }
-      } finally {
-        if (alive) setListLoaded(true);
+        // Fall back to any cached copy (even if stale) rather than an empty list.
+        if (alive) setManifest(cached?.videos ?? []);
       }
     })();
     return () => {
       alive = false;
     };
-  }, [page, field, dir, lang]);
+  }, [facets?.totalAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load the facets (language counts + trending) separately so they never block
-  // the first page of videos. Trending is language-specific, so refetch on lang
-  // change. On the very first load we also use the counts to default the filter
-  // to the visitor's language (if enough videos exist in it).
+  // Load the facets (total count + language counts + trending). Trending is
+  // language-specific, so refetch on lang change. On the very first load we also
+  // use the counts to default the filter to the visitor's language (if enough
+  // videos exist in it).
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -205,7 +267,23 @@ export default function LibraryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang]);
 
-  const hasAny = videos.length > 0 || totalAll > 0;
+  // Derive the visible page entirely from the cached manifest: filter by
+  // language, rank by the chosen field/direction, then slice the current page.
+  const listLoaded = manifest !== null;
+  const filtered = useMemo(() => {
+    if (!manifest) return [];
+    return lang === ALL_LANG ? manifest : manifest.filter((v) => bucketOf(v.language) === lang);
+  }, [manifest, lang]);
+  const sorted = useMemo(() => {
+    const mul = dir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => (scoreOf(a, field) - scoreOf(b, field)) * mul);
+  }, [filtered, field, dir]);
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const clampedPage = Math.min(page, pageCount);
+  const videos = sorted.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE);
+  const hasNext = clampedPage < pageCount;
+
+  const hasAny = sorted.length > 0 || totalAll > 0;
 
   return (
     <main className="g-screen">
@@ -466,21 +544,21 @@ export default function LibraryPage() {
         </div>
 
         {/* Pagination: prev / current page / next — shown whenever there's more
-            than one page. Next disables when the server reports no further page. */}
-        {listLoaded && (page > 1 || hasNext) && (
+            than one page. Next disables on the last page. */}
+        {listLoaded && (clampedPage > 1 || hasNext) && (
           <div className="mt-3 flex items-center justify-center gap-3">
             <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
+              onClick={() => setPage(Math.max(1, clampedPage - 1))}
+              disabled={clampedPage <= 1}
               className="rounded-full bg-violet-deep/40 px-4 py-1.5 text-[13px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)] transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-cream/85"
             >
               ← {t("lib.prev")}
             </button>
             <span className="text-[13px] font-bold text-cream/60">
-              {t("lib.page")} {page}
+              {t("lib.page")} {clampedPage}
             </span>
             <button
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setPage(clampedPage + 1)}
               disabled={!hasNext}
               className="rounded-full bg-violet-deep/40 px-4 py-1.5 text-[13px] font-bold text-cream/85 shadow-[inset_0_0_0_2px_rgba(63,143,200,0.35)] transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:text-cream/85"
             >

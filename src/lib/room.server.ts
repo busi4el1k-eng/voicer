@@ -67,8 +67,25 @@ export type RoomView = {
   // Players frozen into seats when the current game launched (0 before launch).
   // The sector→seat assignment uses [1..seatCount] so it's stable across leaves.
   seatCount: number;
+  // Host's manual character casting: { [playerId]: roles[] }, or null for the
+  // automatic share-out. Drives who dubs which character in the studio.
+  roleAssign: Record<string, number[]> | null;
   players: PlayerView[];
 };
+
+// Coerce the loosely-typed Room.roleAssign JSON into a clean
+// { [playerId]: number[] } map, dropping anything malformed. Returns null when
+// there's no override (→ automatic casting).
+export function normalizeRoleAssign(raw: unknown): Record<string, number[]> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const out: Record<string, number[]> = {};
+  for (const [id, roles] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(roles)) continue;
+    const nums = roles.filter((r): r is number => typeof r === "number" && Number.isInteger(r));
+    out[id] = [...new Set(nums)].sort((a, b) => a - b);
+  }
+  return Object.keys(out).length ? out : null;
+}
 
 // The public shape of a room: its status, the chosen video / rendered result,
 // plus the ordered player list (host first, then join order). Seat is derived
@@ -86,6 +103,7 @@ export async function roomView(code: string): Promise<RoomView | null> {
     videoUploadId: room.videoUploadId,
     finalUrl: room.finalUrl,
     seatCount: room.seatCount,
+    roleAssign: normalizeRoleAssign(room.roleAssign),
     players: room.players.map((p, i) => ({
       id: p.id,
       displayName: p.displayName,

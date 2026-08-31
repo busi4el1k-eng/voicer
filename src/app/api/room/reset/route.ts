@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { normalizeRoomCode } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
@@ -44,7 +45,12 @@ export async function POST(req: NextRequest) {
       where: { roomCode: code },
       data: { status: "playing", seat: 0, matchAvg: null, finalUrl: "" },
     }),
-    db.room.update({ where: { code }, data: { status, videoUploadId: null, finalUrl: "" } }),
+    // Clear the manual casting too — the next game re-derives it from whatever
+    // video the host picks, so a stale override never leaks into a new round.
+    db.room.update({
+      where: { code },
+      data: { status, videoUploadId: null, finalUrl: "", roleAssign: Prisma.DbNull },
+    }),
   ]);
   emitRoom(code);
   return NextResponse.json({ room: await roomView(code) });

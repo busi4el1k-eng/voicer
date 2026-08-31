@@ -332,6 +332,7 @@ export function Lobby({
     join,
     start,
     leave,
+    restart,
   } = useRoom({ displayName: playerName, avatarColor });
 
   // A room needs at least MIN_PLAYERS before any game (party or duel) can start.
@@ -362,6 +363,22 @@ export function Lobby({
   const startGame = async (mode: "party" | "duel") => {
     if (await start(mode)) router.push("/party");
   };
+
+  // Safety net: reopen a stale room for joining. Starting the game flips the
+  // room to "playing" (so members follow the host to the pick screen); if the
+  // host later returns to the dashboard by ANY route other than the reset
+  // button — browser back, the logo, a fresh visit — the room can be left stuck
+  // in "playing" with joins blocked. Whenever the host is sitting here (i.e. not
+  // in play mode) on a "playing" room, drop it back to "lobby". The short delay
+  // avoids racing a legitimate launch: startGame navigates to /party, which
+  // unmounts this component and clears the timer before it can fire. We only
+  // touch "playing" — "dubbing" is an active game, and "finished" is left alone
+  // so members still reading the result/ratings screen aren't yanked away.
+  useEffect(() => {
+    if (!isHost || room?.status !== "playing") return;
+    const id = setTimeout(() => void restart("lobby"), 1200);
+    return () => clearTimeout(id);
+  }, [isHost, room?.status, restart]);
 
   const copyCode = async () => {
     if (!room) return;

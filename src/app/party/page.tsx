@@ -8,6 +8,7 @@ import { VideoStage } from "@/components/VideoStage";
 import { useI18n } from "@/components/LanguageProvider";
 import { formatShareId, formatShareInput } from "@/lib/share-id";
 import { useRoom } from "@/lib/useRoom";
+import { RoleAssignPanel } from "@/components/RoleAssignPanel";
 
 type Video = {
   id: string;
@@ -37,10 +38,13 @@ export default function PartyHome() {
   // Mode requested via ?mode=duel (e.g. from the library chooser). Overrides the
   // room's current mode when the host launches; null = keep the room as-is.
   const [intendedMode, setIntendedMode] = useState<"party" | "duel" | null>(null);
+  // True when we landed here from the library with a video already chosen
+  // (?code=…). In that case the code-search bar is pointless, so we hide it.
+  const [fromLibrary, setFromLibrary] = useState(false);
 
   // The invite-lobby room the user is in (created from the dashboard, persisted
   // in localStorage + polled). Read here only, to show the live party size.
-  const { room, playerId, inRoom, isHost, leave } = useRoom({ displayName: "", avatarColor: "" });
+  const { room, playerId, inRoom, isHost, leave, setRoles } = useRoom({ displayName: "", avatarColor: "" });
   // Only the host chooses the video; every other member waits. `inRoom`/`isHost`
   // are optimistic (from the stored membership) so the waiting view shows
   // instantly, before the room fetch resolves.
@@ -52,6 +56,9 @@ export default function PartyHome() {
   // this only drives the soft colour hint and the heads-up note, not a hard gate.
   const partyMatches = !!video && partyCount !== null && partyCount === video.players;
   const inParty = partyCount !== null && partyCount >= 1;
+  // Show the "cast the roles" left window once the host has found a video and
+  // gathered a party. Members see the waiting view instead, so it's host-side.
+  const showAssign = !isMember && !!video && inParty;
 
   // Once the host launches (room flips to "dubbing"), the host and every waiting
   // member follow into the studio together. Also covers "finished" so a late
@@ -99,7 +106,12 @@ export default function PartyHome() {
       const r = await fetch(`/api/solo/lookup?code=${encodeURIComponent(trimmed)}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || t("solo.lookupFailed"));
-      setVideo(d.video as Video);
+      const found = d.video as Video;
+      // A different video has different characters, so any casting saved for the
+      // previous one is stale — drop back to the automatic default for the new
+      // video. Only fires when there's actually an override to clear.
+      if (found.id !== video?.id && room?.roleAssign) void setRoles(null);
+      setVideo(found);
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("solo.lookupFailed"));
     } finally {
@@ -115,6 +127,7 @@ export default function PartyHome() {
     if (m === "duel" || m === "party") setIntendedMode(m);
     const c = params.get("code");
     if (!c) return;
+    setFromLibrary(true);
     void (async () => {
       const pretty = formatShareInput(c);
       setCode(pretty);
@@ -135,7 +148,21 @@ export default function PartyHome() {
         </h1>
       </div>
 
-      <div className="w-full max-w-xl">
+      <div className="w-full">
+        <div className={showAssign ? "g-center items-start" : "mx-auto w-full max-w-xl"}>
+          {showAssign && video && (
+            <RoleAssignPanel
+              videoId={video.id}
+              players={room?.players ?? []}
+              isHost={isHost}
+              myId={playerId}
+              isDuel={isDuel}
+              roleAssign={room?.roleAssign ?? null}
+              onSave={setRoles}
+            />
+          )}
+          <div className={showAssign ? "g-right" : ""}>
+            <div className={showAssign ? "mx-auto w-full max-w-xl" : ""}>
         {isMember ? (
           // Non-host members wait — the host picks the video for everyone.
           // Renders instantly from the membership hint; the roster fills in
@@ -190,9 +217,11 @@ export default function PartyHome() {
           </>
         ) : (
           <>
+        {!fromLibrary && (
+          <>
         <h2 className="g-title">{t("ppick.findVideo")}</h2>
 
-        {/* Code search */}
+        {/* Code search — hidden when the video was opened from the library. */}
         <div className="g-panel">
           <div className="flex gap-2">
             <input
@@ -223,10 +252,30 @@ export default function PartyHome() {
             </Link>
           </div>
         </div>
+          </>
+        )}
+
+        {/* From the library with no search bar to fall back on: surface the
+            lookup state (loading / error) until the video resolves. */}
+        {fromLibrary && !video && (
+          <div className="g-panel text-center">
+            {err ? (
+              <p className="text-[14px] text-magenta">{err}</p>
+            ) : (
+              <p className="text-[14px] text-cream/60">{busy ? "…" : t("game.loading")}</p>
+            )}
+            <Link
+              href="/library"
+              className="g-btn g-btn-ghost mt-3 inline-flex items-center justify-center"
+            >
+              {t("solo.browseLibrary")}
+            </Link>
+          </div>
+        )}
 
         {/* Found video — game info + mock play */}
         {video && (
-          <div className="g-panel mt-4">
+          <div className={`g-panel ${fromLibrary ? "" : "mt-4"}`}>
             <div className="mb-4">
               <VideoStage src={video.sourceUrl} />
             </div>
@@ -337,19 +386,8 @@ export default function PartyHome() {
         )}
           </>
         )}
-
-        <div className="mt-6 text-center">
-          {/* A member must leave the room first, else the dashboard's follow
-              effect pulls them straight back to /party. */}
-          <button
-            onClick={async () => {
-              if (isMember) await leave();
-              router.push("/dashboard");
-            }}
-            className="text-[13px] text-cream/50 underline"
-          >
-            {t("lib.backToLobby")}
-          </button>
+            </div>
+          </div>
         </div>
       </div>
     </main>

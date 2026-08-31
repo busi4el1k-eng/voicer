@@ -17,7 +17,7 @@ import { downloadHref } from "@/lib/download";
 import { useI18n } from "@/components/LanguageProvider";
 import { useRoom } from "@/lib/useRoom";
 import { useAppDialog } from "@/components/AppDialog";
-import { assignSectors, roleCount, seatsPerRole } from "@/lib/party-assign";
+import { assignSectors, roleSeatsFromAssign } from "@/lib/party-assign";
 
 type Seg = {
   id: string;
@@ -72,12 +72,6 @@ export default function PartyStudioPage() {
   const [videoSaved, setVideoSaved] = useState(false);
   const [playersSaved, setPlayersSaved] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
-  // One-time "uneven party" heads-up: explains how sectors were shared out when
-  // the party size doesn't match the video's character count. null = no notice.
-  const [notice, setNotice] = useState<
-    | null
-    | { kind: "fewer" | "more"; players: number; roles: number; myRoles: number; share: number }
-  >(null);
 
   const stageRef = useRef<VideoStageHandle>(null);
   const pcmRef = useRef<Pcm | null>(null);
@@ -134,33 +128,21 @@ export default function PartyStudioPage() {
         setVideo(d.video);
 
         const seats = Array.from({ length: seatCount }, (_, i) => i + 1);
+        // Honor the host's manual casting when set; otherwise the automatic
+        // share-out. Resolved from the same room.roleAssign the submit route uses.
+        const override = room?.roleAssign
+          ? roleSeatsFromAssign(room.roleAssign, room.players)
+          : undefined;
         // Duel: BOTH players dub the WHOLE video, so everyone gets every playable
         // sector (no seat split). Party: each seat dubs only its assigned sectors.
         const mine = isDuel
           ? d.video.segments.filter((s) => s.endMs > s.startMs)
           : (() => {
-              const assignment = assignSectors(d.video.segments, seats);
+              const assignment = assignSectors(d.video.segments, seats, override);
               return d.video.segments.filter((s) => assignment.get(s.id) === mySeat);
             })();
         setSegs(mine);
         setPhase(mine.length === 0 ? "empty" : "run");
-
-        if (isDuel) return; // no uneven-cast heads-up in a duel
-
-        // Work out whether the party is uneven, and how it affects ME, so we can
-        // show a one-time heads-up. Only when I actually have sectors.
-        const roles = roleCount(d.video.segments);
-        const myRoleCount = new Set(mine.map((s) => s.player ?? 1)).size;
-        if (mine.length > 0 && seatCount !== roles) {
-          if (seatCount < roles) {
-            setNotice({ kind: "fewer", players: seatCount, roles, myRoles: myRoleCount, share: 0 });
-          } else {
-            // Largest number of players sharing any character I voice.
-            const spr = seatsPerRole(d.video.segments, seats);
-            const share = Math.max(1, ...[...new Set(mine.map((s) => s.player ?? 1))].map((r) => spr.get(r) ?? 1));
-            setNotice({ kind: "more", players: seatCount, roles, myRoles: myRoleCount, share });
-          }
-        }
       } catch {
         if (!cancelled) setPhase("error");
       }
@@ -201,7 +183,6 @@ export default function PartyStudioPage() {
     setRenderBusy(false);
     setVideoSaved(false);
     setPlayersSaved(false);
-    setNotice(null);
   }, [room?.videoUploadId]);
 
   // Decode the source once and precompute each of my sectors' original envelope.
@@ -988,13 +969,6 @@ export default function PartyStudioPage() {
                       <span aria-hidden className="text-[15px] leading-none">←</span>
                       {t("game.previousSector")}
                     </button>
-                    <button
-                      onClick={() => setPhase("summary")}
-                      disabled={busy}
-                      className="text-[13px] text-cream/50 underline disabled:opacity-40"
-                    >
-                      {t("game.reviewFinish")}
-                    </button>
                   </div>
                 </div>
 
@@ -1017,36 +991,6 @@ export default function PartyStudioPage() {
         )}
       </div>
       <CombineProgress open={renderBusy} />
-
-      {/* Uneven-party heads-up — shown once when the party size doesn't match the
-          video's character count, explaining how sectors were shared out. */}
-      {notice && (
-        <div className="g-modal-overlay" onClick={() => setNotice(null)}>
-          <div className="g-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-1 grid h-12 w-12 place-items-center rounded-full bg-sun/20 text-[24px]">
-              🎭
-            </div>
-            <h3 className="g-modal-title">{t("passign.title")}</h3>
-            <p className="g-modal-sub">
-              {notice.kind === "fewer"
-                ? t("passign.fewerBody", { players: notice.players, roles: notice.roles })
-                : t("passign.moreBody", { players: notice.players, roles: notice.roles })}
-            </p>
-            <p className="mb-4 text-center text-[14px] font-bold text-sun">
-              {notice.kind === "fewer"
-                ? notice.myRoles > 1
-                  ? t("passign.youVoiceMulti", { n: notice.myRoles })
-                  : t("passign.youVoiceOne")
-                : notice.share > 1
-                  ? t("passign.youShare", { n: notice.share })
-                  : t("passign.youVoiceOne")}
-            </p>
-            <button type="button" className="g-btn g-btn-start w-full" onClick={() => setNotice(null)}>
-              {t("passign.ok")}
-            </button>
-          </div>
-        </div>
-      )}
       {dialog}
     </main>
   );

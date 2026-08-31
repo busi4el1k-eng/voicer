@@ -3,7 +3,8 @@ import db from "@/lib/db";
 import { normalizeRoomCode } from "@/lib/room-code";
 import { roomView } from "@/lib/room.server";
 import { emitRoom } from "@/lib/room-events";
-import { assignSectors } from "@/lib/party-assign";
+import { assignSectors, roleSeatsFromAssign } from "@/lib/party-assign";
+import { normalizeRoleAssign } from "@/lib/room.server";
 import { SPACES_PREFIX, putObject, spacesConfigured } from "@/lib/spaces";
 
 export const runtime = "nodejs";
@@ -72,7 +73,13 @@ export async function POST(req: NextRequest) {
       { length: room.seatCount > 0 ? room.seatCount : room.players.length },
       (_, i) => i + 1,
     );
-    const assignment = assignSectors(segments, seatUniverse);
+    // If the host cast roles manually, honor that; otherwise auto share-out. Both
+    // studio and this route resolve the SAME map, so ownership stays consistent.
+    const roleAssign = normalizeRoleAssign(room.roleAssign);
+    const override = roleAssign
+      ? roleSeatsFromAssign(roleAssign, room.players)
+      : undefined;
+    const assignment = assignSectors(segments, seatUniverse, override);
     mine = new Set(segments.filter((s) => assignment.get(s.id) === seat).map((s) => s.id));
   }
 
