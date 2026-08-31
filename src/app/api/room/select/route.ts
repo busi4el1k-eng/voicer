@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { normalizeRoomCode } from "@/lib/room-code";
-import { roomView } from "@/lib/room.server";
+import { roomView, normalizeRoleAssign } from "@/lib/room.server";
 import { emitRoom } from "@/lib/room-events";
 
 export const runtime = "nodejs";
@@ -10,18 +11,23 @@ export const runtime = "nodejs";
 // room's videoUploadId and flip status to "dubbing" so waiting members follow
 // into the studio. Enforces the "party size must match the video's seats" rule.
 export async function POST(req: NextRequest) {
-  const { code: rawCode, playerId, uploadId, mode: rawMode } = (await req
+  const { code: rawCode, playerId, uploadId, mode: rawMode, roleAssign: rawRoleAssign } = (await req
     .json()
     .catch(() => ({}))) as {
     code?: string;
     playerId?: string;
     uploadId?: string;
     mode?: string;
+    roleAssign?: unknown;
   };
   // Optional: the game type to lock in for this launch (from the library
   // chooser). Only 'party'|'duel' are valid; anything else is ignored and the
   // room keeps whatever mode it already had (e.g. chosen on the dashboard).
   const mode = rawMode === "duel" || rawMode === "party" ? rawMode : null;
+  // Optional: the host's manual role casting for THIS game only. It's committed
+  // here at launch (never stored while the host is still choosing) and wiped
+  // when the room returns to the lobby. null/absent → automatic share-out.
+  const roleAssign = normalizeRoleAssign(rawRoleAssign);
   const code = normalizeRoomCode(rawCode ?? "");
   if (!code || !playerId || !uploadId) {
     return NextResponse.json({ error: "Missing room, player, or video." }, { status: 400 });
@@ -85,6 +91,8 @@ export async function POST(req: NextRequest) {
         finalUrl: "",
         status: "dubbing",
         seatCount: roster.length,
+        // Commit the host's casting for this game (or clear to automatic).
+        roleAssign: roleAssign ?? Prisma.DbNull,
         // Only override the room's mode when the caller specified one.
         ...(mode ? { mode } : {}),
       },

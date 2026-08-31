@@ -312,32 +312,6 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
     [room, membership, playerId],
   );
 
-  // Host-only: save (or clear) the manual character casting for the room. Pass
-  // null to fall back to the automatic share-out. Optimistically updates the
-  // local room so the panel reflects the change instantly; members get it via
-  // the live stream.
-  const setRoles = useCallback(
-    async (roleAssign: Record<string, number[]> | null): Promise<boolean> => {
-      const code = room?.code ?? membership?.code ?? null;
-      if (!code || !playerId) return false;
-      setRoom((r) => (r ? { ...r, roleAssign } : r));
-      try {
-        const res = await fetch("/api/room/roles", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ code, playerId, roleAssign }),
-        });
-        if (!res.ok) return false;
-        const data = await res.json();
-        if (data.room) setRoom(data.room);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    [room?.code, membership?.code, playerId],
-  );
-
   // Authoritative host flag once the room is loaded; before that, fall back to
   // the membership snapshot so the UI (e.g. the waiting room) is correct
   // instantly. `inRoom` is optimistic for the same reason.
@@ -360,6 +334,5 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
     start,
     restart,
     leave,
-    setRoles,
   };
 }

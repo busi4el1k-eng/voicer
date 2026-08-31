@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AccountBar } from "@/components/AccountBar";
@@ -35,6 +35,9 @@ export default function PartyHome() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [launching, setLaunching] = useState(false);
+  // Whether the role casting is complete enough to launch (every character has a
+  // player, every player has a character). Reported by the RoleAssignPanel.
+  const [castValid, setCastValid] = useState(true);
   // Mode requested via ?mode=duel (e.g. from the library chooser). Overrides the
   // room's current mode when the host launches; null = keep the room as-is.
   const [intendedMode, setIntendedMode] = useState<"party" | "duel" | null>(null);
@@ -44,7 +47,10 @@ export default function PartyHome() {
 
   // The invite-lobby room the user is in (created from the dashboard, persisted
   // in localStorage + polled). Read here only, to show the live party size.
-  const { room, playerId, inRoom, isHost, leave, setRoles } = useRoom({ displayName: "", avatarColor: "" });
+  const { room, playerId, inRoom, isHost, leave } = useRoom({ displayName: "", avatarColor: "" });
+  // The host's current role casting, kept only in memory (never persisted while
+  // choosing) and sent to the server at launch. null = use the automatic pick.
+  const castingRef = useRef<Record<string, number[]> | null>(null);
   // Only the host chooses the video; every other member waits. `inRoom`/`isHost`
   // are optimistic (from the stored membership) so the waiting view shows
   // instantly, before the room fetch resolves.
@@ -85,6 +91,9 @@ export default function PartyHome() {
           // When arriving from the library's Duel/Party chooser, set the room's
           // mode at launch. Omitted otherwise so the dashboard-chosen mode stands.
           ...(intendedMode ? { mode: intendedMode } : {}),
+          // Commit the host's role casting for THIS game only (null = automatic).
+          // It's stored for the duration of the game and wiped when it ends.
+          roleAssign: castingRef.current,
         }),
       });
       const d = await r.json();
@@ -106,12 +115,9 @@ export default function PartyHome() {
       const r = await fetch(`/api/solo/lookup?code=${encodeURIComponent(trimmed)}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || t("solo.lookupFailed"));
-      const found = d.video as Video;
-      // A different video has different characters, so any casting saved for the
-      // previous one is stale — drop back to the automatic default for the new
-      // video. Only fires when there's actually an override to clear.
-      if (found.id !== video?.id && room?.roleAssign) void setRoles(null);
-      setVideo(found);
+      // The casting is local and re-seeds from the automatic pick per video (the
+      // panel resets on a video/roster change), so there's nothing to clear here.
+      setVideo(d.video as Video);
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("solo.lookupFailed"));
     } finally {
@@ -157,8 +163,10 @@ export default function PartyHome() {
               isHost={isHost}
               myId={playerId}
               isDuel={isDuel}
-              roleAssign={room?.roleAssign ?? null}
-              onSave={setRoles}
+              onChange={(c) => {
+                castingRef.current = c;
+              }}
+              onValidChange={setCastValid}
             />
           )}
           <div className={showAssign ? "g-right" : ""}>
@@ -344,7 +352,7 @@ export default function PartyHome() {
                   party yet. Launching drops the whole party into the studio. */}
               <button
                 onClick={() => void startForEveryone()}
-                disabled={video.lines === 0 || !inParty || launching}
+                disabled={video.lines === 0 || !inParty || launching || !castValid}
                 className="g-btn g-btn-start w-full disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {launching
@@ -353,9 +361,11 @@ export default function PartyHome() {
                     ? t("solo.noLinesYet")
                     : !inParty
                       ? t("ppick.needParty")
-                      : isDuel
-                        ? t("duel.startEveryone")
-                        : t("ppick.startEveryone")}
+                      : !castValid
+                        ? t("cast.finish")
+                        : isDuel
+                          ? t("duel.startEveryone")
+                          : t("ppick.startEveryone")}
               </button>
 
               {video.lines > 0 && !inParty && (
