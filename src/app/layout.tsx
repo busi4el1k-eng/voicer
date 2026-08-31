@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Fredoka, Nunito } from "next/font/google";
 import { cookies } from "next/headers";
 import { ClerkResilientProvider } from "@/components/ClerkResilientProvider";
@@ -44,18 +43,15 @@ export default async function RootLayout({
 
   const shell = (
     <html lang={locale} className={`${fredoka.variable} ${nunito.variable} h-full`}>
-      <body className="min-h-full flex flex-col">
-        {/* Monetag In-Page Push tag. `beforeInteractive` in the root layout makes
-            Next inject it into the initial HTML <head> from the server — matching
-            Monetag's "place the tag in the header" instruction — so their
-            installation check detects it and the floating ad renders. Prod only. */}
+      <head>
+        {/* Monetag In-Page Push tag — Monetag's exact snippet, placed literally
+            inside <head> per their install instructions. Prod only. Next merges
+            its generated metadata (<title>, icons, etc.) into this same <head>. */}
         {MONETAG_ENABLED && (
-          <Script
-            id="monetag-ipp"
-            strategy="beforeInteractive"
-            dangerouslySetInnerHTML={{ __html: monetagSnippet() }}
-          />
+          <script dangerouslySetInnerHTML={{ __html: monetagSnippet() }} />
         )}
+      </head>
+      <body className="min-h-full flex flex-col">
         <LanguageProvider initialLocale={locale}>
           <PostHogIdentify />
           <AnimatedBackground />

@@ -16,5 +16,5 @@ export const MONETAG_ENABLED =
 // Monetag's "Check installation" crawler detect the tag — a client-side useEffect
 // injection isn't present in the fetched HTML, so verification fails there.
 export function monetagSnippet(): string {
-  return `(function(s){s.dataset.zone='${MONETAG_ZONE}',s.src='${MONETAG_SRC}'})([document.documentElement,document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`;
+  return `(function(s){s.dataset.zone='${MONETAG_ZONE}',s.src='${MONETAG_SRC}'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`;
 }
