@@ -205,6 +205,23 @@ export default function PartyStudioPage() {
     })();
   }, [video?.sourceUrl, segs]);
 
+  // Back-fill the match score for any take recorded before the original envelope
+  // finished decoding (see sectorReady above), so not blocking on the whole-file
+  // decode never costs a score. Runs once both envelopes for a sector exist.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setScores((prev) => {
+      let next = prev;
+      for (const s of segs) {
+        if (next[s.id] == null && origWave[s.id] && takeWave[s.id]) {
+          if (next === prev) next = { ...prev };
+          next[s.id] = sectorMatch(origWave[s.id], takeWave[s.id]);
+        }
+      }
+      return next;
+    });
+  }, [origWave, takeWave, segs]);
+
   // Clear any pending record cap / countdown if we unmount mid-recording.
   useEffect(() => {
     return () => {
@@ -214,9 +231,13 @@ export default function PartyStudioPage() {
   }, []);
 
   const seg = segs[cur];
-  // Ready to record only when the video can play AND this sector's original
-  // audio envelope is decoded — until then the Record button shows a loader.
-  const sectorReady = videoReady && !!(seg && origWave[seg.id]);
+  // Ready to record as soon as the video can play. We deliberately do NOT wait
+  // for this sector's original audio envelope (origWave): decoding it fetches the
+  // WHOLE source file, which on mobile takes many seconds — blocking recording on
+  // it is what made iPhone sit on "loading the scene" waiting for the whole video.
+  // The envelope decodes in the background and back-fills the waveform + match
+  // score when it lands (see the score back-fill effect below).
+  const sectorReady = videoReady;
 
   const stopRecording = useCallback(async () => {
     if (capRef.current != null) {

@@ -1,6 +1,13 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useI18n } from "@/components/LanguageProvider";
 
 // The app-styled video player used in the creator/editor — a `.g-player` shell
@@ -24,6 +31,17 @@ const fmt = (ms: number) => {
   const s = Math.max(0, ms) / 1000;
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 };
+
+// True on iPhone/iPad Safari (incl. iPadOS 13+, which reports as "MacIntel" but
+// has touch). We take a different sector-playback path there — see `videoSrc`.
+const IS_IOS =
+  typeof navigator !== "undefined" &&
+  (/iP(hone|od|ad)/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && (navigator.maxTouchPoints ?? 0) > 1));
+
+// A no-op subscribe so useSyncExternalStore can expose IS_IOS as a hydration-safe
+// value (false on the server + first render, then the real value) with no effect.
+const subscribeNoop = () => () => {};
 
 export const VideoStage = forwardRef<
   VideoStageHandle,
@@ -61,6 +79,28 @@ export const VideoStage = forwardRef<
     const frac = span > 0 ? rel / span : 0;
     // How much of the (sector or whole) timeline has downloaded, as a fraction.
     const bufFrac = span > 0 ? Math.min(1, Math.max(0, (bufferedMs - base) / span)) : 0;
+
+    // iOS-only sector playback via a Media Fragment. On iPhone/iPad, seeking into
+    // a long file is unreliable: Safari downloads the whole video and hands play
+    // to its native fullscreen player, which ignores our sector controls and just
+    // plays the entire clip — exactly the "not separated / whole video / iPhone
+    // player" bug. Scoping the source to `#t=start,end` makes Safari seek to the
+    // sector start, fetch only that range, and — because playback then needs no
+    // seek-before-`play()` — stay inline. The `key` (which only changes on iOS,
+    // since `videoSrc` is constant elsewhere) reloads the element per sector so
+    // the new fragment applies. Other platforms keep the single-source + JS-seek
+    // path, which already works there, with zero change. useSyncExternalStore
+    // keeps SSR/hydration consistent: false on the server, real value on client.
+    const isIOS = useSyncExternalStore(
+      subscribeNoop,
+      () => IS_IOS,
+      () => false,
+    );
+    const secStr = (ms: number) => Math.max(0, ms / 1000).toFixed(3);
+    const videoSrc =
+      isIOS && src && sector
+        ? `${src}#t=${secStr(sector.startMs)},${secStr(sector.endMs)}`
+        : src;
 
     useImperativeHandle(ref, () => ({
       playSector(startMs: number, endMs: number) {
@@ -236,8 +276,11 @@ export const VideoStage = forwardRef<
             freeze. */}
         <div className="relative">
           <video
+            // Reloads per sector on iOS (where `videoSrc` carries the #t=
+            // fragment); a stable, unchanging key elsewhere so nothing remounts.
+            key={videoSrc}
             ref={videoRef}
-            src={src}
+            src={videoSrc}
             preload="auto"
             // iOS: play inline (never take over the screen) so our sector
             // controls stay in charge — required alongside the faststart source
