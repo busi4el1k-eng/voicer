@@ -20,7 +20,7 @@ export function SiteFooter() {
           Privacy Policy
         </Link>
       </nav>
-      <p className="mt-3">© {year} Cinema Dub · dubthatmovie.com</p>
+      <p className="mt-3">© {year} DubThatMovie · dubthatmovie.com</p>
     </footer>
   );
 }

@@ -8,6 +8,7 @@ import { SPACES_PREFIX, deleteObjects, putObjectStream, spacesConfigured } from 
 import { rateLimit } from "@/lib/rate-limit";
 import { generateShareId } from "@/lib/share-id.server";
 import { generateBedForUpload } from "@/lib/bed.server";
+import { normalizeSourceForUpload } from "@/lib/normalize.server";
 import { guessTitleLang } from "@/lib/lang-detect";
 import { assertReadable, isPermanentInputError } from "@/lib/ffmpeg";
 
@@ -123,6 +124,11 @@ export async function POST(req: NextRequest) {
     where: { id: upload.id },
     data: { sourceKey: key, sourceUrl: url },
   });
+
+  // De-fragment + faststart the source now, off the request path, so iOS can
+  // seek per-sector instead of downloading the whole file (see normalize.server).
+  // The in-process worker is the backstop if this doesn't finish/run.
+  after(() => normalizeSourceForUpload(saved.id));
 
   // Start separating the music bed now, off the request path, so it's likely
   // ready by the time the creator finishes placing sectors and renders. No-op

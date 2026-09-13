@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import { cookies } from "next/headers";
+import { AdSense } from "@/components/AdSense";
 import { ClerkResilientProvider } from "@/components/ClerkResilientProvider";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { BackButton } from "@/components/BackButton";
@@ -27,8 +28,13 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Cinema Dub",
-  description: "Everyone gets a mic. Nobody gets away with it.",
+  metadataBase: new URL("https://dubthatmovie.com"),
+  title: "DubThatMovie — dub movie scenes with your friends",
+  description:
+    "DubThatMovie is a free browser party game where you re-voice movie and video scenes. " +
+    "Listen to a line, perform it over the muted replay, and a robot judge scores your pitch, " +
+    "rhythm and words. Play solo, host a party, or duel head-to-head.",
+  applicationName: "DubThatMovie",
 };
 
 export default async function RootLayout({
@@ -43,6 +49,9 @@ export default async function RootLayout({
   const shell = (
     <html lang={locale} className={`${fredoka.variable} ${nunito.variable} h-full`}>
       <body className="min-h-full flex flex-col">
+        {/* Google AdSense loader (every page), injected client-side so it can't
+            trip a hydration mismatch — see AdSense.tsx. */}
+        <AdSense />
         <LanguageProvider initialLocale={locale}>
           <PostHogIdentify />
           <AnimatedBackground />

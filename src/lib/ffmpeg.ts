@@ -108,6 +108,18 @@ export async function extractAudio(input: string, out: string): Promise<Buffer> 
   return readFile(out);
 }
 
+// Remux a source into a plain progressive *faststart* container without
+// re-encoding: this de-fragments a fragmented MP4 (moof/mvex boxes — which
+// Safari can't seek into, so it downloads the whole file to reach a sector) into
+// a normal single-moov file, and moves that moov atom to the front. Stream copy,
+// so it's fast (~fraction of a second per minute of video) and lossless — frame
+// timing is untouched, so sector [startMs,endMs) offsets stay exactly valid.
+// `out`'s extension selects the muxer; keep it matching the source container.
+export async function remuxFaststart(input: string, out: string): Promise<Buffer> {
+  await run(["-y", "-i", input, "-c", "copy", "-movflags", "+faststart", out]);
+  return readFile(out);
+}
+
 // Run ffmpeg and resolve with its full stderr (where filters print their
 // summaries), regardless of exit code — analysis filters still emit useful
 // numbers even when ffmpeg exits non-zero on an odd input.

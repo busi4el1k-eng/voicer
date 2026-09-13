@@ -4,9 +4,9 @@ import { Logo } from "@/components/Logo";
 import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  title: "About Us · Cinema Dub",
+  title: "About Us · DubThatMovie",
   description:
-    "What Cinema Dub is, who makes it, and why we built a game around dubbing short movie clips.",
+    "What DubThatMovie is, who makes it, and why we built a game around dubbing short movie clips.",
 };
 
 // Static "About us" page — required for AdSense trust/transparency. On-brand
@@ -49,12 +49,12 @@ export default function AboutPage() {
       </div>
 
       <div className="w-full max-w-3xl pb-16 text-left text-cream/85">
-        <h1 className="g-title mb-4 text-center">About Cinema Dub</h1>
+        <h1 className="g-title mb-4 text-center">About DubThatMovie</h1>
 
         {/* Intro */}
         <div className="g-panel text-[15px] leading-relaxed">
           <p>
-            <strong className="text-cream">Cinema Dub</strong> is a free online
+            <strong className="text-cream">DubThatMovie</strong> is a free online
             game that turns movie and cartoon clips into a stage for your voice.
             Pick a scene, listen to how it was originally delivered, then
             re-record the lines yourself. When you finish, the game stitches your
@@ -91,7 +91,7 @@ export default function AboutPage() {
             <p>
               We want voice acting to feel as playful and social as karaoke. Most
               people never get to hear themselves as their favourite character —
-              Cinema Dub removes every barrier: no downloads, no editing skills,
+              DubThatMovie removes every barrier: no downloads, no editing skills,
               no account required. Just press record and perform.
             </p>
           </div>
@@ -107,7 +107,7 @@ export default function AboutPage() {
               Who we are
             </h2>
             <p>
-              Cinema Dub is an independent project built and maintained by{" "}
+              DubThatMovie is an independent project built and maintained by{" "}
               <strong className="text-cream">Busuioc Nichita</strong>, based in{" "}
               <strong className="text-cream">Chișinău, Moldova</strong>. We are
               not affiliated with any film studio; uploaded clips belong to their

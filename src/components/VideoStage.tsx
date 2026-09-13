@@ -239,6 +239,10 @@ export const VideoStage = forwardRef<
             ref={videoRef}
             src={src}
             preload="auto"
+            // iOS: play inline (never take over the screen) so our sector
+            // controls stay in charge — required alongside the faststart source
+            // for per-sector playback to work on iPhone.
+            playsInline
             onClick={togglePlay}
             onPlay={() => setPlaying(true)}
             onPlaying={() => {

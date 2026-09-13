@@ -4,9 +4,9 @@ import { Logo } from "@/components/Logo";
 import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  title: "Contacts · Cinema Dub",
+  title: "Contacts · DubThatMovie",
   description:
-    "How to reach the Cinema Dub team — support, feedback, business enquiries, and content/takedown requests.",
+    "How to reach the DubThatMovie team — support, feedback, business enquiries, and content/takedown requests.",
 };
 
 // Static "Contacts" page — required for AdSense trust/transparency. On-brand
@@ -32,7 +32,7 @@ export default function ContactPage() {
 
         <p className="mx-auto mb-8 max-w-xl text-center text-[15px] leading-relaxed text-cream/70">
           Got a question, a bug, an idea, or a partnership in mind? We&rsquo;d
-          love to hear from you — Cinema Dub is a small, independent project and
+          love to hear from you — DubThatMovie is a small, independent project and
           real people read every message.
         </p>
 
@@ -85,7 +85,7 @@ export default function ContactPage() {
               Who operates this site
             </h2>
             <p>
-              Cinema Dub (<strong className="text-cream">dubthatmovie.com</strong>)
+              DubThatMovie (<strong className="text-cream">dubthatmovie.com</strong>)
               is operated by <strong className="text-cream">Busuioc Nichita</strong>,
               based in <strong className="text-cream">Chișinău, Moldova</strong>.
             </p>
@@ -101,7 +101,7 @@ export default function ContactPage() {
             Privacy Policy
           </Link>
           <Link href="/" className="g-btn g-btn-ghost">
-            ← Back to Cinema Dub
+            ← Back to DubThatMovie
           </Link>
         </div>
       </div>

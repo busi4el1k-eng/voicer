@@ -338,6 +338,8 @@ const en: Dict = {
   "home.feat.dub.d": "Turn funny moments or your favorite videos into your own dub.",
   "home.feat.share.t": "Show it off",
   "home.feat.share.d": "Share your creations and watch what everyone else made.",
+  "home.tagline":
+    "Re-voice movie and video scenes with your friends — hear a line, perform it over the muted replay, and let the robot judge score your take. Free, right in your browser.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "Welcome back to the booth",
@@ -426,7 +428,7 @@ const en: Dict = {
   "share.creating": "Creating link…",
   "share.linkReady": "Anyone with this link can watch",
   "share.failed": "Couldn't create a share link. Try again.",
-  "watch.subtitle": "Made with Cinema Dub",
+  "watch.subtitle": "Made with DubThatMovie",
   "watch.untitled": "A shared dub",
   "watch.makeYours": "🎬 Make your own dub",
   "watch.notFoundTitle": "Dub not found",
@@ -878,6 +880,8 @@ const es: Dict = {
   "home.feat.dub.d": "Convierte momentos divertidos o tus vídeos favoritos en tu propio doblaje.",
   "home.feat.share.t": "Presume de ello",
   "home.feat.share.d": "Comparte tus creaciones y mira lo que hicieron los demás.",
+  "home.tagline":
+    "Pon tu voz a escenas de películas y vídeos con tus amigos: escucha una línea, actúala sobre la reproducción muda y deja que el juez robot puntúe tu toma. Gratis, en tu navegador.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "Bienvenido de nuevo a la cabina",
@@ -962,7 +966,7 @@ const es: Dict = {
   "share.creating": "Creando enlace…",
   "share.linkReady": "Cualquiera con este enlace puede verlo",
   "share.failed": "No se pudo crear el enlace. Inténtalo de nuevo.",
-  "watch.subtitle": "Hecho con Cinema Dub",
+  "watch.subtitle": "Hecho con DubThatMovie",
   "watch.untitled": "Un doblaje compartido",
   "watch.makeYours": "🎬 Haz tu propio doblaje",
   "watch.notFoundTitle": "Doblaje no encontrado",
@@ -1414,6 +1418,8 @@ const fr: Dict = {
   "home.feat.dub.d": "Transforme des moments drôles ou tes vidéos préférées en ton propre doublage.",
   "home.feat.share.t": "Fais-le voir",
   "home.feat.share.d": "Partage tes créations et découvre celles des autres.",
+  "home.tagline":
+    "Redouble des scènes de films et de vidéos avec tes amis : écoute une réplique, rejoue-la sur la lecture muette, et laisse le juge robot noter ta prise. Gratuit, dans ton navigateur.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "De retour dans la cabine",
@@ -1498,7 +1504,7 @@ const fr: Dict = {
   "share.creating": "Création du lien…",
   "share.linkReady": "Toute personne ayant ce lien peut le regarder",
   "share.failed": "Impossible de créer le lien. Réessayez.",
-  "watch.subtitle": "Réalisé avec Cinema Dub",
+  "watch.subtitle": "Réalisé avec DubThatMovie",
   "watch.untitled": "Un doublage partagé",
   "watch.makeYours": "🎬 Faites votre propre doublage",
   "watch.notFoundTitle": "Doublage introuvable",
@@ -1950,6 +1956,8 @@ const ru: Dict = {
   "home.feat.dub.d": "Преврати смешные моменты или любимые видео в собственную озвучку.",
   "home.feat.share.t": "Покажи всем",
   "home.feat.share.d": "Делись своими работами и смотри, что создали другие.",
+  "home.tagline":
+    "Переозвучивай сцены из фильмов и видео с друзьями: услышь реплику, сыграй её поверх немого повтора, а робот-судья оценит твой дубль. Бесплатно, прямо в браузере.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "С возвращением в студию",
@@ -2034,7 +2042,7 @@ const ru: Dict = {
   "share.creating": "Создаём ссылку…",
   "share.linkReady": "Любой, у кого есть эта ссылка, может посмотреть",
   "share.failed": "Не удалось создать ссылку. Попробуйте ещё раз.",
-  "watch.subtitle": "Сделано в Cinema Dub",
+  "watch.subtitle": "Сделано в DubThatMovie",
   "watch.untitled": "Общий дубляж",
   "watch.makeYours": "🎬 Сделай свой дубляж",
   "watch.notFoundTitle": "Дубляж не найден",
@@ -2486,6 +2494,8 @@ const ro: Dict = {
   "home.feat.dub.d": "Transformă momente amuzante sau videoclipurile preferate în propriul dublaj.",
   "home.feat.share.t": "Arată tuturor",
   "home.feat.share.d": "Împarte creațiile tale și vezi ce au făcut ceilalți.",
+  "home.tagline":
+    "Dublează scene din filme și clipuri cu prietenii: ascultă o replică, joac-o peste reluarea mută, iar juriul-robot îți punctează preluarea. Gratuit, în browser.",
 
   // Auth (login / signup subtitles)
   "auth.loginSubtitle": "Bine ai revenit în cabină",
@@ -2570,7 +2580,7 @@ const ro: Dict = {
   "share.creating": "Se creează linkul…",
   "share.linkReady": "Oricine are acest link îl poate viziona",
   "share.failed": "Nu s-a putut crea linkul. Încearcă din nou.",
-  "watch.subtitle": "Făcut cu Cinema Dub",
+  "watch.subtitle": "Făcut cu DubThatMovie",
   "watch.untitled": "Un dublaj distribuit",
   "watch.makeYours": "🎬 Fă-ți propriul dublaj",
   "watch.notFoundTitle": "Dublaj negăsit",

@@ -37,10 +37,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const share = await getShare(id);
-  const title = share?.title ? `${share.title} · Cinema Dub` : "Cinema Dub";
+  const title = share?.title ? `${share.title} · DubThatMovie` : "DubThatMovie";
   return {
     title,
-    description: "Watch this dub, made with Cinema Dub.",
+    description: "Watch this dub, made with DubThatMovie.",
     openGraph: { title, videos: share ? [share.videoUrl] : undefined },
   };
 }
@@ -64,7 +64,7 @@ export default async function WatchPage({
     <main className="g-screen">
       <div className="flex h-[72px] items-center">
         <Link href="/" className="g-logo">
-          Cinema Dub
+          DubThatMovie
         </Link>
       </div>
 

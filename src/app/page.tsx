@@ -20,6 +20,13 @@ export default function Landing() {
           </h1>
         </div>
 
+        {/* One-line intro: real, indexable copy describing the game (helps SEO /
+            AdSense "does this page have content?"). Kept compact so it stays
+            inside the locked single-screen landing on desktop. */}
+        <p className="max-w-[56ch] shrink-0 text-balance px-4 text-center text-[13px] leading-[1.5] text-cream/70 sm:text-[14px]">
+          <T k="home.tagline" />
+        </p>
+
         <div className="g-center">
           {/* LEFT — choose how to play */}
           <div className="g-left g-panel">

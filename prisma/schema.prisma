@@ -134,6 +134,17 @@ model VideoUpload {
   autoStatus    String    @default("idle")
   autoStartedAt DateTime?
   autoError     String    @default("")
+  // iOS sector-seek fix. Many exporters produce *fragmented* MP4s (moof boxes,
+  // no seek index): Safari can't seek into them and downloads the whole file to
+  // reach a sector, while Chromium (desktop/Android) tolerates it. We remux each
+  // source once to a plain progressive faststart MP4 (-c copy, lossless) so every
+  // game mode seeks a single sector by byte-range on every platform.
+  // pending|processing|ready|error|invalid. "ready" also covers a source that was
+  // already clean, and non-MP4 containers we intentionally skip.
+  sourceFsStatus    String    @default("pending")
+  // When the current normalize job entered "processing" — lets a later sweep
+  // reclaim a job whose worker died mid-remux (status stuck on "processing").
+  sourceFsStartedAt DateTime?
   segments   VideoSegment[]
   ratings    VideoRating[]
   plays      VideoPlay[]

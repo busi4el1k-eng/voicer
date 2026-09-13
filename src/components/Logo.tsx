@@ -1,4 +1,4 @@
-// Cinema Dub brand mark: a film clapperboard — the "start the scene" symbol —
+// DubThatMovie brand mark: a film clapperboard — the "start the scene" symbol —
 // with its top arm raised open (about to clap = action!) and a magenta play
 // triangle on the slate to reinforce "start / playback". Drawn in the app's
 // Gartic register: chunky shapes, dark multi-safe outline, hard offset shadow,
@@ -6,7 +6,7 @@
 
 export function Logo({
   className,
-  title = "Cinema Dub",
+  title = "DubThatMovie",
 }: {
   className?: string;
   title?: string;

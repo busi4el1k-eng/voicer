@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy · Cinema Dub",
-  description: "How Cinema Dub collects, uses, and protects your data.",
+  title: "Privacy Policy · DubThatMovie",
+  description: "How DubThatMovie collects, uses, and protects your data.",
 };
 
 // Static legal page — kept in English (the app default) and deliberately plain
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         <div className="g-panel space-y-6 text-[14px] leading-relaxed">
           <section>
             <p>
-              Cinema Dub (&ldquo;we&rdquo;, &ldquo;us&rdquo;) operates the website{" "}
+              DubThatMovie (&ldquo;we&rdquo;, &ldquo;us&rdquo;) operates the website{" "}
               <strong>dubthatmovie.com</strong>, a game where players record dubs
               over short video clips. This policy explains what data we collect,
               why, and the choices you have. By using the site you agree to this
@@ -165,7 +165,7 @@ export default function PrivacyPage() {
               Children
             </h2>
             <p>
-              Cinema Dub is not directed to children under 13, and we do not
+              DubThatMovie is not directed to children under 13, and we do not
               knowingly collect their personal data.
             </p>
           </section>
@@ -187,7 +187,7 @@ export default function PrivacyPage() {
 
         <div className="mt-6">
           <Link href="/" className="text-[13px] text-cream/60 underline">
-            ← Back to Cinema Dub
+            ← Back to DubThatMovie
           </Link>
         </div>
       </div>

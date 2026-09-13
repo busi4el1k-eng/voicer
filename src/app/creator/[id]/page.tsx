@@ -914,6 +914,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 ref={videoRef}
                 src={upload.sourceUrl}
                 preload="auto"
+                playsInline
                 onClick={togglePlay}
                 onPlay={() => setPlaying(true)}
                 onPlaying={() => {
