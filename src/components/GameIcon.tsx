@@ -9,6 +9,9 @@ const PATHS = {
   party: `<path d="M4 20l4-11 6 6-10 5z"/><path d="M13 4c2 0 2 2 4 2M15 8c2 0 2 2 4 2"/><circle cx="18" cy="14" r="1"/><circle cx="20.5" cy="18" r="1"/>`,
   // two crossed blades — the Duel icon
   duel: `<path d="M5 5 L15 15"/><path d="M13 17 L17 13"/><path d="M15 15 L18.5 18.5"/><circle cx="19.2" cy="19.2" r="1.1"/><path d="M19 5 L9 15"/><path d="M7 13 L11 17"/><path d="M9 15 L5.5 18.5"/><circle cx="4.8" cy="19.2" r="1.1"/>`,
+  // two tin cans joined by a string — the Telephone Chain icon (the mic passes
+  // down the line, each player hearing only the one before them)
+  telephone: `<rect x="2.5" y="8" width="6" height="8" rx="1.3"/><rect x="15.5" y="8" width="6" height="8" rx="1.3"/><path d="M8.5 11c2-1.4 5-1.4 7 0"/><circle cx="5.5" cy="12" r="0.9"/><circle cx="18.5" cy="12" r="0.9"/>`,
   solo: `<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M4 9l3-4 4 4M11 5l4 4M15 5l4 4"/><circle cx="12" cy="15" r="2.4"/>`,
   soon: `<rect x="6" y="11" width="12" height="9" rx="2"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/><circle cx="12" cy="15.5" r="1.3"/>`,
   // ── steps (landing "how to play") ──

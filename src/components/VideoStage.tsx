@@ -53,9 +53,13 @@ export const VideoStage = forwardRef<
     // when the player is opened by a user gesture (e.g. the podium click/hold),
     // which is what lets sound autoplay.
     autoPlay?: boolean;
+    // Force the muted state. Telephone Chain sets this true so the active player
+    // is "blind" — they watch the sector silently and hear only the previous
+    // player's take, never the original. Undefined = user-controlled (default).
+    muted?: boolean;
   }
 >(
-  function VideoStage({ src, sector, onReadyChange, autoPlay }, ref) {
+  function VideoStage({ src, sector, onReadyChange, autoPlay, muted: mutedProp }, ref) {
     const { t } = useI18n();
     const videoRef = useRef<HTMLVideoElement>(null);
     const playerRef = useRef<HTMLDivElement>(null);
@@ -106,8 +110,10 @@ export const VideoStage = forwardRef<
       playSector(startMs: number, endMs: number) {
         const v = videoRef.current;
         if (!v) return;
-        v.muted = false;
-        setMuted(false);
+        // Honor a forced mute (Telephone) instead of always unmuting.
+        const m = mutedProp ?? false;
+        v.muted = m;
+        setMuted(m);
         v.currentTime = startMs / 1000;
         setPlayhead(startMs);
         stopAtRef.current = endMs;
@@ -157,6 +163,16 @@ export const VideoStage = forwardRef<
       else v.addEventListener("canplay", go, { once: true });
       return () => v.removeEventListener("canplay", go);
     }, [autoPlay, src]);
+
+    // A parent can force the muted state (Telephone mutes the video so the active
+    // player hears only the previous take). Re-applied on source reload, since a
+    // fresh element resets muted, and kept in sync if the prop flips per turn.
+    useEffect(() => {
+      const v = videoRef.current;
+      if (!v || mutedProp === undefined) return;
+      v.muted = mutedProp;
+      setMuted(mutedProp);
+    }, [mutedProp, videoSrc]);
 
     const onTimeUpdate = () => {
       const v = videoRef.current;

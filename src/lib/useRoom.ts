@@ -16,13 +16,19 @@ export type PlayerView = {
 export type RoomView = {
   code: string;
   status: string;
-  mode: string; // 'party' | 'duel'
+  mode: string; // 'party' | 'duel' | 'telephone'
   videoUploadId: string | null;
   finalUrl: string;
   seatCount: number; // players frozen into seats at launch (0 before launch)
   // Host's manual character casting { [playerId]: roles[] }, or null for auto.
   roleAssign: Record<string, number[]> | null;
   players: PlayerView[];
+  // Telephone Chain live state (null/0 in party/duel). See lib/room.server.
+  currentSeat: number | null; // whose turn it is now (null once the chain is done)
+  currentSegmentId: string | null; // the sector being dubbed now
+  chainTotal: number; // total turns = playable sectors
+  chainDone: number; // turns completed so far
+  previousTakeUrl: string | null; // the only cue the active player gets
 };
 
 const STORAGE_KEY = "cd_room";
@@ -246,9 +252,11 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
   );
 
   // Host-only: flip the room to "playing" so waiting members follow into the
-  // game. `mode` picks the game type ("party" co-op | "duel" competitive) and is
-  // frozen onto the room here. Returns true once the server confirms.
-  const start = useCallback(async (mode: "party" | "duel" = "party"): Promise<boolean> => {
+  // game. `mode` picks the game type ("party" co-op | "duel" competitive |
+  // "telephone" chain) and is frozen onto the room here. Returns true once the
+  // server confirms.
+  const start = useCallback(
+    async (mode: "party" | "duel" | "telephone" = "party"): Promise<boolean> => {
     if (!room || !playerId) return false;
     setBusy(true);
     setError(null);
@@ -312,6 +320,28 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
     [room, membership, playerId],
   );
 
+  // Telephone Chain: advance past the turn that's stuck (an AFK/disconnected
+  // active player would otherwise freeze the whole chain). Server-side any member
+  // may call it; the studio gates WHEN the button appears. The skipped sector
+  // keeps its original audio in the final render.
+  const skip = useCallback(async (): Promise<boolean> => {
+    const code = room?.code ?? membership?.code ?? null;
+    if (!code || !playerId) return false;
+    try {
+      const res = await fetch("/api/room/skip", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code, playerId }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data.room) setRoom(data.room);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [room, membership, playerId]);
+
   // Authoritative host flag once the room is loaded; before that, fall back to
   // the membership snapshot so the UI (e.g. the waiting room) is correct
   // instantly. `inRoom` is optimistic for the same reason.
@@ -333,6 +363,7 @@ export function useRoom(me: { displayName: string; avatarColor: string }) {
     join,
     start,
     restart,
+    skip,
     leave,
   };
 }

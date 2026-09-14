@@ -580,6 +580,56 @@ body {
   background: #2a6f9e;
   color: #e6f4fc;
 }
+/* "NEW" flag on a freshly-added mode tile — bright sun badge so it draws the eye
+   against the artwork. */
+.g-modecard .g-newtag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #ffb42e;
+  color: #012342;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+/* Info "i" button on a mode tile — opens a modal describing that mode. It sits
+   over the artwork (top-right) and swallows the click so it never launches the
+   mode. A span (not a nested <button>, which is invalid inside the card button). */
+.g-modecard .g-modeinfo {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 900;
+  font-style: normal;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  background: rgba(3, 35, 66, 0.72);
+  color: #e6f4fc;
+  border: 1.5px solid rgba(230, 244, 252, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition:
+    transform 0.08s,
+    background 0.12s;
+  user-select: none;
+}
+.g-modecard .g-modeinfo:hover {
+  background: #2277aa;
+  transform: scale(1.08);
+}
 
 /* User / player card */
 .g-user {

@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
     playerId?: string;
     mode?: string;
   };
-  const mode = rawMode === "duel" ? "duel" : "party";
+  const mode =
+    rawMode === "duel" ? "duel" : rawMode === "telephone" ? "telephone" : "party";
   const code = normalizeRoomCode(rawCode ?? "");
   if (!code || !playerId) {
     return NextResponse.json({ error: "Missing room or player." }, { status: 400 });

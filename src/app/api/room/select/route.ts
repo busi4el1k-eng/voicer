@@ -21,9 +21,11 @@ export async function POST(req: NextRequest) {
     roleAssign?: unknown;
   };
   // Optional: the game type to lock in for this launch (from the library
-  // chooser). Only 'party'|'duel' are valid; anything else is ignored and the
-  // room keeps whatever mode it already had (e.g. chosen on the dashboard).
-  const mode = rawMode === "duel" || rawMode === "party" ? rawMode : null;
+  // chooser). Only 'party'|'duel'|'telephone' are valid; anything else is
+  // ignored and the room keeps whatever mode it already had (e.g. chosen on the
+  // dashboard).
+  const mode =
+    rawMode === "duel" || rawMode === "party" || rawMode === "telephone" ? rawMode : null;
   // Optional: the host's manual role casting for THIS game only. It's committed
   // here at launch (never stored while the host is still choosing) and wiped
   // when the room returns to the lobby. null/absent → automatic share-out.
@@ -91,6 +93,9 @@ export async function POST(req: NextRequest) {
         finalUrl: "",
         status: "dubbing",
         seatCount: roster.length,
+        // Reset the Telephone Chain cursor so a rematch in the same room starts
+        // the chain from turn 0 (harmless for party/duel, which never read it).
+        round: 0,
         // Commit the host's casting for this game (or clear to automatic).
         roleAssign: roleAssign ?? Prisma.DbNull,
         // Only override the room's mode when the caller specified one.

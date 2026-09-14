@@ -37,7 +37,10 @@ export async function POST(req: NextRequest) {
 
   const me = room.players.find((p) => p.id === playerId);
   if (!me) return NextResponse.json({ error: "You're not in this room." }, { status: 403 });
-  if (!me.isHost) {
+  // Telephone Chain ends with everyone on a "someone's dubbing" waiting screen —
+  // there's no host action mid-chain, and the host may even have dropped — so any
+  // player can assemble the finished video. Party/duel stay host-only.
+  if (!me.isHost && room.mode !== "telephone") {
     return NextResponse.json({ error: "Only the host can finish the game." }, { status: 403 });
   }
   if (!room.players.every((p) => p.status === "finished")) {

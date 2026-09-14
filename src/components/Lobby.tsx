@@ -16,9 +16,19 @@ type Mode = {
   href?: string; // present = working; absent = placeholder (coming soon)
   ghost?: boolean; // hidden/unrevealed slot ("???")
   image?: string; // illustration shown in place of the GameIcon
+  isNew?: boolean; // shows a "NEW" flag on the tile
 };
 
 const MODES: Mode[] = [
+  {
+    id: "telephone",
+    icon: "telephone",
+    titleKey: "mode.telephone.title",
+    textKey: "mode.telephone.text",
+    href: "/party", // shared pick screen; room.mode drives the telephone flow
+    image: "/modes/telephone.png",
+    isNew: true,
+  },
   {
     id: "creator",
     icon: "creator",
@@ -190,6 +200,8 @@ export function Lobby({
   const [selected, setSelected] = useState("");
   const [note, setNote] = useState(false);
   const [gate, setGate] = useState(false);
+  // The mode whose "about this mode" info modal is open (null = closed).
+  const [info, setInfo] = useState<Mode | null>(null);
 
   // Mode strip scrolling. On desktop it's click-and-drag: pressing and releasing
   // in place is a real button click, but pressing and moving scrolls the strip
@@ -360,7 +372,7 @@ export function Lobby({
 
   // Host action: launch the chosen game type for everyone, then head in. The
   // members follow automatically once the room flips to "playing".
-  const startGame = async (mode: "party" | "duel") => {
+  const startGame = async (mode: "party" | "duel" | "telephone") => {
     if (await start(mode)) router.push("/party");
   };
 
@@ -400,7 +412,7 @@ export function Lobby({
     // Party & duel share one room; the modal gathers players and, once there are
     // enough, lets the host pick the game. Both cards enter the same way — click
     // opens the create/join modal, whether or not a room exists yet.
-    if (mode.id === "party" || mode.id === "duel") {
+    if (mode.id === "party" || mode.id === "duel" || mode.id === "telephone") {
       setRoomError(null);
       setPartyOpen(true);
       return;
@@ -439,6 +451,31 @@ export function Lobby({
                   </div>
                 )}
                 {m.ghost && <span className="g-soontag">{t("lobby.soonTag")}</span>}
+                {m.isNew && <span className="g-newtag">{t("lobby.newTag")}</span>}
+                {!m.ghost && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t("lobby.aboutMode")}
+                    title={t("lobby.aboutMode")}
+                    className="g-modeinfo"
+                    // Swallow the click so it opens the info modal instead of
+                    // launching / selecting the mode.
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInfo(m);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setInfo(m);
+                      }
+                    }}
+                  >
+                    i
+                  </span>
+                )}
               </div>
               <span className="g-modecard-title">{t(m.ghost ? "mode.soon.title" : m.titleKey)}</span>
             </button>
@@ -457,6 +494,47 @@ export function Lobby({
       )}
 
       {gate && <GuestGate onClose={() => setGate(false)} />}
+
+      {/* "About this mode" — the info (i) button on each tile opens this, showing
+          the mode's illustration, name and description. Purely informational. */}
+      {info && (
+        <div className="g-modal-overlay" onClick={() => setInfo(null)}>
+          <div className="g-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="g-modal-x"
+              aria-label={t("common.close")}
+              onClick={() => setInfo(null)}
+            >
+              ×
+            </button>
+            {info.image ? (
+              <img
+                src={info.image}
+                alt=""
+                aria-hidden
+                className="mx-auto mb-3 h-28 w-28 rounded-[14px] object-contain"
+              />
+            ) : (
+              <div
+                className="mx-auto mb-3 grid h-20 w-20 place-items-center rounded-[14px]"
+                style={{ background: "radial-gradient(120% 120% at 30% 20%, #226c99, #0f3a54)" }}
+              >
+                <GameIcon name={info.icon as GameIconName} size={52} />
+              </div>
+            )}
+            <h3 className="g-modal-title">{t(info.titleKey)}</h3>
+            <p className="g-modal-sub">{t(info.textKey)}</p>
+            <button
+              type="button"
+              className="g-btn g-btn-primary w-full"
+              onClick={() => setInfo(null)}
+            >
+              {t("common.close")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Members (everyone but the host) wait here — they can see the party and
           leave, but the host leads and chooses what to play. Shows instantly
@@ -480,7 +558,11 @@ export function Lobby({
               ×
             </button>
             <h3 className="g-modal-title">
-              {selected === "duel" ? t("duel.title") : t("party.title")}
+              {selected === "duel"
+                ? t("duel.title")
+                : selected === "telephone"
+                  ? t("tel.title")
+                  : t("party.title")}
             </h3>
 
             {room ? (
@@ -500,10 +582,14 @@ export function Lobby({
                     <button
                       type="button"
                       className="g-btn g-btn-start w-full"
-                      onClick={() => void startGame(selected as "party" | "duel")}
+                      onClick={() => void startGame(selected as "party" | "duel" | "telephone")}
                       disabled={roomBusy}
                     >
-                      {selected === "duel" ? t("duel.startDuel") : t("party.startParty")}
+                      {selected === "duel"
+                        ? t("duel.startDuel")
+                        : selected === "telephone"
+                          ? t("tel.startTel")
+                          : t("party.startParty")}
                     </button>
                   </div>
                 ) : (
@@ -516,7 +602,11 @@ export function Lobby({
               <>
                 {roomError && <p className="g-modal-sub text-magenta">{roomError}</p>}
                 <p className="g-modal-sub">
-                  {selected === "duel" ? t("duel.host") : t("party.host")}
+                  {selected === "duel"
+                    ? t("duel.host")
+                    : selected === "telephone"
+                      ? t("tel.host")
+                      : t("party.host")}
                 </p>
                 <button type="button" className="g-btn g-btn-primary w-full" onClick={() => create()}>
                   {t("party.generate")}

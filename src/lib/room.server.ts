@@ -1,6 +1,7 @@
 import "server-only";
 import db from "@/lib/db";
 import { randomRoomCode } from "@/lib/room-code";
+import { chainOrder } from "@/lib/telephone";
 
 // Abandoned rooms are never explicitly closed (a host who just shuts the tab
 // leaves the row behind), so we sweep any room older than this on create. The
@@ -61,7 +62,7 @@ export type PlayerView = {
 export type RoomView = {
   code: string;
   status: string;
-  mode: string; // 'party' | 'duel'
+  mode: string; // 'party' | 'duel' | 'telephone'
   videoUploadId: string | null;
   finalUrl: string;
   // Players frozen into seats when the current game launched (0 before launch).
@@ -71,6 +72,15 @@ export type RoomView = {
   // automatic share-out. Drives who dubs which character in the studio.
   roleAssign: Record<string, number[]> | null;
   players: PlayerView[];
+  // ── Telephone Chain live state (all null/0 in party/duel) ──────────────────
+  // The chain walks the whole video one sector at a time; exactly one player is
+  // "up" at once. These let every client show "{name} is dubbing sector a/b" and
+  // hand the active player the ONE thing they're allowed to hear.
+  currentSeat: number | null; // whose turn it is now (null once the chain is done)
+  currentSegmentId: string | null; // the sector being dubbed now
+  chainTotal: number; // total turns = playable sectors (0 when not telephone)
+  chainDone: number; // turns completed so far (= the round cursor)
+  previousTakeUrl: string | null; // the previous player's take — the only cue the active player gets
 };
 
 // Coerce the loosely-typed Room.roleAssign JSON into a clean
@@ -96,6 +106,42 @@ export async function roomView(code: string): Promise<RoomView | null> {
     include: { players: { orderBy: [{ isHost: "desc" }, { createdAt: "asc" }] } },
   });
   if (!room) return null;
+
+  // Telephone Chain: derive the live cursor from the same pure turn order the
+  // submit/skip routes validate against, and surface the previous take (the only
+  // audio the active player may hear). Only touch the DB for telephone rooms so
+  // party/duel views stay a single query.
+  let currentSeat: number | null = null;
+  let currentSegmentId: string | null = null;
+  let chainTotal = 0;
+  let chainDone = 0;
+  let previousTakeUrl: string | null = null;
+  if (room.mode === "telephone" && room.videoUploadId) {
+    const segs = await db.videoSegment.findMany({
+      where: { uploadId: room.videoUploadId },
+      select: { id: true, startMs: true, endMs: true },
+    });
+    const seatUniverse = room.seatCount > 0 ? room.seatCount : room.players.length;
+    const turns = chainOrder(segs, seatUniverse);
+    chainTotal = turns.length;
+    chainDone = Math.min(room.round, chainTotal);
+    if (room.round < chainTotal) {
+      currentSeat = turns[room.round].seat;
+      currentSegmentId = turns[room.round].segmentId;
+    }
+    // The player at turn N hears turn N-1's dub. On the very first turn (or when
+    // the previous turn was skipped and left no take) there's nothing to hear.
+    if (room.round > 0 && room.round - 1 < chainTotal) {
+      const prev = await db.roomTake.findUnique({
+        where: {
+          roomCode_segmentId: { roomCode: code, segmentId: turns[room.round - 1].segmentId },
+        },
+        select: { partUrl: true },
+      });
+      previousTakeUrl = prev?.partUrl ?? null;
+    }
+  }
+
   return {
     code: room.code,
     status: room.status,
@@ -104,6 +150,11 @@ export async function roomView(code: string): Promise<RoomView | null> {
     finalUrl: room.finalUrl,
     seatCount: room.seatCount,
     roleAssign: normalizeRoleAssign(room.roleAssign),
+    currentSeat,
+    currentSegmentId,
+    chainTotal,
+    chainDone,
+    previousTakeUrl,
     players: room.players.map((p, i) => ({
       id: p.id,
       displayName: p.displayName,

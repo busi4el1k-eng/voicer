@@ -38,9 +38,9 @@ export default function PartyHome() {
   // Whether the role casting is complete enough to launch (every character has a
   // player, every player has a character). Reported by the RoleAssignPanel.
   const [castValid, setCastValid] = useState(true);
-  // Mode requested via ?mode=duel (e.g. from the library chooser). Overrides the
-  // room's current mode when the host launches; null = keep the room as-is.
-  const [intendedMode, setIntendedMode] = useState<"party" | "duel" | null>(null);
+  // Mode requested via ?mode=duel|telephone (e.g. from the library chooser).
+  // Overrides the room's current mode when the host launches; null = keep as-is.
+  const [intendedMode, setIntendedMode] = useState<"party" | "duel" | "telephone" | null>(null);
   // True when we landed here from the library with a video already chosen
   // (?code=…). In that case the code-search bar is pointless, so we hide it.
   const [fromLibrary, setFromLibrary] = useState(false);
@@ -56,6 +56,8 @@ export default function PartyHome() {
   // instantly, before the room fetch resolves.
   const isMember = inRoom && !isHost;
   const isDuel = intendedMode === "duel" || (intendedMode == null && room?.mode === "duel");
+  const isTelephone =
+    intendedMode === "telephone" || (intendedMode == null && room?.mode === "telephone");
   const partyCount = room ? room.players.length : null;
   // Whether the party size matches the video's recommended (creator-cast) count.
   // Any size is now allowed to play — the studio shares sectors out to fit — so
@@ -64,7 +66,9 @@ export default function PartyHome() {
   const inParty = partyCount !== null && partyCount >= 1;
   // Show the "cast the roles" left window once the host has found a video and
   // gathered a party. Members see the waiting view instead, so it's host-side.
-  const showAssign = !isMember && !!video && inParty;
+  // Telephone has no character casting (turns go round-robin over sectors), so
+  // skip the panel entirely there — same spirit as duel skipping it internally.
+  const showAssign = !isMember && !!video && inParty && !isTelephone;
 
   // Once the host launches (room flips to "dubbing"), the host and every waiting
   // member follow into the studio together. Also covers "finished" so a late
@@ -130,7 +134,7 @@ export default function PartyHome() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
-    if (m === "duel" || m === "party") setIntendedMode(m);
+    if (m === "duel" || m === "party" || m === "telephone") setIntendedMode(m);
     const c = params.get("code");
     if (!c) return;
     setFromLibrary(true);
@@ -149,8 +153,16 @@ export default function PartyHome() {
       </div>
       <div className="flex h-[92px] items-center">
         <h1 className="g-logo">
-          {isDuel ? "Duel" : "Party"}
-          <em>Dub</em>
+          {isTelephone ? (
+            <>
+              Gartic<em>Phone</em>
+            </>
+          ) : (
+            <>
+              {isDuel ? "Duel" : "Party"}
+              <em>Dub</em>
+            </>
+          )}
         </h1>
       </div>
 
@@ -365,7 +377,9 @@ export default function PartyHome() {
                         ? t("cast.finish")
                         : isDuel
                           ? t("duel.startEveryone")
-                          : t("ppick.startEveryone")}
+                          : isTelephone
+                            ? t("tel.startEveryone")
+                            : t("ppick.startEveryone")}
               </button>
 
               {video.lines > 0 && !inParty && (
@@ -382,9 +396,20 @@ export default function PartyHome() {
                   {t("duel.pickNote")}
                 </p>
               )}
+              {/* Telephone: everyone dubs down the chain in turn — no casting. */}
+              {video.lines > 0 && inParty && isTelephone && (
+                <p className="text-center text-[13px] leading-[1.5] text-sun">
+                  {t("tel.pickNote")}
+                </p>
+              )}
               {/* Party: non-blocking heads-up when the size differs from the cast
                   count — fewer players double up characters, more players share. */}
-              {video.lines > 0 && inParty && !isDuel && !partyMatches && partyCount !== null && (
+              {video.lines > 0 &&
+                inParty &&
+                !isDuel &&
+                !isTelephone &&
+                !partyMatches &&
+                partyCount !== null && (
                 <p className="text-center text-[13px] leading-[1.5] text-sun">
                   {partyCount < video.players
                     ? t("ppick.fewerOk", { a: partyCount, b: video.players })

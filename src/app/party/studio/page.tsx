@@ -47,7 +47,7 @@ export default function PartyStudioPage() {
   const mic = useMic();
   const { t } = useI18n();
   const { dialog, confirm } = useAppDialog();
-  const { room, playerId, inRoom, isHost, hydrated, restart } = useRoom({
+  const { room, playerId, inRoom, isHost, hydrated, restart, skip } = useRoom({
     displayName: "",
     avatarColor: "",
   });
@@ -72,12 +72,18 @@ export default function PartyStudioPage() {
   const [videoSaved, setVideoSaved] = useState(false);
   const [playersSaved, setPlayersSaved] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  // Telephone Chain: single take submit-in-flight + a per-turn age (seconds) that
+  // gates when the "skip stuck turn" and "assemble" fallbacks appear.
+  const [sending, setSending] = useState(false);
+  const [turnAge, setTurnAge] = useState(0);
 
   const stageRef = useRef<VideoStageHandle>(null);
   const pcmRef = useRef<Pcm | null>(null);
   const takesRef = useRef<Record<string, RecordResult>>({});
   const capRef = useRef<number | null>(null); // auto-stop timer (sector-length cap)
   const countdownRef = useRef<number | null>(null); // pre-record 3-2-1 ticker
+  const prevAudioRef = useRef<HTMLAudioElement | null>(null); // telephone "hear previous"
+  const renderKickedRef = useRef(false); // telephone: auto-assemble fires once per game
 
   const isDuel = room?.mode === "duel";
   const me = room?.players.find((p) => p.id === playerId);
@@ -111,6 +117,32 @@ export default function PartyStudioPage() {
   // the SAME way here as the server does in submit.
   const seatCount = room ? (room.seatCount > 0 ? room.seatCount : room.players.length) : 0;
 
+  // ── Telephone Chain: server-driven turn state ──────────────────────────────
+  // One player is "up" at a time; everyone else waits. All of this comes from the
+  // room view (lib/room.server derives it from the pure chain order), so there's
+  // no client turn logic to get out of sync.
+  const isTelephone = room?.mode === "telephone";
+  const chainTotal = room?.chainTotal ?? 0;
+  const chainDone = room?.chainDone ?? 0;
+  const chainComplete = isTelephone && chainTotal > 0 && chainDone >= chainTotal;
+  const isMyTurn =
+    isTelephone && room?.currentSeat != null && room.currentSeat === mySeat && !chainComplete;
+  const hasPrev = !!room?.previousTakeUrl; // the one cue the active player gets
+  const telSeg =
+    isTelephone && video && room?.currentSegmentId
+      ? (video.segments.find((s) => s.id === room.currentSegmentId) ?? null)
+      : null;
+  const activePlayer =
+    isTelephone && room ? (room.players.find((p) => p.seat === room.currentSeat) ?? null) : null;
+  // Round-robin seat = (order % seatCount) + 1; the next turn's order is chainDone+1.
+  const nextSeat = seatCount > 0 ? ((chainDone + 1) % seatCount) + 1 : 0;
+  const amNext = isTelephone && !chainComplete && chainDone + 1 < chainTotal && nextSeat === mySeat;
+  const chainFrac = chainTotal > 0 ? Math.min(1, chainDone / chainTotal) : 0;
+  // Grace before offering to skip a stuck turn / manually assemble, so a brief
+  // pause never triggers them. `turnAge` resets each turn (effect below).
+  const canSkip = isTelephone && !chainComplete && turnAge >= 18;
+  const showAssembleFallback = !!chainComplete && turnAge >= 12;
+
   // Load the room's video, then keep only the sectors this seat was assigned.
   // The assignment adapts to the party size (see lib/party-assign): with fewer
   // players than characters a seat covers several roles; with more, a character
@@ -126,6 +158,20 @@ export default function PartyStudioPage() {
         const d = (await r.json()) as { video: Video };
         if (cancelled) return;
         setVideo(d.video);
+
+        // Telephone Chain: no per-seat split — the whole video is one sequential
+        // chain. Keep every playable sector (timeline order); the current turn's
+        // sector is chosen server-side (room.currentSegmentId), not a local cursor.
+        if (room?.mode === "telephone") {
+          setSegs(
+            d.video.segments
+              .filter((s) => s.endMs > s.startMs)
+              .slice()
+              .sort((a, b) => a.startMs - b.startMs || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+          );
+          setPhase("run");
+          return;
+        }
 
         const seats = Array.from({ length: seatCount }, (_, i) => i + 1);
         // Honor the host's manual casting when set; otherwise the automatic
@@ -181,11 +227,15 @@ export default function PartyStudioPage() {
     setVideoReady(false);
     setErr("");
     setRenderBusy(false);
+    renderKickedRef.current = false;
     setVideoSaved(false);
     setPlayersSaved(false);
   }, [room?.videoUploadId]);
 
-  // Decode the source once and precompute each of my sectors' original envelope.
+  // Decode the source once and precompute each sector's original envelope. Every
+  // mode uses this — including Telephone, where it's the on-screen "original
+  // soundwave" the player times their dub against (they still can't HEAR the
+  // original; the envelope is only a visual timing guide).
   useEffect(() => {
     if (!video?.sourceUrl || segs.length === 0) return;
     (async () => {
@@ -376,6 +426,133 @@ export default function PartyStudioPage() {
     }
   }, [room, playerId, t]);
 
+  // ── Telephone Chain: turn recording + submit ───────────────────────────────
+  // Stop capture and keep the take (waveform best-effort). Keyed on the
+  // server-chosen sector (telSeg), not the party's local cursor.
+  const telStopRec = useCallback(async () => {
+    if (capRef.current != null) {
+      clearTimeout(capRef.current);
+      capRef.current = null;
+    }
+    if (!telSeg) return;
+    const take = await mic.stopRec();
+    if (!take) return;
+    takesRef.current[telSeg.id] = take;
+    setTakes({ ...takesRef.current });
+    try {
+      const pcm = await decodeAudio(take.blob);
+      setTakeWave((p) => ({ ...p, [telSeg.id]: pcm.data }));
+    } catch {
+      /* keep the recording even if we can't draw its waveform */
+    }
+  }, [telSeg, mic]);
+
+  const telStartRec = useCallback(async () => {
+    if (!telSeg) return;
+    if (!mic.ready) await mic.open();
+    mic.startRec();
+    // Recording only arms the mic — it never auto-plays the sector (same as the
+    // solo/party dub). The player scrubs/plays the video themselves (it's muted on
+    // blind turns), so pressing Record / Re-Record never blasts the original audio.
+    if (capRef.current != null) clearTimeout(capRef.current);
+    const maxMs = Math.max(300, telSeg.endMs - telSeg.startMs);
+    capRef.current = window.setTimeout(() => void telStopRec(), maxMs);
+  }, [telSeg, mic, telStopRec]);
+
+  const telBeginCountdown = useCallback(() => {
+    if (!telSeg || countdownRef.current != null || mic.recording) return;
+    if (!mic.ready) void mic.open();
+    let n = 3;
+    setCountdown(n);
+    countdownRef.current = window.setInterval(() => {
+      n -= 1;
+      if (n <= 0) {
+        if (countdownRef.current != null) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
+        setCountdown(null);
+        void telStartRec();
+      } else {
+        setCountdown(n);
+      }
+    }, 1000);
+  }, [telSeg, mic, telStartRec]);
+
+  // The one cue the active player gets: the previous player's take (never the
+  // original, never the script).
+  const hearPrev = useCallback(() => {
+    const url = room?.previousTakeUrl;
+    if (!url) return;
+    prevAudioRef.current?.pause();
+    const a = new Audio(url);
+    prevAudioRef.current = a;
+    void a.play().catch(() => {});
+  }, [room?.previousTakeUrl]);
+
+  const playTelTake = useCallback(() => {
+    const take = telSeg ? takesRef.current[telSeg.id] : undefined;
+    if (!take) return;
+    void new Audio(take.url).play().catch(() => {});
+  }, [telSeg]);
+
+  // Upload the single take for this turn; the server advances the cursor and
+  // everyone's stream flips to the next player.
+  const sendTurn = useCallback(async () => {
+    if (!telSeg || !room || !playerId) return;
+    const take = takesRef.current[telSeg.id];
+    if (!take) {
+      setErr(t("tel.recordFirst"));
+      return;
+    }
+    setErr("");
+    setSending(true);
+    try {
+      const fd = new FormData();
+      fd.append("code", room.code);
+      fd.append("playerId", playerId);
+      fd.append(`take:${telSeg.id}`, take.blob, `${telSeg.id}.webm`);
+      const r = await fetch("/api/room/submit", { method: "POST", body: fd });
+      if (!r.ok) throw new Error((await r.json()).error || t("tel.sendFailed"));
+      // Turn passes via the live stream; drop the local take so a later turn of
+      // mine in the same chain starts clean.
+      delete takesRef.current[telSeg.id];
+      setTakes({ ...takesRef.current });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t("tel.sendFailed"));
+    } finally {
+      setSending(false);
+    }
+  }, [telSeg, room, playerId, t]);
+
+  // Age the current turn (seconds) so the skip/assemble fallbacks can surface
+  // after a grace period. Resets whenever the cursor moves or the chain finishes.
+  useEffect(() => {
+    if (!isTelephone) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTurnAge(0);
+    const id = setInterval(() => setTurnAge((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [isTelephone, chainDone, chainComplete]);
+
+  // Telephone ends with everyone on a waiting screen, so no one is poised to press
+  // "render". Elect ONE client to auto-assemble (host if present, else lowest
+  // seat), guarded to fire once. If that client vanished, a manual button appears
+  // for everyone after a short grace (showAssembleFallback).
+  useEffect(() => {
+    if (!isTelephone || !chainComplete || !room) return;
+    if (room.finalUrl || renderBusy || renderKickedRef.current) return;
+    const host = room.players.find((p) => p.isHost);
+    const elected = host ?? [...room.players].sort((a, b) => a.seat - b.seat)[0];
+    if (elected && elected.id === playerId) {
+      renderKickedRef.current = true;
+      // Kicking the render sets renderBusy; that's the intended one-shot side
+      // effect of the chain completing (guarded above so it fires exactly once).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void renderFinal();
+    }
+  }, [isTelephone, chainComplete, room, renderBusy, playerId, renderFinal]);
+
   // Leaving is per-player: whoever taps this just goes to their own dashboard.
   // The host no longer resets the room on the way out, so the party stays
   // "finished" — every other player keeps their result screen and leaves on
@@ -447,6 +624,7 @@ export default function PartyStudioPage() {
   const isRunView =
     !showResult &&
     phase !== "error" &&
+    !isTelephone &&
     !mySubmitted &&
     phase !== "submitting" &&
     phase !== "empty" &&
@@ -484,6 +662,247 @@ export default function PartyStudioPage() {
       ))}
     </div>
   );
+
+  // Telephone roster — like `roster` but ordered by seat and highlighting who's
+  // dubbing now / up next, so the wait screen reads as a live turn queue.
+  const telRoster = room && (
+    <div className="flex flex-col gap-2">
+      {[...room.players]
+        .sort((a, b) => a.seat - b.seat)
+        .map((p) => {
+          const dubbing = p.seat === room.currentSeat && !chainComplete;
+          const up = p.seat === nextSeat && !chainComplete && chainDone + 1 < chainTotal;
+          return (
+            <div
+              key={p.id}
+              className={`flex items-center gap-3 rounded-[10px] px-4 py-3 ${
+                dubbing ? "bg-sun/15 shadow-[inset_0_0_0_2px_rgba(247,148,29,0.6)]" : "bg-white/5"
+              }`}
+            >
+              <span
+                className="grid h-8 w-8 flex-none place-items-center rounded-[8px] font-display text-[14px] font-black text-white"
+                style={{ backgroundColor: p.avatarColor }}
+              >
+                {p.displayName.charAt(0).toUpperCase()}
+              </span>
+              <span className="flex-1 truncate font-display text-[14px] font-bold text-cream">
+                {p.displayName}
+                {p.id === playerId && <span className="text-cream/50"> {t("common.you")}</span>}
+                {p.isHost && (
+                  <span className="ml-2 rounded-[6px] bg-sun px-2 py-0.5 font-display text-[10px] font-black uppercase text-ink">
+                    {t("common.host")}
+                  </span>
+                )}
+              </span>
+              <span
+                className={`font-display text-[11px] font-bold uppercase tracking-[0.06em] ${
+                  dubbing ? "text-sun" : up ? "text-mint" : "text-cream/40"
+                }`}
+              >
+                {dubbing
+                  ? t("tel.dubbing")
+                  : up
+                    ? t("tel.upNext")
+                    : chainComplete
+                      ? t("pstud.finished")
+                      : t("tel.waiting")}
+              </span>
+            </div>
+          );
+        })}
+    </div>
+  );
+
+  // The whole Telephone Chain studio: assemble (chain done) → your blind turn →
+  // waiting for whoever's up. The finished video reuses the party result panel
+  // (telephone finishes into room.finalUrl exactly like a co-op dub).
+  const telephoneView = (() => {
+    if (chainComplete) {
+      return (
+        <div className="g-panel text-center">
+          <h2 className="g-title">{t("tel.chainDone")}</h2>
+          <p className="mb-4 text-[13px] text-cream/60">{t("tel.chainDoneBody")}</p>
+          {telRoster}
+          <div className="mt-5 flex flex-col items-center gap-2 border-t border-cream/10 pt-4">
+            {renderBusy || !showAssembleFallback ? (
+              <p className="flex items-center gap-2 text-[13px] text-cream/70">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-cream/25 border-t-mint" />
+                {t("tel.assembling")}
+              </p>
+            ) : (
+              <button
+                className="g-btn g-btn-start w-full"
+                disabled={renderBusy}
+                onClick={() => void renderFinal()}
+              >
+                {t("tel.assemble")}
+              </button>
+            )}
+            {err && <p className="text-[13px] text-magenta">{err}</p>}
+          </div>
+        </div>
+      );
+    }
+
+    if (isMyTurn) {
+      return (
+        <div className="mx-auto w-full max-w-2xl">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-display text-[14px] font-bold uppercase tracking-[0.1em] text-sun">
+              {t("tel.yourTurn")}
+            </span>
+            <span className="font-display text-[13px] font-bold uppercase tracking-[0.08em] text-cream/50">
+              {t("tel.turnOf", { a: chainDone + 1, b: chainTotal })}
+            </span>
+          </div>
+          {!telSeg ? (
+            <div className="g-panel text-center">
+              <p className="text-cream/60">{t("game.loading")}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="g-panel">
+                <div className="relative">
+                  <VideoStage
+                    ref={stageRef}
+                    src={video?.sourceUrl}
+                    sector={{ startMs: telSeg.startMs, endMs: telSeg.endMs }}
+                    muted={hasPrev}
+                    onReadyChange={setVideoReady}
+                  />
+                  {counting && countdown != null && <ClapperCountdown count={countdown} />}
+                </div>
+                <p className="mt-2 text-center font-display text-[12px] uppercase tracking-[0.08em] text-cream/45">
+                  {fmt(telSeg.startMs)} – {fmt(telSeg.endMs)} · {t("game.spaceHint")}
+                </p>
+              </div>
+
+              {/* The one cue — hear the previous player, or the seed/skip note. */}
+              <div className="g-panel">
+                {hasPrev ? (
+                  <>
+                    <p className="mb-3 text-center text-[13px] leading-[1.5] text-cream/70">
+                      {t("tel.hearPrevHint")}
+                    </p>
+                    <button
+                      onClick={hearPrev}
+                      disabled={busy}
+                      className="g-btn g-btn-primary w-full"
+                    >
+                      {t("tel.hearPrev")}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-center text-[13px] leading-[1.5] text-mint">
+                    {chainDone === 0 ? t("tel.firstHint") : t("tel.prevSkipped")}
+                  </p>
+                )}
+              </div>
+
+              {/* Recorder — shows the original soundwave (visual timing guide) +
+                  the live mic / your take, same as the solo & party dub. */}
+              <div className="g-panel">
+                <RecorderWave
+                  original={origWave[telSeg.id]}
+                  take={takeWave[telSeg.id]}
+                  recording={mic.recording}
+                  getLevel={mic.getLevel}
+                  durationMs={telSeg.endMs - telSeg.startMs}
+                />
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <button
+                    onClick={() =>
+                      mic.recording
+                        ? void telStopRec()
+                        : counting
+                          ? cancelCountdown()
+                          : telBeginCountdown()
+                    }
+                    disabled={!videoReady && !mic.recording && !counting}
+                    className={`g-btn h-11 text-[14px] disabled:opacity-60 ${
+                      mic.recording || counting ? "bg-magenta text-cream" : "g-btn-start"
+                    }`}
+                  >
+                    {!videoReady && !mic.recording && !counting
+                      ? t("game.loadingScene")
+                      : mic.recording
+                        ? t("game.stop")
+                        : counting
+                          ? t("game.startingIn", { n: countdown ?? "" })
+                          : takes[telSeg.id]
+                            ? t("game.reRecord")
+                            : t("game.record")}
+                  </button>
+                  <button
+                    onClick={playTelTake}
+                    disabled={!takes[telSeg.id] || busy}
+                    className="g-btn g-btn-ghost h-11 text-[14px]"
+                  >
+                    {t("game.myTake")}
+                  </button>
+                  <button
+                    onClick={() => void sendTurn()}
+                    disabled={!takes[telSeg.id] || busy || sending}
+                    className="g-btn g-btn-primary col-span-2 h-11 text-[14px] sm:col-span-1"
+                  >
+                    {sending ? t("tel.sending") : t("tel.sendTurn")}
+                  </button>
+                </div>
+                {mic.error && <p className="mt-3 text-[13px] text-magenta">{mic.error}</p>}
+                {err && <p className="mt-3 text-[13px] text-magenta">{err}</p>}
+              </div>
+
+              <button
+                onClick={() => void skip()}
+                className="mx-auto text-[13px] text-cream/50 underline"
+              >
+                {t("tel.passMine")}
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Waiting for whoever's up — the "please wait" screen the whole party sees.
+    return (
+      <div className="g-panel text-center">
+        <div
+          className="mx-auto mb-2 grid h-14 w-14 place-items-center rounded-full font-display text-[24px] font-black text-white"
+          style={{ backgroundColor: activePlayer?.avatarColor ?? "rgba(255,255,255,0.12)" }}
+        >
+          {activePlayer ? activePlayer.displayName.charAt(0).toUpperCase() : ""}
+        </div>
+        <h2 className="g-title">
+          {activePlayer ? t("tel.nowDubbing", { name: activePlayer.displayName }) : t("game.loading")}
+        </h2>
+        <p className="mb-1 font-display text-[13px] font-bold uppercase tracking-[0.08em] text-mint">
+          {t("tel.sectorProgress", { a: chainDone + 1, b: chainTotal })}
+        </p>
+        <p className="mb-4 text-[13px] leading-[1.5] text-cream/60">
+          {amNext ? t("tel.yourTurnSoon") : t("tel.waitHint")}
+        </p>
+
+        <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-mint transition-all"
+            style={{ width: `${Math.round(chainFrac * 100)}%` }}
+          />
+        </div>
+
+        {telRoster}
+
+        {canSkip && (
+          <div className="mt-5 flex flex-col items-center gap-2 border-t border-cream/10 pt-4">
+            <p className="text-[12px] text-cream/50">{t("tel.skipStuck")}</p>
+            <button onClick={() => void skip()} className="g-btn g-btn-ghost w-full">
+              {t("tel.skip", { name: activePlayer?.displayName ?? "" })}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  })();
 
   const title = video?.title || t("pstud.partyDub");
 
@@ -765,6 +1184,9 @@ export default function PartyStudioPage() {
               {leaving ? t("pstud.leaving") : t("pstud.leaveParty")}
             </button>
           </div>
+        ) : isTelephone ? (
+          // Telephone Chain: your blind turn / waiting for whoever's up / assemble.
+          telephoneView
         ) : mySubmitted || phase === "submitting" ? (
           // I've finished my sectors — wait for everyone, then the host renders.
           <div className="g-panel">

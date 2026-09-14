@@ -5,6 +5,7 @@ import { roomView } from "@/lib/room.server";
 import { emitRoom } from "@/lib/room-events";
 import { assignSectors, roleSeatsFromAssign } from "@/lib/party-assign";
 import { normalizeRoleAssign } from "@/lib/room.server";
+import { chainOrder } from "@/lib/telephone";
 import { SPACES_PREFIX, putObject, spacesConfigured } from "@/lib/spaces";
 
 export const runtime = "nodejs";
@@ -56,6 +57,52 @@ export async function POST(req: NextRequest) {
     where: { uploadId: room.videoUploadId },
     select: { id: true, player: true, startMs: true, endMs: true },
   });
+
+  // ── Telephone Chain: one turn at a time ─────────────────────────────────────
+  // Only the seat whose turn it is right now (Room.round) may submit, and only
+  // the ONE sector that turn owns. We store the take (RoomTake, same as party)
+  // then advance the cursor with a compare-and-swap so two racing submits can't
+  // both move it. On the last turn everyone is marked finished, which opens the
+  // shared party render gate — the whole chain becomes one combined video.
+  if (room.mode === "telephone") {
+    const turns = chainOrder(segments, room.seatCount > 0 ? room.seatCount : room.players.length);
+    const total = turns.length;
+    const round = room.round;
+    if (round >= total) {
+      return NextResponse.json({ error: "The chain is already complete." }, { status: 409 });
+    }
+    const turn = turns[round];
+    if (turn.seat !== seat) {
+      return NextResponse.json({ error: "It's not your turn yet." }, { status: 409 });
+    }
+    const file = form.get(`take:${turn.segmentId}`);
+    if (!(file instanceof File) || file.size === 0) {
+      return NextResponse.json({ error: "Record your take first." }, { status: 400 });
+    }
+    // Upload BEFORE advancing so a failed upload never burns the turn.
+    const buf = Buffer.from(await file.arrayBuffer());
+    const key = `${SPACES_PREFIX}rooms/${code}/takes/${turn.segmentId}.webm`;
+    const { url } = await putObject(key, buf, file.type || "audio/webm");
+    // Compare-and-swap the cursor: whoever moves it round→round+1 owns the turn.
+    // A concurrent/double submit finds it already advanced (count 0) and no-ops.
+    const advanced = await db.room.updateMany({
+      where: { code, round, status: "dubbing" },
+      data: { round: round + 1 },
+    });
+    if (advanced.count > 0) {
+      await db.roomTake.upsert({
+        where: { roomCode_segmentId: { roomCode: code, segmentId: turn.segmentId } },
+        update: { playerId, partKey: key, partUrl: url },
+        create: { roomCode: code, segmentId: turn.segmentId, playerId, partKey: key, partUrl: url },
+      });
+      // Chain complete → everyone "finished" so the party render gate opens.
+      if (round + 1 >= total) {
+        await db.roomPlayer.updateMany({ where: { roomCode: code }, data: { status: "finished" } });
+      }
+    }
+    emitRoom(code); // the mic passes to the next player on every client
+    return NextResponse.json({ room: await roomView(code) });
+  }
 
   // Which sectors this player is allowed to dub.
   //   • Party: the sector→seat assignment adapts to the party size (see

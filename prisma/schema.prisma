@@ -274,9 +274,13 @@ model Room {
   // 'lobby' (dashboard invite) | 'playing' (host picking a video on /party) |
   // 'dubbing' (everyone recording in the studio) | 'finished' (rendered)
   status    String       @default("lobby")
-  // 'party' (co-op: sectors split across seats, one combined render) |
-  // 'duel'  (1v1: BOTH players dub the whole video, each gets their own render,
-  //          winner by capture score). Additive column; existing rows are "party".
+  // 'party'     (co-op: sectors split across seats, one combined render) |
+  // 'duel'      (1v1: BOTH players dub the whole video, each gets their own
+  //             render, winner by capture score) |
+  // 'telephone' (chain: the whole video is dubbed one sector at a time, passed
+  //             seat to seat; each player hears ONLY the previous take, never the
+  //             original — reuses RoomTake + the party render, cursor is `round`).
+  // Additive free-form column; existing rows are "party".
   mode      String       @default("party")
   pack      Pack?        @relation(fields: [packId], references: [id], onDelete: SetNull)
   packId    String?
@@ -293,6 +297,9 @@ model Room {
   // voice. Null = use the automatic share-out (lib/party-assign). Set from the
   // pick-screen RoleAssignPanel; cleared when the room returns to the lobby.
   roleAssign Json?
+  // Telephone Chain cursor: the index of the turn being dubbed right now. Advances
+  // one per submit/skip (compare-and-swap); when it reaches the sector count the
+  // chain is complete. Unused by party/duel. Reset to 0 at select / reset.
   round     Int          @default(0)
   players   RoomPlayer[]
   takes     RoomTake[]

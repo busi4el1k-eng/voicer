@@ -616,9 +616,6 @@ export function LibraryBrowser({ initialVideos }: { initialVideos: Video[] }) {
             >
               ×
             </button>
-            <div className="mx-auto mb-1 grid h-12 w-12 place-items-center rounded-full bg-mint/20 text-[24px]">
-              🎬
-            </div>
             <h3 className="g-modal-title">{t("lib.chooseTitle")}</h3>
             <p className="g-modal-sub">
               {t("lib.chooseSub", { title: chosen.title || t("lib.untitled") })}
@@ -649,6 +646,19 @@ export function LibraryBrowser({ initialVideos }: { initialVideos: Video[] }) {
               }
             >
               {t("lib.duelMode")}
+            </button>
+            <button
+              type="button"
+              className="g-btn g-btn-primary w-full"
+              onClick={() =>
+                router.push(
+                  chosen.shareId
+                    ? `/party?code=${chosen.shareId}&mode=telephone`
+                    : "/party?mode=telephone",
+                )
+              }
+            >
+              {t("lib.telephoneMode")}
             </button>
           </div>
         </div>

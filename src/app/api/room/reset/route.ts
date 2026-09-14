@@ -49,7 +49,14 @@ export async function POST(req: NextRequest) {
     // video the host picks, so a stale override never leaks into a new round.
     db.room.update({
       where: { code },
-      data: { status, videoUploadId: null, finalUrl: "", roleAssign: Prisma.DbNull },
+      data: {
+        status,
+        videoUploadId: null,
+        finalUrl: "",
+        roleAssign: Prisma.DbNull,
+        // Reset the Telephone Chain cursor too (no-op for party/duel).
+        round: 0,
+      },
     }),
   ]);
   emitRoom(code);
