@@ -6,7 +6,10 @@
     "dev": "NODE_OPTIONS='--max-old-space-size=6144' next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:backup": "bash scripts/db/backup.sh",
+    "db:restore": "bash scripts/db/restore.sh",
+    "db:migrate-from-neon": "bash scripts/db/migrate-from-neon.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
