@@ -19,7 +19,7 @@ unset LC_ALL
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$REPO_ROOT"
 
-log() { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
+log() { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
 
 # Read KEY=VALUE lines without eval-ing them (values contain & and ? — sourcing would break).

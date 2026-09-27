@@ -32,20 +32,57 @@ npm run dev
 `rclone` lives in `~/.local/bin`. The old `.env.local` (Neon) is saved as
 `.env.local.bak-neon`.
 
-## Server cutover (OVH) — plan
+## Server (OVH) — live since 2026-09-27 09:38 UTC
 
-1. Add a `db` service to `docker-compose.deploy.yml`: `postgres:18`, named volume,
-   healthcheck `pg_isready`, **no public port**, `POSTGRES_USER=voicer`,
-   strong `POSTGRES_PASSWORD`. App `depends_on: db (service_healthy)`.
-2. In the server `.env`: `NEON_DATABASE_URL=<current Neon URL>`,
-   `DATABASE_URL=postgresql://voicer:<pw>@db:5432/voicer`,
-   `BACKUP_BUCKET=dubthatmovie-db-backups`, `BACKUP_PREFIX=prod`.
-3. Stop the app (so nothing is written to Neon after the snapshot), then:
-   `PG_EXEC="docker compose -f docker-compose.deploy.yml exec -T db" scripts/db/migrate-from-neon.sh`
-   Only continue if it prints `SUCCESS`.
-4. Start the app, check the site.
-5. Nightly backup — crontab on the host:
-   `15 3 * * * cd /home/ubuntu/voicer && PG_EXEC="docker compose -f docker-compose.deploy.yml exec -T db" scripts/db/backup.sh >> /var/log/voicer-db-backup.log 2>&1`
-   plus a weekly `scripts/db/restore.sh --verify`.
-6. Keep Neon untouched for a week as a fallback (rollback = put the Neon URL
-   back in `DATABASE_URL`, restart). Then update /privacy (it still names Neon).
+Production runs on the `db` service in `docker-compose.deploy.yml` (host-only file,
+backup of the pre-migration version: `docker-compose.deploy.yml.bak-neon-20260927`):
+
+```yaml
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    cpuset: "3-5"            # app cores — never competes with Demucs (0-2)
+    mem_limit: 2g
+    shm_size: 256m
+    stop_grace_period: 60s
+    environment:
+      - POSTGRES_USER=voicer
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      - POSTGRES_DB=voicer
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C.UTF-8 --locale-provider=builtin --builtin-locale=C.UTF-8
+      - TZ=UTC
+    volumes:
+      - pgdata:/var/lib/postgresql   # postgres:18 keeps PGDATA in 18/docker under here
+    expose:
+      - "5432"                       # compose network only, no public port
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voicer -d voicer"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+```
+
+`voicer-web` has `depends_on: db: condition: service_healthy`.
+Server `.env`: `DATABASE_URL=postgresql://voicer:<POSTGRES_PASSWORD>@db:5432/voicer`,
+`POSTGRES_PASSWORD`, `NEON_DATABASE_URL` (old, frozen), `BACKUP_BUCKET=dubthatmovie-db-backups`,
+`BACKUP_PREFIX=prod`. Pre-migration `.env`: `.env.bak-neon-20260927`.
+
+Cron (`crontab -l` as ubuntu), logs in `~/logs/`:
+
+```
+PATH=/usr/local/bin:/usr/bin:/bin
+15 */6 * * *  cd /home/ubuntu/voicer && PG_EXEC="docker compose -f docker-compose.deploy.yml exec -T db" scripts/db/backup.sh >> /home/ubuntu/logs/db-backup.log 2>&1
+45 4 * * 0    cd /home/ubuntu/voicer && PG_EXEC="docker compose -f docker-compose.deploy.yml exec -T db" scripts/db/restore.sh --verify >> /home/ubuntu/logs/db-restore-verify.log 2>&1
+```
+
+Run any tool by hand the same way, e.g.
+`cd ~/voicer && PG_EXEC="docker compose -f docker-compose.deploy.yml exec -T db" scripts/db/restore.sh --list`
+
+**Gotcha:** `docker compose exec -T` reads stdin — never pipe a script into
+`ssh host bash -s` that calls it (it swallows the rest of the script). Copy the
+script over and run it as a file, or add `</dev/null`.
+
+**Rollback:** Neon is frozen at the cutover and does NOT receive new data. Going back
+means copying the self-hosted db back into Neon first (pg_dump db → pg_restore into
+Neon), then `DATABASE_URL=$NEON_DATABASE_URL` and `docker compose … up -d voicer-web`.
+Neon can be deleted once you're confident (it's no longer used).
